@@ -16,7 +16,7 @@ def setup_ddns(entry_domain, entry_hash, host_ip):
     ddns_package_url = os.environ.get('DDNS_PACKAGE_URL')
     target, domain = entry_domain.split('.', 1)
 
-    run('yum install -y {}'.format(ddns_package_url))
+    run('yum localinstall -y {}'.format(ddns_package_url))
     run('echo "{} {} {}" >> /etc/redhat-ddns/hosts'.format(
         target, domain, entry_hash))
     run('echo "127.0.0.1 {} localhost" > /etc/hosts'.format(entry_domain))
