@@ -1,4 +1,5 @@
 import os
+import sys
 import time
 
 from fabric.api import execute, put, run
@@ -142,3 +143,56 @@ def reservation():
     domain = '{target_image}.{vm_domain}'.format(**options)
 
     execute(setup_ddns, domain, options['ddns_hash'], vm_ip, host=vm_ip)
+
+
+def install_nightly(admin_password=None):
+    """Task to install Foreman nightly using katello-deploy script"""
+    if admin_password is None:
+        admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme')
+
+    distro = os.environ.get('DISTRO')
+
+    if distro is None:
+        print 'The DISTRO environment variable should be defined'
+        sys.exit(1)
+
+    if distro.startswith('rhel'):
+        rhn_info = {
+            'rhn_username': os.environ.get('RHN_USERNAME'),
+            'rhn_password': os.environ.get('RHN_PASSWORD'),
+            'rhn_poolid': os.environ.get('RHN_POOLID'),
+        }
+        os_version = distro[4]
+
+        if any([value is None for _, value in rhn_info.items()]):
+            print('One of RHN_USERNAME, RHN_PASSWORD, RHN_POOLID environment '
+                  'variables is not defined')
+            sys.exit(1)
+
+        run('subscription-manager register --force --user={0[rhn_username]} '
+            '--password={0[rhn_password]}'.format(rhn_info))
+        run('subscription-manager subscribe --pool={0[rhn_poolid]}'.format(
+            rhn_info))
+
+    run('yum repolist')
+    # Make sure to have yum-utils installed
+    run('yum install -y yum-utils')
+    run('yum-config-manager --disable "*"')
+    run('yum-config-manager --enable "rhel-{0}-server-rpms"'.format(
+        os_version))
+    run('yum-config-manager --enable "rhel-server-rhscl-{0}-rpms"'.format(
+        os_version))
+    # Install required packages for the installation
+    run('yum install -y git ruby java-1.7.0-openjdk')
+
+    run('if [ -d katello-deploy ]; then rm -rf katello-deploy; fi')
+    run('git clone https://github.com/Katello/katello-deploy.git')
+
+    run('setenforce 0')
+    run('cd katello-deploy && ./setup.rb --skip-installer rhel6')
+    run('katello-installer -v -d --foreman-admin-password="{0}"'.format(
+        admin_password))
+    run('service iptables stop')
+
+    # Ensure that the installer worked
+    run('hammer -u admin -p {0} ping'.format(admin_password))
