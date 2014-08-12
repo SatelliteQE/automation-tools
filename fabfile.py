@@ -196,3 +196,84 @@ def install_nightly(admin_password=None):
 
     # Ensure that the installer worked
     run('hammer -u admin -p {0} ping'.format(admin_password))
+
+
+def install_satellite(admin_password=None):
+    """Task to install Satellite 6"""
+    if admin_password is None:
+        admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme')
+
+    distro = os.environ.get('DISTRO')
+
+    if distro is None:
+        print 'The DISTRO environment variable should be defined'
+        sys.exit(1)
+
+    base_url = os.environ.get('BASE_URL')
+
+    if base_url is None:
+        print 'The BASE_URL environment variable should be defined'
+        sys.exit(1)
+
+    satellite_repo = StringIO()
+    satellite_repo.write('[satellite]\n')
+    satellite_repo.write('name=satellite\n')
+    satellite_repo.write('baseurl={0}\n'.format(base_url))
+    satellite_repo.write('enabled=1\n')
+    satellite_repo.write('gpgcheck=0\n')
+    put(local_path=satellite_repo,
+        remote_path='/etc/yum.repos.d/satellite.repo')
+    satellite_repo.close()
+
+    if distro.startswith('rhel'):
+        rhn_info = {
+            'rhn_username': os.environ.get('RHN_USERNAME'),
+            'rhn_password': os.environ.get('RHN_PASSWORD'),
+            'rhn_poolid': os.environ.get('RHN_POOLID'),
+        }
+        os_version = distro[4]
+
+        if any([value is None for _, value in rhn_info.items()]):
+            print('One of RHN_USERNAME, RHN_PASSWORD, RHN_POOLID environment '
+                  'variables is not defined')
+            sys.exit(1)
+
+        run('subscription-manager register --force --user={0[rhn_username]} '
+            '--password={0[rhn_password]}'.format(rhn_info))
+        run('subscription-manager subscribe --pool={0[rhn_poolid]}'.format(
+            rhn_info))
+
+    run('yum repolist')
+    # Make sure to have yum-utils installed
+    run('rm -rf /etc/yum.repos.d/beaker-*')
+    run('rm -rf /var/cache/yum*')
+
+    if distro.startswith('rhel7'):
+        run('sed -i -e "s/enabled.*/enabled=0/" '
+            '/etc/yum/pluginconf.d/subscription-manager.conf')
+        run('sed -i -e "s/enabled.*/enabled = 0/g" '
+            '/etc/yum.repos.d/redhat.repo')
+
+    run('yum clean all')
+    run('yum install -y yum-utils')
+    run('yum-config-manager --disable "*"')
+    run('yum-config-manager --enable "rhel-{0}-server-rpms"'.format(
+        os_version))
+    run('yum-config-manager --enable "rhel-server-rhscl-{0}-rpms"'.format(
+        os_version))
+    run('yum-config-manager --enable satellite')
+    run('yum repolist')
+
+    # Install required packages for the installation
+    run('yum install -y java-1.7.0-openjdk katello libvirt')
+
+    run('setenforce 0')
+    run('katello-installer -v -d --foreman-admin-password="{0}"'.format(
+        admin_password))
+    run('service iptables stop')
+
+    if distro.startswith('rhel7'):
+        run('service firewalld stop')
+
+    # Ensure that the installer worked
+    run('hammer -u admin -p {0} ping'.format(admin_password))
