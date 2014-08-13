@@ -297,3 +297,14 @@ def reservation_install_nightly(admin_password=None):
     execute(reservation)
     execute(setup_ddns, env['vm_domain'], env['vm_ip'], host=env['vm_ip'])
     execute(install_nightly, admin_password, host=env['vm_ip'])
+
+
+def partition_disk():
+    """Re-partitions disk to increase the size of /root to handle
+    synchronization of larger repositories.
+
+    """
+    run('umount /home')
+    run('lvremove /dev/mapper/*home')
+    run('lvresize -l +100%FREE /dev/mapper/*root')
+    run('if uname -r | grep -q el6; then resize2fs /; else xfs_growfs /; fi')
