@@ -2,11 +2,11 @@ import os
 import sys
 import time
 
-from fabric.api import execute, put, run
+from fabric.api import env, execute, put, run
 from StringIO import StringIO
 
 
-def setup_ddns(entry_domain, entry_hash, host_ip):
+def setup_ddns(entry_domain, host_ip):
     """Task to setup DDNS client
 
     :param str entry_domain: the FQDN of the host
@@ -14,12 +14,21 @@ def setup_ddns(entry_domain, entry_hash, host_ip):
     :param str host_ip: host IP address
 
     """
+    ddns_hash = os.environ.get('DDNS_HASH'),
+    if ddns_hash is None:
+        print 'The DDNS_HASH environment variable should be defined'
+        sys.exit(1)
+
     ddns_package_url = os.environ.get('DDNS_PACKAGE_URL')
+    if ddns_package_url is None:
+        print 'The DDNS_PACKAGE_URL environment variable should be defined'
+        sys.exit(1)
+
     target, domain = entry_domain.split('.', 1)
 
     run('yum localinstall -y {}'.format(ddns_package_url))
     run('echo "{} {} {}" >> /etc/redhat-ddns/hosts'.format(
-        target, domain, entry_hash))
+        target, domain, ddns_hash))
     run('echo "127.0.0.1 {} localhost" > /etc/hosts'.format(entry_domain))
     run('echo "{} {}" >> /etc/hosts'.format(
         host_ip, domain))
@@ -104,7 +113,7 @@ def setup_http_proxy():
         ))
 
 
-def reservation():
+def reservation(data=None):
     """Task to provision a VM using snap-guest based on a ``SOURCE_IMAGE`` base
     image.
 
@@ -120,12 +129,13 @@ def reservation():
     The VM will have the TARGET_IMAGE.VM_DOMAIN hostname, but make sure to have
     setup DDND entry correctly.
 
+    This task will add to the ``env`` the vm_ip and vm_domain
+
     """
     options = {
         'vm_ram': os.environ.get('VM_RAM'),
         'vm_cpu': os.environ.get('VM_CPU'),
         'vm_domain': os.environ.get('VM_DOMAIN'),
-        'ddns_hash': os.environ.get('DDNS_HASH'),
         'source_image': os.environ.get('SOURCE_IMAGE'),
         'target_image': os.environ.get('TARGET_IMAGE'),
     }
@@ -138,11 +148,9 @@ def reservation():
 
     result = run('ping -c 1 {}.local'.format(
         options['target_image']))
-    vm_ip = result.split('(')[1].split(')')[0]
 
-    domain = '{target_image}.{vm_domain}'.format(**options)
-
-    execute(setup_ddns, domain, options['ddns_hash'], vm_ip, host=vm_ip)
+    env['vm_ip'] = result.split('(')[1].split(')')[0]
+    env['vm_domain'] = '{target_image}.{vm_domain}'.format(**options)
 
 
 def install_nightly(admin_password=None):
@@ -277,3 +285,15 @@ def install_satellite(admin_password=None):
 
     # Ensure that the installer worked
     run('hammer -u admin -p {0} ping'.format(admin_password))
+
+
+def reservation_install_nightly(admin_password=None):
+    """Task to execute reservation, setup_ddns and install_nightly
+
+    The ``admin_password`` parameter will be passed to the install_nightly
+    task.
+
+    """
+    execute(reservation)
+    execute(setup_ddns, env['vm_domain'], env['vm_ip'], host=env['vm_ip'])
+    execute(install_nightly, admin_password, host=env['vm_ip'])
