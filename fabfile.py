@@ -14,7 +14,7 @@ def setup_ddns(entry_domain, host_ip):
     :param str host_ip: host IP address
 
     """
-    ddns_hash = os.environ.get('DDNS_HASH'),
+    ddns_hash = os.environ.get('DDNS_HASH')
     if ddns_hash is None:
         print 'The DDNS_HASH environment variable should be defined'
         sys.exit(1)
@@ -26,12 +26,12 @@ def setup_ddns(entry_domain, host_ip):
 
     target, domain = entry_domain.split('.', 1)
 
-    run('yum localinstall -y {}'.format(ddns_package_url))
-    run('echo "{} {} {}" >> /etc/redhat-ddns/hosts'.format(
+    run('yum localinstall -y {0}'.format(ddns_package_url))
+    run('echo "{0} {1} {2}" >> /etc/redhat-ddns/hosts'.format(
         target, domain, ddns_hash))
-    run('echo "127.0.0.1 {} localhost" > /etc/hosts'.format(entry_domain))
-    run('echo "{} {}" >> /etc/hosts'.format(
-        host_ip, domain))
+    run('echo "127.0.0.1 {0} localhost" > /etc/hosts'.format(entry_domain))
+    run('echo "{0} {1}" >> /etc/hosts'.format(
+        host_ip, entry_domain))
     run('redhat-ddns-client enable')
     run('redhat-ddns-client')
 
