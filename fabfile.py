@@ -152,10 +152,14 @@ def reservation():
     env['vm_domain'] = '{target_image}.{vm_domain}'.format(**options)
 
 
-def install_nightly(admin_password=None):
+def install_nightly(admin_password=None, org_name=None, loc_name=None):
     """Task to install Foreman nightly using katello-deploy script"""
     if admin_password is None:
         admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme')
+    if org_name is None:
+        org_name = os.environ.get('ORGANIZATION_NAME', 'Default_Organization')
+    if loc_name is None:
+        org_name = os.environ.get('LOCATION_NAME', 'Default_Location')
 
     distro = os.environ.get('DISTRO')
 
@@ -198,9 +202,11 @@ def install_nightly(admin_password=None):
     # Make sure that SELinux is enabled
     run('setenforce 1')
     run('cd katello-deploy && ./setup.rb --skip-installer rhel6')
-    run('katello-installer -v -d --foreman-admin-password="{0}"'.format(
-        admin_password))
-    run('service iptables stop')
+    run('katello-installer -v -d '
+        '--foreman-admin-password="{0}" '
+        '--foreman-initial-organization="{1}" '
+        '--foreman-initial-location="{2}"'
+        ''.format(admin_password, org_name, loc_name))
 
     # Ensure that the installer worked
     run('hammer -u admin -p {0} ping'.format(admin_password))
