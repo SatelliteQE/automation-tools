@@ -258,9 +258,9 @@ def install_satellite(admin_password=None):
     run('rm -rf /var/cache/yum*')
 
     if distro.startswith('rhel7'):
-        run('sed -i -e "s/enabled.*/enabled=0/" '
+        run('sed -i -e "s/^enabled.*/enabled=0/" '
             '/etc/yum/pluginconf.d/subscription-manager.conf')
-        run('sed -i -e "s/enabled.*/enabled = 0/g" '
+        run('sed -i -e "s/^enabled.*/enabled = 0/g" '
             '/etc/yum.repos.d/redhat.repo')
 
     run('yum clean all')
