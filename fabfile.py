@@ -251,21 +251,20 @@ def install_satellite(admin_password=None):
         run('subscription-manager subscribe --pool={0[rhn_poolid]}'.format(
             rhn_info))
 
-    run('yum repolist')
+    # This is needed for `yum-config-manager`
+    run('yum install -y yum-utils')
 
+    # Clean up system if Beaker-based
     run('rm -rf /etc/yum.repos.d/beaker-*')
     run('rm -rf /var/cache/yum*')
 
-    if distro.startswith('rhel7'):
-        run('sed -i -e "s/^enabled.*/enabled=0/" '
-            '/etc/yum/pluginconf.d/subscription-manager.conf')
-        run('sed -i -e "s/^enabled.*/enabled = 0/g" '
-            '/etc/yum.repos.d/redhat.repo')
+    # Disable yum plugin for sub-man
+    run('sed -i -e "s/^enabled.*/enabled=0/" '
+        '/etc/yum/pluginconf.d/subscription-manager.conf')
+    # And disable all repos for now
+    run('sed -i -e "s/^enabled.*/enabled = 0/g" '
+        '/etc/yum.repos.d/redhat.repo')
 
-    run('yum clean all')
-    # Make sure to have yum-utils installed
-    run('yum install -y yum-utils')
-    run('yum-config-manager --disable "*"')
     run('yum-config-manager --enable "rhel-{0}-server-rpms"'.format(
         os_version))
     run('yum-config-manager --enable "rhel-server-rhscl-{0}-rpms"'.format(
@@ -280,10 +279,6 @@ def install_satellite(admin_password=None):
     run('setenforce 1')
     run('katello-installer -v -d --foreman-admin-password="{0}"'.format(
         admin_password))
-    run('service iptables stop')
-
-    if distro.startswith('rhel7'):
-        run('service firewalld stop')
 
     # Ensure that the installer worked
     run('hammer -u admin -p {0} ping'.format(admin_password))
