@@ -113,7 +113,7 @@ def setup_http_proxy():
         ))
 
 
-def reservation(data=None):
+def reservation():
     """Task to provision a VM using snap-guest based on a ``SOURCE_IMAGE`` base
     image.
 
@@ -122,7 +122,6 @@ def reservation(data=None):
     VM_RAM: RAM memory in MB
     VM_CPU: number of CPU cores
     VM_DOMAIN: VM's domain name
-    DDNS_HASH: DDNS entry hash
     SOURCE_IMAGE: base image name
     TARGET_IMAGE: target image name
 
@@ -253,7 +252,7 @@ def install_satellite(admin_password=None):
             rhn_info))
 
     run('yum repolist')
-    # Make sure to have yum-utils installed
+
     run('rm -rf /etc/yum.repos.d/beaker-*')
     run('rm -rf /var/cache/yum*')
 
@@ -264,6 +263,7 @@ def install_satellite(admin_password=None):
             '/etc/yum.repos.d/redhat.repo')
 
     run('yum clean all')
+    # Make sure to have yum-utils installed
     run('yum install -y yum-utils')
     run('yum-config-manager --disable "*"')
     run('yum-config-manager --enable "rhel-{0}-server-rpms"'.format(
