@@ -289,16 +289,28 @@ def install_satellite(admin_password=None):
     run('hammer -u admin -p {0} ping'.format(admin_password))
 
 
-def reservation_install_nightly(admin_password=None):
-    """Task to execute reservation, setup_ddns and install_nightly
+def reservation_install(task_name, admin_password=None):
+    """Task to execute reservation, setup_ddns and install_``task_name``
 
-    The ``admin_password`` parameter will be passed to the install_nightly
-    task.
+    The ``admin_password`` parameter will be passed to the
+    install_``task_name`` task.
 
     """
+    task_names = ('nightly', 'satellite')
+
+    if task_name not in task_names:
+        print 'task_name "{0}" should be one of {1}'.format(
+            task_name, ', '.join(task_names))
+        sys.exit(1)
+
     execute(reservation)
     execute(setup_ddns, env['vm_domain'], env['vm_ip'], host=env['vm_ip'])
-    execute(install_nightly, admin_password, host=env['vm_ip'])
+
+    if task_name == 'nightly':
+        execute(install_nightly, admin_password, host=env['vm_ip'])
+
+    if task_name == 'satellite':
+        execute(install_satellite, admin_password, host=env['vm_ip'])
 
 
 def partition_disk():
