@@ -196,7 +196,8 @@ def install_nightly(admin_password=None):
     run('if [ -d katello-deploy ]; then rm -rf katello-deploy; fi')
     run('git clone https://github.com/Katello/katello-deploy.git')
 
-    run('setenforce 0')
+    # Make sure that SELinux is enabled
+    run('setenforce 1')
     run('cd katello-deploy && ./setup.rb --skip-installer rhel6')
     run('katello-installer -v -d --foreman-admin-password="{0}"'.format(
         admin_password))
@@ -275,7 +276,8 @@ def install_satellite(admin_password=None):
     # Install required packages for the installation
     run('yum install -y java-1.7.0-openjdk katello libvirt')
 
-    run('setenforce 0')
+    # Make sure that SELinux is enabled
+    run('setenforce 1')
     run('katello-installer -v -d --foreman-admin-password="{0}"'.format(
         admin_password))
     run('service iptables stop')
