@@ -2,7 +2,7 @@ import os
 import sys
 import time
 
-from fabric.api import env, execute, put, run
+from fabric.api import cd, env, execute, local, put, run
 from StringIO import StringIO
 
 
@@ -323,3 +323,20 @@ def partition_disk():
     run('lvremove /dev/mapper/*home')
     run('lvresize -l +100%FREE /dev/mapper/*root')
     run('if uname -r | grep -q el6; then resize2fs /; else xfs_growfs /; fi')
+
+
+# Miscelaneous tasks ==========================================================
+def create_personal_git_repo(name, private=False):
+    """Creates a new personal git repository under the public_git repository"""
+    repo_name = '{0}.git'.format(name)
+
+    local('git init --bare --shared={0} {1}'
+          ''.format('none' if private else 'all', repo_name))
+
+    # Ensure that the public_git directory is created
+    run('mkdir -p ~/public_git')
+    run('chmod 755 ~/public_git')
+
+    put(repo_name, '~/public_git/'.format(repo_name))
+
+    local('rm -rf {0}'.format(repo_name))
