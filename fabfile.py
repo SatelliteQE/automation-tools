@@ -42,6 +42,7 @@ def setup_http_proxy():
 
     """
     proxy_hostname = os.environ.get('PROXY_HOSTNAME')
+    proxy_port = os.environ.get('PROXY_PORT')
     proxy_username = os.environ.get('PROXY_USER')
     proxy_password = os.environ.get('PROXY_PASSWORD')
 
@@ -91,14 +92,16 @@ def setup_http_proxy():
     run('service iptables restart')
 
     # Configuring yum to use the proxy
-    run('echo "proxy=http://{}:8888" >> /etc/yum.conf'.format(proxy_hostname))
+    run('echo "proxy=http://{}:{}" >> /etc/yum.conf'
+        ''.format(proxy_hostname, proxy_port))
     run('echo "proxy_username={}" >> /etc/yum.conf'.format(proxy_username))
     run('echo "proxy_password={}" >> /etc/yum.conf'.format(proxy_password))
 
     # Configuring rhsm to use the proxy
     run('sed -i -e "s/^proxy_hostname.*/proxy_hostname = {}/" '
         '/etc/rhsm/rhsm.conf'.format(proxy_hostname))
-    run('sed -i -e "s/^proxy_port.*/proxy_port = 8888/" /etc/rhsm/rhsm.conf')
+    run('sed -i -e "s/^proxy_port.*/proxy_port = {}/" '
+        '/etc/rhsm/rhsm.conf'.format(proxy_port))
     run('sed -i -e "s/^proxy_user.*/proxy_user = {}/" '
         '/etc/rhsm/rhsm.conf'.format(proxy_username))
     run('sed -i -e "s/^proxy_password.*/proxy_password = {}/" '
@@ -106,10 +109,10 @@ def setup_http_proxy():
 
     # Run the installer
     run('katello-installer -v --foreman-admin-password="changeme" '
-        '--katello-proxy-url=http://{} --katello-proxy-port=8888 '
+        '--katello-proxy-url=http://{} --katello-proxy-port={} '
         '--katello-proxy-username={} '
         '--katello-proxy-password={}'.format(
-            proxy_hostname, proxy_username, proxy_password
+            proxy_hostname, proxy_port, proxy_username, proxy_password
         ))
 
 
