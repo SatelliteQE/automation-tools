@@ -260,9 +260,6 @@ def install_satellite(admin_password=None):
         run('subscription-manager subscribe --pool={0[rhn_poolid]}'.format(
             rhn_info))
 
-    # This is needed for `yum-config-manager`
-    run('yum install -y yum-utils')
-
     # Clean up system if Beaker-based
     run('rm -rf /etc/yum.repos.d/beaker-*')
     run('rm -rf /var/cache/yum*')
@@ -271,14 +268,12 @@ def install_satellite(admin_password=None):
     run('sed -i -e "s/^enabled.*/enabled=0/" '
         '/etc/yum/pluginconf.d/subscription-manager.conf')
     # And disable all repos for now
-    run('sed -i -e "s/^enabled.*/enabled = 0/g" '
-        '/etc/yum.repos.d/redhat.repo')
+    run('subscription-manager repos --disable "*"')
 
-    run('yum-config-manager --enable "rhel-{0}-server-rpms"'.format(
+    run('subscription-manager repos --enable "rhel-{0}-server-rpms"'.format(
         os_version))
-    run('yum-config-manager --enable "rhel-server-rhscl-{0}-rpms"'.format(
-        os_version))
-    run('yum-config-manager --enable satellite')
+    run('subscription-manager repos --enable "rhel-server-rhscl-{0}-rpms"'
+        ''.format(os_version))
     run('yum repolist')
 
     # Install required packages for the installation
