@@ -320,7 +320,8 @@ def partition_disk():
     run('umount /home')
     run('lvremove /dev/mapper/*home')
     run('lvresize -l +100%FREE /dev/mapper/*root')
-    run('if uname -r | grep -q el6; then resize2fs /; else xfs_growfs /; fi')
+    run('if uname -r | grep -q el6; then resize2fs /dev/mapper/*root; '
+        'else xfs_growfs /; fi')
 
 
 # Miscelaneous tasks ==========================================================
