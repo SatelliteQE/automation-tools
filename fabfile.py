@@ -2,7 +2,7 @@ import os
 import sys
 import time
 
-from fabric.api import cd, env, execute, local, put, run
+from fabric.api import env, execute, local, put, run
 from StringIO import StringIO
 
 
