@@ -6,6 +6,35 @@ from fabric.api import env, execute, local, put, run
 from StringIO import StringIO
 
 
+def unsubscribe():
+    """Unregisters a machine from Red Hat"""
+    run('subscription-manager unregister')
+    run('subscription-manager clean')
+
+
+def subscribe():
+    """Registers and subscribes machine to Red Hat."""
+
+    distro = os.environ.get('DISTRO')
+
+    if distro.startswith('rhel'):
+        rhn_info = {
+            'rhn_username': os.environ.get('RHN_USERNAME'),
+            'rhn_password': os.environ.get('RHN_PASSWORD'),
+            'rhn_poolid': os.environ.get('RHN_POOLID'),
+        }
+
+        if any([value is None for _, value in rhn_info.items()]):
+            print('One of RHN_USERNAME, RHN_PASSWORD, RHN_POOLID environment '
+                  'variables is not defined')
+            sys.exit(1)
+
+        run('subscription-manager register --force --user={0[rhn_username]} '
+            '--password={0[rhn_password]}'.format(rhn_info))
+        run('subscription-manager subscribe --pool={0[rhn_poolid]}'.format(
+            rhn_info))
+
+
 def setup_ddns(entry_domain, host_ip):
     """Task to setup DDNS client
 
@@ -170,23 +199,9 @@ def install_nightly(admin_password=None, org_name=None, loc_name=None):
         print 'The DISTRO environment variable should be defined'
         sys.exit(1)
 
-    if distro.startswith('rhel'):
-        rhn_info = {
-            'rhn_username': os.environ.get('RHN_USERNAME'),
-            'rhn_password': os.environ.get('RHN_PASSWORD'),
-            'rhn_poolid': os.environ.get('RHN_POOLID'),
-        }
-        os_version = distro[4]
-
-        if any([value is None for _, value in rhn_info.items()]):
-            print('One of RHN_USERNAME, RHN_PASSWORD, RHN_POOLID environment '
-                  'variables is not defined')
-            sys.exit(1)
-
-        run('subscription-manager register --force --user={0[rhn_username]} '
-            '--password={0[rhn_password]}'.format(rhn_info))
-        run('subscription-manager subscribe --pool={0[rhn_poolid]}'.format(
-            rhn_info))
+    # Register and subscribe machine to Red Hat
+    subscribe()
+    os_version = distro[4]
 
     run('yum repolist')
     # Make sure to have yum-utils installed
@@ -242,23 +257,9 @@ def install_satellite(admin_password=None):
         remote_path='/etc/yum.repos.d/satellite.repo')
     satellite_repo.close()
 
-    if distro.startswith('rhel'):
-        rhn_info = {
-            'rhn_username': os.environ.get('RHN_USERNAME'),
-            'rhn_password': os.environ.get('RHN_PASSWORD'),
-            'rhn_poolid': os.environ.get('RHN_POOLID'),
-        }
-        os_version = distro[4]
-
-        if any([value is None for _, value in rhn_info.items()]):
-            print('One of RHN_USERNAME, RHN_PASSWORD, RHN_POOLID environment '
-                  'variables is not defined')
-            sys.exit(1)
-
-        run('subscription-manager register --force --user={0[rhn_username]} '
-            '--password={0[rhn_password]}'.format(rhn_info))
-        run('subscription-manager subscribe --pool={0[rhn_poolid]}'.format(
-            rhn_info))
+    # Register and subscribe machine to Red Hat
+    subscribe()
+    os_version = distro[4]
 
     # Clean up system if Beaker-based
     run('rm -rf /etc/yum.repos.d/beaker-*')
