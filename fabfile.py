@@ -1,4 +1,5 @@
 import os
+import random
 import sys
 import time
 
@@ -12,10 +13,17 @@ def unsubscribe():
     run('subscription-manager clean')
 
 
-def subscribe():
+def subscribe(autosubscribe=False):
     """Registers and subscribes machine to Red Hat."""
 
     distro = os.environ.get('DISTRO')
+    if distro is not None:
+        distro = distro.lower()
+    else:
+        print 'You need to provide a distro.'
+        sys.exit(1)
+
+    autosubscribe = '--autosubscribe' if autosubscribe else ''
 
     if distro.startswith('rhel'):
         rhn_info = {
@@ -24,15 +32,24 @@ def subscribe():
             'rhn_poolid': os.environ.get('RHN_POOLID'),
         }
 
-        if any([value is None for _, value in rhn_info.items()]):
-            print('One of RHN_USERNAME, RHN_PASSWORD, RHN_POOLID environment '
+        if any([
+            value is None
+            for key, value in rhn_info.items()
+            if key != 'rhn_poolid'
+        ]):
+            print('One of RHN_USERNAME, RHN_PASSWORD environment '
                   'variables is not defined')
             sys.exit(1)
 
-        run('subscription-manager register --force --user={0[rhn_username]} '
-            '--password={0[rhn_password]}'.format(rhn_info))
-        run('subscription-manager subscribe --pool={0[rhn_poolid]}'.format(
-            rhn_info))
+        run('subscription-manager register --force'
+            ' --user={0[rhn_username]}'
+            ' --password={0[rhn_password]}'
+            ' {1}'
+            ''.format(rhn_info, autosubscribe))
+
+        if rhn_info['rhn_poolid'] is not None:
+            run('subscription-manager subscribe --pool={0[rhn_poolid]}'.format(
+                rhn_info))
 
 
 def setup_ddns(entry_domain, host_ip):
@@ -340,3 +357,96 @@ def create_personal_git_repo(name, private=False):
     put(repo_name, '~/public_git/'.format(repo_name))
 
     local('rm -rf {0}'.format(repo_name))
+
+
+# Client registration ==================================================
+def update_basic_packages():
+    """Updates some basic packages before we can run some real tests."""
+    subscribe(autosubscribe=True)
+    run('yum update -y subscription-manager yum-utils',
+        warn_only=True, quiet=True)
+    run('yum install -y yum-plugin-security yum-security',
+        warn_only=True, quiet=True)
+    run('rpm -q subscription-manager python-rhsm')
+    # Clean up
+    unsubscribe()
+
+
+def client_registration_test(clean_beaker=True):
+    """Register client against Satellite 6 and runs tests."""
+
+    # Org
+    org = os.getenv('ORG', 'Default_Organization')
+    # Activation Key
+    ak = os.getenv('ACTIVATIONKEY')
+    if not ak:
+        print "You need to provide an activationkey."
+        sys.exit(1)
+    # Candlepin cert RPM
+    cert_url = os.getenv('CERTURL')
+    if not cert_url:
+        print "You need to install the Candlepin Cert RPM."
+        sys.exit(1)
+
+    # If this is a Beaker box, 'disable' Beaker repos
+    if clean_beaker:
+        run('mv /etc/yum.repos.d/beaker* .', warn_only=True)
+
+    # Update some basic packages before we try to register
+    update_basic_packages()
+
+    # Install the cert file
+    run('rpm -Uvh {0}'.format(cert_url), warn_only=True)
+
+    # Register and subscribe
+    run('subscription-manager register --force'
+        ' --org="{0}"'
+        ' --activationkey="{1}"'
+        ''.format(org, ak))
+    run('subscription-manager refresh')
+    run('yum clean all', quiet=True)
+    print "'Firefox' and 'Telnet' should not be installed."
+    run('rpm -q firefox telnet', warn_only=True)
+    print "Installing 'Firefox' and 'Telnet'."
+    run('yum install -y firefox telnet', quiet=True)
+    print "'Firefox' and 'Telnet' should be installed."
+    run('rpm -q firefox telnet')
+    print "Removing 'Firefox' and 'Telnet'."
+    run('yum remove -y firefox telnet', quiet=True)
+    print "Checking if 'Firefox' and 'Telnet' are installed."
+    run('rpm -q firefox telnet', warn_only=True)
+    print "Installing 'Web Server' group."
+    run('yum groupinstall -y "Web Server"', quiet=True)
+    print "Checking for 'httpd' and starting."
+    run('rpm -q httpd')
+    run('service httpd start', warn_only=True)
+
+    # Install random errata
+    install_errata()
+
+    # Clean up
+    unsubscribe()
+
+
+def install_errata():
+
+    erratum = run('yum list-sec', warn_only=True, quiet=True)
+
+    if erratum:
+        erratum = erratum.split('\r\n')
+        errata = [entry for entry in erratum if entry.startswith('RH')]
+        if errata:
+            # Pick a random errata from the available list
+            # Example: RHBA-2013:1357 bugfix   man-pages-5.10.2-1.el5.noarch
+            rnd_errata = errata[random.randint(0, len(errata) - 1)]
+            # ... and parse what we want
+            rnd_errata = rnd_errata.split(' ')[0]
+            print "Applying errata: {0}".format(rnd_errata)
+            # Apply the errata
+            run(
+                'yum update -y --advisory "{0}"'.format(rnd_errata),
+                quiet=True)
+        else:
+            print "NO ERRATA AVAILABLE"
+    else:
+        print "FAILED TO OBTAIN ERRATA INFORMATION"
