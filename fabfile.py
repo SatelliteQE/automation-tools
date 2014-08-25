@@ -407,6 +407,13 @@ def partition_disk():
         'else xfs_growfs / && mount / -o inode64,remount; fi')
 
 
+def fix_hostname():
+    """Updates `/etc/hosts` with FQDN and IP."""
+    ip_addr = run("ping -c 1 $(hostname) | grep 'icmp_seq' "
+                  "| awk -F '(' '{print $2}' | awk -F ')' '{print $1}'")
+    run('echo "{0} $(hostname)" >> /etc/hosts'.format(ip_addr))
+
+
 # Miscelaneous tasks ==========================================================
 def create_personal_git_repo(name, private=False):
     """Creates a new personal git repository under the public_git repository"""
