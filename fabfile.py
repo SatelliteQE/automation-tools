@@ -292,7 +292,7 @@ def install_nightly(admin_password=None, org_name=None, loc_name=None):
     run('yum-config-manager --enable "rhel-server-rhscl-{0}-rpms"'.format(
         os_version))
     # Install required packages for the installation
-    run('yum install -y git ruby java-1.7.0-openjdk')
+    run('yum install -y git ruby')
 
     run('if [ -d katello-deploy ]; then rm -rf katello-deploy; fi')
     run('git clone https://github.com/Katello/katello-deploy.git')
@@ -358,7 +358,7 @@ def install_satellite(admin_password=None):
     run('yum repolist')
 
     # Install required packages for the installation
-    run('yum install -y java-1.7.0-openjdk katello libvirt')
+    run('yum install -y katello libvirt')
 
     # Make sure that SELinux is enabled
     run('setenforce 1')
