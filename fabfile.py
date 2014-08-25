@@ -162,6 +162,69 @@ def setup_http_proxy():
         ))
 
 
+def setup_default_capsule(interface=None):
+    """Task to setup a the default capsule for Satellite
+
+    :param str interface: Network interface name to be used
+
+    """
+    forwarders = run('cat /etc/resolv.conf | grep nameserver | '
+                     'awk \'{print $2}\'', quiet=True).split('\n')
+    forwarders = ' '.join([
+        '--capsule-dns-forwarders {0}'.format(forwarder.strip())
+        for forwarder in forwarders
+    ])
+    if len(forwarders) == 0:
+        print 'Was not possible to fetch nameserver information'
+        sys.exit(1)
+
+    oauth_secret = run(
+        'grep oauth_consumer_secret /etc/foreman/settings.yaml | '
+        'cut -d " " -f 2', quiet=True).strip()
+    if len(oauth_secret) == 0:
+        print 'Not able to'
+
+    hostname = run('hostname', quiet=True).strip()
+    if len(hostname) == 0:
+        print 'Was not possible to fetch hostname information'
+        sys.exit(1)
+
+    domain = hostname.split('.', 1)[1]
+    if len(domain) == 0:
+        print 'Was not possible to fetch domain information'
+        sys.exit(1)
+
+    if interface is None:
+        interface = run(
+            'ip addr | grep "state UP" | cut -d ":" -f 2', quiet=True)
+    if len(interface) == 0:
+        print 'Was not possible to fetch interface information'
+        sys.exit(1)
+
+    run(
+        'katello-installer -v'
+        '--capsule-parent-fqdn {hostname} '
+        '--capsule-dns true '
+        '{forwarders} '
+        '--capsule-dns-interface {interface} '
+        '--capsule-dns-zone {domain} '
+        '--capsule-dhcp true '
+        '--capsule-dhcp-interface {interface} '
+        '--capsule-tftp true '
+        '--capsule-puppet true '
+        '--capsule-puppetca true '
+        '--capsule-register-in-foreman true '
+        '--capsule-foreman-oauth-secret {oauth_secret}'
+        ''.format(
+            hostname=hostname,
+            forwarders=forwarders,
+            interface=interface,
+            domain=domain,
+            oauth_secret=oauth_secret
+        )
+    )
+
+
 def reservation():
     """Task to provision a VM using snap-guest based on a ``SOURCE_IMAGE`` base
     image.
@@ -328,6 +391,8 @@ def reservation_install(task_name, admin_password=None):
 
     if task_name == 'satellite':
         execute(install_satellite, admin_password, host=env['vm_ip'])
+
+    execute(setup_default_capsule, host=env['vm_ip'])
 
 
 def partition_disk():
