@@ -404,7 +404,7 @@ def partition_disk():
     run('lvremove /dev/mapper/*home')
     run('lvresize -l +100%FREE /dev/mapper/*root')
     run('if uname -r | grep -q el6; then resize2fs -f /dev/mapper/*root; '
-        'else xfs_growfs /; fi')
+        'else xfs_growfs / && mount / -o inode64,remount; fi')
 
 
 # Miscelaneous tasks ==========================================================
