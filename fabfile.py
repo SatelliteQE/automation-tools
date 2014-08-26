@@ -9,7 +9,7 @@ from StringIO import StringIO
 
 def unsubscribe():
     """Unregisters a machine from Red Hat"""
-    run('subscription-manager unregister')
+    run('subscription-manager unregister', warn_only=True)
     run('subscription-manager clean')
 
 
@@ -202,7 +202,7 @@ def setup_default_capsule(interface=None):
         sys.exit(1)
 
     run(
-        'katello-installer -v'
+        'katello-installer -v '
         '--capsule-parent-fqdn {hostname} '
         '--capsule-dns true '
         '{forwarders} '
@@ -417,6 +417,10 @@ def fix_hostname():
 # Miscelaneous tasks ==========================================================
 def create_personal_git_repo(name, private=False):
     """Creates a new personal git repository under the public_git repository"""
+
+    # Since all args are turned to string...
+    private = (private.lower() == 'true')
+
     repo_name = '{0}.git'.format(name)
 
     local('git init --bare --shared={0} {1}'
@@ -431,7 +435,20 @@ def create_personal_git_repo(name, private=False):
     local('rm -rf {0}'.format(repo_name))
 
 
-# Client registration ==================================================
+# Client registration
+# ==================================================
+def clean_rhsm():
+    """Removes pre-existing Candlepin certs and resets RHSM."""
+    run('yum erase -y $(rpm -qa |grep katello-ca-consumer)', warn_only=True)
+    run("sed -i -e 's/^hostname.*/hostname=subscription.rhn.redhat.com/' "
+        "/etc/rhsm/rhsm.conf")
+    run("sed -i -e 's/^prefix.*/prefix=\/subscription/' /etc/rhsm/rhsm.conf")
+    run("sed -i -e 's/^baseurl.*/baseurl=https:\/\/cdn.redhat.com/' "
+        "/etc/rhsm/rhsm.conf")
+    run("sed -i -e 's/^repo_ca_cert.*/repo_ca_cert=%(ca_cert_dir)"
+        "sredhat-uep.pem/' /etc/rhsm/rhsm.conf")
+
+
 def update_basic_packages():
     """Updates some basic packages before we can run some real tests."""
     subscribe(autosubscribe=True)
@@ -444,8 +461,12 @@ def update_basic_packages():
     unsubscribe()
 
 
-def client_registration_test(clean_beaker=True):
+def client_registration_test(clean_beaker=True, update_packages=True):
     """Register client against Satellite 6 and runs tests."""
+
+    # Since all arguments are turned to string...
+    clean_beaker = (clean_beaker.lower() == 'true')
+    update_packages = (update_packages.lower() == 'true')
 
     # Org
     org = os.getenv('ORG', 'Default_Organization')
@@ -461,11 +482,12 @@ def client_registration_test(clean_beaker=True):
         sys.exit(1)
 
     # If this is a Beaker box, 'disable' Beaker repos
-    if clean_beaker:
+    if clean_beaker is True:
         run('mv /etc/yum.repos.d/beaker* .', warn_only=True)
 
     # Update some basic packages before we try to register
-    update_basic_packages()
+    if update_packages is True:
+        update_basic_packages()
 
     # Install the cert file
     run('rpm -Uvh {0}'.format(cert_url), warn_only=True)
@@ -489,18 +511,23 @@ def client_registration_test(clean_beaker=True):
     run('rpm -q firefox telnet', warn_only=True)
     print "Installing 'Web Server' group."
     run('yum groupinstall -y "Web Server"', quiet=True)
-    print "Checking for 'httpd' and starting."
+    print "Checking for 'httpd' and starting it."
     run('rpm -q httpd')
     run('service httpd start', warn_only=True)
+    print "Stopping 'httpd' service and remove 'Web Server' group."
+    run('service httpd stop', warn_only=True)
+    run('yum groupremove -y "Web Server"', quiet=True)
 
     # Install random errata
     install_errata()
 
     # Clean up
+    clean_rhsm()
     unsubscribe()
 
 
 def install_errata():
+    """Randomly selects an errata and installs it."""
 
     erratum = run('yum list-sec', warn_only=True, quiet=True)
 
