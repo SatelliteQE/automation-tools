@@ -562,8 +562,8 @@ def client_registration_test(clean_beaker=True, update_packages=True):
     install_errata()
 
     # Clean up
-    clean_rhsm()
     unsubscribe()
+    clean_rhsm()
 
 
 def install_errata():
