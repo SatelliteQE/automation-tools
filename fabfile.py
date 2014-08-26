@@ -264,6 +264,45 @@ def reservation():
     env['vm_domain'] = '{target_image}.{vm_domain}'.format(**options)
 
 
+def install_prerequisites():
+    """Task to ensure that the prerequisites for installation are in place"""
+
+    # Full forward and reverse DNS resolution using a fully qualified domain
+    # name. Check that hostname and localhost resolve correctly, using the
+    # following commands:
+    run('ping -c1 localhost')
+    run('ping -c1 `hostname -s`')
+    run('ping -c1 `hostname -f`')
+
+    # It is recommended that a time synchronizer such as ntpd is installed and
+    # enabled on Satellite Server. To enable ntpd and have it persist at
+    # bootup:
+    run('yum install -y ntp', warn_only=True)
+    run('service ntpd start')
+    run('chkconfig ntpd on')
+
+    # Port 443 for HTTPS (secure WWW) must be open for incoming connections.
+    run('iptables -I INPUT -m state --state NEW -p tcp --dport 443 -j ACCEPT')
+
+    # Port 5671 must be open for SSL communication with managed systems.
+    run('iptables -I INPUT -m state --state NEW -p tcp --dport 5671 -j ACCEPT')
+
+    # Port 80 for HTTP (WWW) must be open to download the bootstrap files.
+    run('iptables -I INPUT -m state --state NEW -p tcp --dport 80 -j ACCEPT')
+
+    # Port 8140 must be open for incoming Puppet connections with the managed
+    # systems.
+    run('iptables -I INPUT -m state --state NEW -p tcp --dport 8140 -j ACCEPT')
+
+    # Port 9090 must be open for Foreman Smart Proxy connections with the
+    # managed systems.
+    run('iptables -I INPUT -m state --state NEW -p tcp --dport 9090 -j ACCEPT')
+
+    # To make the changes persistent across reboots when using the command line
+    # use this command:
+    run('iptables-save > /etc/sysconfig/iptables')
+
+
 def install_nightly(admin_password=None, org_name=None, loc_name=None):
     """Task to install Foreman nightly using katello-deploy script"""
     if admin_password is None:
@@ -279,8 +318,6 @@ def install_nightly(admin_password=None, org_name=None, loc_name=None):
         print 'The DISTRO environment variable should be defined'
         sys.exit(1)
 
-    # Register and subscribe machine to Red Hat
-    subscribe()
     os_version = distro[4]
 
     run('yum repolist')
@@ -337,8 +374,6 @@ def install_satellite(admin_password=None):
         remote_path='/etc/yum.repos.d/satellite.repo')
     satellite_repo.close()
 
-    # Register and subscribe machine to Red Hat
-    subscribe()
     os_version = distro[4]
 
     # Clean up system if Beaker-based
@@ -385,6 +420,11 @@ def reservation_install(task_name, admin_password=None):
 
     execute(reservation)
     execute(setup_ddns, env['vm_domain'], env['vm_ip'], host=env['vm_ip'])
+
+    # Register and subscribe machine to Red Hat
+    execute(subscribe, host=env['vm_ip'])
+
+    execute(install_prerequisites, host=env['vm_ip'])
 
     if task_name == 'nightly':
         execute(install_nightly, admin_password, host=env['vm_ip'])
