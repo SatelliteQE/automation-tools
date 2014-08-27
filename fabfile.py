@@ -480,7 +480,10 @@ def create_personal_git_repo(name, private=False):
 # ==================================================
 def clean_rhsm():
     """Removes pre-existing Candlepin certs and resets RHSM."""
-    run('yum erase -y $(rpm -qa |grep katello-ca-consumer)', warn_only=True)
+    print "Erasing existing Candlepin certs, if any."
+    run('yum erase -y $(rpm -qa |grep katello-ca-consumer)',
+        warn_only=True, quiet=True)
+    print "Resetting rhsm.conf to point to cdn."
     run("sed -i -e 's/^hostname.*/hostname=subscription.rhn.redhat.com/' "
         "/etc/rhsm/rhsm.conf")
     run("sed -i -e 's/^prefix.*/prefix=\/subscription/' /etc/rhsm/rhsm.conf")
@@ -537,11 +540,14 @@ def client_registration_test(clean_beaker=True, update_packages=True):
     run('rpm -Uvh {0}'.format(cert_url), warn_only=True)
 
     # Register and subscribe
+    print "Register/Subscribe using Subscription-manager."
     run('subscription-manager register --force'
         ' --org="{0}"'
         ' --activationkey="{1}"'
         ''.format(org, ak))
+    print "Refreshing Subscription-manager."
     run('subscription-manager refresh')
+    print "Performing yum clean up."
     run('yum clean all', quiet=True)
     print "'Firefox' and 'Telnet' should not be installed."
     run('rpm -q firefox telnet', warn_only=True)
@@ -561,7 +567,8 @@ def client_registration_test(clean_beaker=True, update_packages=True):
     print "Stopping 'httpd' service and remove 'Web Server' group."
     run('service httpd stop', warn_only=True)
     run('yum groupremove -y "Web Server"', quiet=True)
-
+    print "Checking if 'httpd' is really removed."
+    run('rpm -q httpd', warn_only=True)
     # Install random errata
     install_errata()
 
