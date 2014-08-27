@@ -458,8 +458,9 @@ def fix_hostname():
 def create_personal_git_repo(name, private=False):
     """Creates a new personal git repository under the public_git repository"""
 
-    # Since all args are turned to string...
-    private = (private.lower() == 'true')
+    # Since all args are turned to string, if no defaults are used...
+    if isinstance(private, str):
+        private = (private.lower() == 'true')
 
     repo_name = '{0}.git'.format(name)
 
@@ -504,9 +505,12 @@ def update_basic_packages():
 def client_registration_test(clean_beaker=True, update_packages=True):
     """Register client against Satellite 6 and runs tests."""
 
-    # Since all arguments are turned to string...
-    clean_beaker = (clean_beaker.lower() == 'true')
-    update_packages = (update_packages.lower() == 'true')
+    # Since all arguments are turned to string, if no defaults are
+    # used...
+    if isinstance(clean_beaker, str):
+        clean_beaker = (clean_beaker.lower() == 'true')
+    if isinstance(update_packages, str):
+        update_packages = (update_packages.lower() == 'true')
 
     # Org
     org = os.getenv('ORG', 'Default_Organization')
