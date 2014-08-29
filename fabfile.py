@@ -441,7 +441,7 @@ def partition_disk():
 
     """
     run('umount /home')
-    run('lvremove /dev/mapper/*home')
+    run('lvremove -f /dev/mapper/*home')
     run('lvresize -f -l +100%FREE /dev/mapper/*root')
     run('if uname -r | grep -q el6; then resize2fs -f /dev/mapper/*root; '
         'else xfs_growfs / && mount / -o inode64,remount; fi')
