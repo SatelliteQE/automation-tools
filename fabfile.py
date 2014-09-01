@@ -99,41 +99,19 @@ def setup_http_proxy():
     eth = eth.split('(')[1].split(')')[0]
     proxy = proxy.split('(')[1].split(')')[0]
 
-    output = StringIO()
-    output.write(
-        '*filter\n'
-        ':INPUT ACCEPT [0:0]\n'
-        ':FORWARD ACCEPT [0:0]\n'
-        ':OUTPUT ACCEPT [0:0]\n'
-        '-A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT\n'
-        '-A INPUT -i lo -j ACCEPT\n'
-        '-A INPUT -m state --state NEW -m tcp -p tcp --dport 443 -j ACCEPT\n'
-        '-A INPUT -m state --state NEW -m tcp -p tcp --dport 80 -j ACCEPT\n'
-        '-A INPUT -m state --state NEW -m tcp -p tcp --dport 22 -j ACCEPT\n'
-        '-A INPUT -j REJECT --reject-with icmp-host-prohibited\n'
-        '-A FORWARD -j REJECT --reject-with icmp-host-prohibited\n'
-        '-A OUTPUT -m state --state ESTABLISHED,RELATED -j ACCEPT\n'
-        '-A OUTPUT -d 127.0.0.1 -j ACCEPT\n'
-    )
+    # Satellite 6 IP
+    run('iptables -I OUTPUT -d {} -j ACCEPT'.format(eth))
 
-    output.write('# Satellite 6 IP\n')
-    output.write('-A OUTPUT -d {} -j ACCEPT\n'.format(eth))
+    # PROXY IP
+    run('iptables -I OUTPUT -d {} -j ACCEPT'.format(proxy))
 
-    output.write('# PROXY IP\n')
-    output.write('-A OUTPUT -d {} -j ACCEPT\n'.format(proxy))
-
-    output.write('# Nameservers\n')
+    # Nameservers
     for entry in nameservers.split('\n'):
-        output.write('-A OUTPUT -d {} -j ACCEPT\n'.format(entry))
+        run('iptables -I OUTPUT -d {} -j ACCEPT'.format(entry))
 
-    output.write('-A OUTPUT -j REJECT --reject-with icmp-host-prohibited\n')
-    output.write('COMMIT\n')
-
-    run('cp /etc/sysconfig/iptables /etc/sysconfig/iptables.old')
-    print 'Writing {} to /etc/sysconfig/iptables'.format(output.getvalue())
-    put(local_path=output, remote_path='/etc/sysconfig/iptables')
-
-    output.close()
+    # To make the changes persistent across reboots when using the command line
+    # use this command:
+    run('iptables-save > /etc/sysconfig/iptables')
 
     run('service iptables restart')
 
@@ -297,6 +275,9 @@ def install_prerequisites():
     # Port 9090 must be open for Foreman Smart Proxy connections with the
     # managed systems.
     run('iptables -I INPUT -m state --state NEW -p tcp --dport 9090 -j ACCEPT')
+
+    # Port 22 must be open for connections via ssh
+    run('iptables -I INPUT -m state --state NEW -p tcp --dport 22 -j ACCEPT')
 
     # To make the changes persistent across reboots when using the command line
     # use this command:
