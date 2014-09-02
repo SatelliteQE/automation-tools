@@ -582,3 +582,27 @@ def install_errata():
             print "NO ERRATA AVAILABLE"
     else:
         print "FAILED TO OBTAIN ERRATA INFORMATION"
+
+
+def install_katello_agent():
+    """Installs the 'katello-agent' package."""
+    # Check that the package is not installed
+    run('rpm -q katello-agent', warn_only=True)
+    # Install it
+    run('yum install -y katello-agent')
+    # Now, check that the package is installed...
+    run('rpm -q katello-agent')
+    # ...and that 'goerd' is running.
+    run('service goferd status')
+
+
+def remove_katello_agent():
+    """Removes the 'katello-agent' package."""
+    # Check that the package is installed
+    run('rpm -q katello-agent')
+    # Remove it
+    run('rpm -e katello-agent')
+    # Now, check that the package is indeed gone...
+    run('rpm -q katello-agent', warn_only=True)
+    # ...and that 'goerd' is not running.
+    run('service goferd status', warn_only=True)
