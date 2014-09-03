@@ -6,6 +6,8 @@ import time
 from fabric.api import env, execute, local, put, run
 from StringIO import StringIO
 
+LIBVIRT_IMAGES_DIR = '/var/lib/libvirt/images'
+
 
 def unsubscribe():
     """Unregisters a machine from Red Hat"""
@@ -203,8 +205,8 @@ def setup_default_capsule(interface=None):
     )
 
 
-def reservation():
-    """Task to provision a VM using snap-guest based on a ``SOURCE_IMAGE`` base
+def vm_create():
+    """Task to create a VM using snap-guest based on a ``SOURCE_IMAGE`` base
     image.
 
     Expects the following environment variables::
@@ -214,9 +216,10 @@ def reservation():
     VM_DOMAIN: VM's domain name
     SOURCE_IMAGE: base image name
     TARGET_IMAGE: target image name
+    IMAGE_DIR: path where the generated image will be stored
 
     The VM will have the TARGET_IMAGE.VM_DOMAIN hostname, but make sure to have
-    setup DDND entry correctly.
+    setup DDNS entry correctly.
 
     This task will add to the ``env`` the vm_ip and vm_domain
 
@@ -227,10 +230,25 @@ def reservation():
         'vm_domain': os.environ.get('VM_DOMAIN'),
         'source_image': os.environ.get('SOURCE_IMAGE'),
         'target_image': os.environ.get('TARGET_IMAGE'),
+        'image_dir': os.environ.get('IMAGE_DIR'),
     }
 
-    run('snap-guest -b {source_image} -t {target_image} -m {vm_ram} '
-        '-c {vm_cpu} -d {vm_domain} -n bridge=br0 -f'.format(**options))
+    command_args = [
+        'snap-guest',
+        '-b {source_image}',
+        '-t {target_image}',
+        '-m {vm_ram}',
+        '-c {vm_cpu}',
+        '-d {vm_domain}',
+        '-n bridge=br0 -f',
+    ]
+
+    if options['image_dir'] is not None:
+        command_args.append('-p {image_dir}')
+
+    command = ' '.join(command_args).format(**options)
+
+    run(command)
 
     # Give some time to machine boot
     time.sleep(60)
@@ -240,6 +258,31 @@ def reservation():
 
     env['vm_ip'] = result.split('(')[1].split(')')[0]
     env['vm_domain'] = '{target_image}.{vm_domain}'.format(**options)
+
+
+def vm_destroy(domain=None, image_dir=None, delete_image=False):
+    if domain is None:
+        print 'You should specify the virtual machine domain'
+        sys.exit(1)
+    if image_dir is None:
+        image_dir = LIBVIRT_IMAGES_DIR
+    if isinstance(delete_image, str):
+        delete_image = (delete_image.lower() == 'true')
+
+    run('virsh destroy {domain}'.format(domain=domain), warn_only=True)
+    run('virsh undefine {domain}'.format(domain=domain), warn_only=True)
+
+    if delete_image is True:
+        image_name = '{domain}.img'.format(domain=domain)
+        run('rm {image_path}'.format(
+            image_path=os.path.join(image_dir, image_name)), warn_only=True)
+
+
+def vm_list(list_all=True):
+    if isinstance(list_all, str):
+        list_all = (list_all.lower() == 'true')
+
+    run('virsh list --all')
 
 
 def install_prerequisites():
@@ -399,7 +442,7 @@ def reservation_install(task_name, admin_password=None):
             task_name, ', '.join(task_names))
         sys.exit(1)
 
-    execute(reservation)
+    execute(vm_create)
     execute(setup_ddns, env['vm_domain'], env['vm_ip'], host=env['vm_ip'])
 
     # Register and subscribe machine to Red Hat
