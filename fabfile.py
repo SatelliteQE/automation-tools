@@ -3,7 +3,7 @@ import random
 import sys
 import time
 
-from fabric.api import env, execute, local, put, run
+from fabric.api import cd, env, execute, local, put, run
 from StringIO import StringIO
 
 LIBVIRT_IMAGES_DIR = '/var/lib/libvirt/images'
@@ -371,6 +371,30 @@ def install_nightly(admin_password=None, org_name=None, loc_name=None):
     run('hammer -u admin -p {0} ping'.format(admin_password))
 
 
+def manage_repos(os_version=None):
+    """Enables only required RHEL repos for Satellite 6."""
+
+    if os_version is None:
+        print "Please provide the OS version."
+        sys.exit(1)
+
+    # Clean up system if Beaker-based
+    run('rm -rf /etc/yum.repos.d/beaker-*')
+    run('rm -rf /var/cache/yum*')
+
+    # Disable yum plugin for sub-man
+    run('sed -i -e "s/^enabled.*/enabled=0/" '
+        '/etc/yum/pluginconf.d/subscription-manager.conf')
+    # And disable all repos for now
+    run('subscription-manager repos --disable "*"')
+
+    run('subscription-manager repos --enable "rhel-{0}-server-rpms"'.format(
+        os_version))
+    run('subscription-manager repos --enable "rhel-server-rhscl-{0}-rpms"'
+        ''.format(os_version))
+    run('yum repolist')
+
+
 def install_satellite(admin_password=None):
     """Task to install Satellite 6"""
     if admin_password is None:
@@ -400,24 +424,62 @@ def install_satellite(admin_password=None):
 
     os_version = distro[4]
 
-    # Clean up system if Beaker-based
-    run('rm -rf /etc/yum.repos.d/beaker-*')
-    run('rm -rf /var/cache/yum*')
-
-    # Disable yum plugin for sub-man
-    run('sed -i -e "s/^enabled.*/enabled=0/" '
-        '/etc/yum/pluginconf.d/subscription-manager.conf')
-    # And disable all repos for now
-    run('subscription-manager repos --disable "*"')
-
-    run('subscription-manager repos --enable "rhel-{0}-server-rpms"'.format(
-        os_version))
-    run('subscription-manager repos --enable "rhel-server-rhscl-{0}-rpms"'
-        ''.format(os_version))
-    run('yum repolist')
+    manage_repos(os_version)
 
     # Install required packages for the installation
     run('yum install -y katello libvirt')
+
+    # Make sure that SELinux is enabled
+    run('setenforce 1')
+    run('katello-installer -v -d --foreman-admin-password="{0}"'.format(
+        admin_password))
+
+    # Ensure that the installer worked
+    run('hammer -u admin -p {0} ping'.format(admin_password))
+
+
+def iso_install(iso_url=None, check_sigs=False):
+    """Installs Satellite 6 from an ISO image."""
+
+    admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme')
+
+    distro = os.environ.get('DISTRO')
+
+    if distro is None:
+        print 'The DISTRO environment variable should be defined'
+        sys.exit(1)
+
+    os_version = distro[4]
+
+    # Check that we have a URL
+    if iso_url is None:
+        print "Please provide a valid URL for the ISO image."
+        sys.exit(1)
+    # Wether we should check for package signatures
+    if isinstance(check_sigs, str):
+        check_sigs = (check_sigs.lower() == 'true')
+
+    # First, subscribe the system
+    subscribe()
+
+    # Enable some repos
+    manage_repos(os_version)
+
+    # Basic configuration
+    install_prerequisites()
+
+    # Download the ISO
+    run('wget {0}'.format(iso_url), quiet=True)
+
+    # Create a 'check-out' folder, mount ISO to it...
+    run('mkdir ISO')
+    run('mount *.iso ISO -t iso9660 -o loop')
+    # ...and run the installer script.
+    with cd('/root/ISO'):
+        if check_sigs is True:
+            run('./install_packages')
+        else:
+            run('./install_packages --nogpgsigs')
 
     # Make sure that SELinux is enabled
     run('setenforce 1')
