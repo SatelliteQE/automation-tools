@@ -262,20 +262,22 @@ def vm_create():
     env['vm_domain'] = '{target_image}.{vm_domain}'.format(**options)
 
 
-def vm_destroy(domain=None, image_dir=None, delete_image=False):
-    if domain is None:
-        print 'You should specify the virtual machine domain'
+def vm_destroy(target_image=None, image_dir=None, delete_image=False):
+    if target_image is None:
+        print 'You should specify the virtual machine image'
         sys.exit(1)
     if image_dir is None:
         image_dir = LIBVIRT_IMAGES_DIR
     if isinstance(delete_image, str):
         delete_image = (delete_image.lower() == 'true')
 
-    run('virsh destroy {domain}'.format(domain=domain), warn_only=True)
-    run('virsh undefine {domain}'.format(domain=domain), warn_only=True)
+    run('virsh destroy {target_image}'.format(target_image=target_image),
+        warn_only=True)
+    run('virsh undefine {target_image}'.format(target_image=target_image),
+        warn_only=True)
 
     if delete_image is True:
-        image_name = '{domain}.img'.format(domain=domain)
+        image_name = '{target_image}.img'.format(target_image=target_image)
         run('rm {image_path}'.format(
             image_path=os.path.join(image_dir, image_name)), warn_only=True)
 
