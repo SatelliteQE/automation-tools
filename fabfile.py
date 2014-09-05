@@ -519,8 +519,7 @@ def reservation_install(task_name, admin_password=None):
 
     if task_name == 'satellite':
         execute(install_satellite, admin_password, host=env['vm_ip'])
-
-    execute(setup_default_capsule, host=env['vm_ip'])
+        execute(setup_default_capsule, host=env['vm_ip'])
 
 
 def partition_disk():
