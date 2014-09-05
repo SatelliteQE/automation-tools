@@ -177,6 +177,8 @@ def setup_default_capsule(interface=None):
     if interface is None:
         interface = run(
             'ip addr | grep "state UP" | cut -d ":" -f 2', quiet=True)
+        # Aways select the first interface
+        interface = interface.split('\n', 1)[0].strip()
     if len(interface) == 0:
         print 'Was not possible to fetch interface information'
         sys.exit(1)
