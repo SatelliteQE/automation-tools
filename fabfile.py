@@ -338,7 +338,7 @@ def install_nightly(admin_password=None, org_name=None, loc_name=None):
     if org_name is None:
         org_name = os.environ.get('ORGANIZATION_NAME', 'Default_Organization')
     if loc_name is None:
-        org_name = os.environ.get('LOCATION_NAME', 'Default_Location')
+        loc_name = os.environ.get('LOCATION_NAME', 'Default_Location')
 
     distro = os.environ.get('DISTRO')
 
@@ -348,14 +348,8 @@ def install_nightly(admin_password=None, org_name=None, loc_name=None):
 
     os_version = distro[4]
 
-    run('yum repolist')
-    # Make sure to have yum-utils installed
-    run('yum install -y yum-utils')
-    run('yum-config-manager --disable "*"')
-    run('yum-config-manager --enable "rhel-{0}-server-rpms"'.format(
-        os_version))
-    run('yum-config-manager --enable "rhel-server-rhscl-{0}-rpms"'.format(
-        os_version))
+    manage_repos(os_version)
+
     # Install required packages for the installation
     run('yum install -y git ruby')
 
