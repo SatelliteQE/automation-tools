@@ -544,6 +544,14 @@ def reservation_install(task_name, admin_password=None, certificate_url=None):
     if task_name == 'satellite':
         execute(install_satellite, admin_password, host=env['vm_ip'])
         execute(setup_default_capsule, host=env['vm_ip'])
+    
+    # Allows accepting modified (UUID) redhat-manifest by using a fake-manifest-ca.crt
+    run('wget -O /etc/candlepin/certs/upstream/fake_manifest.crt http://cosmos.lab.eng.pnq.redhat.com/rhel64/fake_manifest.crt')
+
+    if 'el6' in os.uname()[2]:
+    	run('service tomcat6 restart')
+    else:
+    	run('systemctl restart tomcat')
 
     setup_fake_manifest_certificate(certificate_url)
 
