@@ -207,6 +207,31 @@ def setup_default_capsule(interface=None):
     )
 
 
+def setup_fake_manifest_certificate(certificate_url=None):
+    """Task to setup a fake manifest certificate
+
+    Allows accepting modified (UUID) redhat-manifest by using a
+    fake-manifest-ca.crt
+
+    """
+    certificate_url = certificate_url or os.environ.get(
+        'FAKE_MANIFEST_CERT_URL')
+    if certificate_url is None:
+        print 'You should specify the fake certificate URL'
+        sys.exit(1)
+
+    run('wget -O /etc/candlepin/certs/upstream/fake_manifest.crt '
+        '{certificate_url}'.format(certificate_url=certificate_url))
+
+    uname = run('uname -r')
+    if 'el6' in uname:
+        run('service tomcat6 restart')
+    elif 'el7' in uname:
+        run('service tomcat restart')
+    else:
+        print 'Unable to restart tomcat'
+
+
 def vm_create():
     """Task to create a VM using snap-guest based on a ``SOURCE_IMAGE`` base
     image.
@@ -488,11 +513,14 @@ def iso_install(iso_url=None, check_sigs=False):
     run('hammer -u admin -p {0} ping'.format(admin_password))
 
 
-def reservation_install(task_name, admin_password=None):
+def reservation_install(task_name, admin_password=None, certificate_url=None):
     """Task to execute reservation, setup_ddns and install_``task_name``
 
     The ``admin_password`` parameter will be passed to the
     install_``task_name`` task.
+
+    The ``certificate_url`` parameter will be passed to the
+    setup_fake_manifest_certificate task.
 
     """
     task_names = ('nightly', 'satellite')
@@ -516,6 +544,8 @@ def reservation_install(task_name, admin_password=None):
     if task_name == 'satellite':
         execute(install_satellite, admin_password, host=env['vm_ip'])
         execute(setup_default_capsule, host=env['vm_ip'])
+
+    setup_fake_manifest_certificate(certificate_url)
 
 
 def partition_disk():
