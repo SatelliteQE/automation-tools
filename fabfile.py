@@ -548,7 +548,11 @@ def reservation_install(task_name, admin_password=None, certificate_url=None):
     certificate_url = certificate_url or os.environ.get(
         'FAKE_MANIFEST_CERT_URL')
     if certificate_url is not None:
-        setup_fake_manifest_certificate(certificate_url)
+        execute(
+            setup_fake_manifest_certificate,
+            certificate_url,
+            host=env['vm_ip']
+        )
 
 
 def partition_disk():
