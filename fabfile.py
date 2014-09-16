@@ -50,8 +50,17 @@ def subscribe(autosubscribe=False):
             ''.format(rhn_info, autosubscribe))
 
         if rhn_info['rhn_poolid'] is not None:
-            run('subscription-manager subscribe --pool={0[rhn_poolid]}'.format(
-                rhn_info))
+            for _ in range(3):
+                result = run(
+                    'subscription-manager subscribe --pool={0[rhn_poolid]}'
+                    ''.format(rhn_info),
+                    warn_only=True
+                )
+                if result.return_code == 0:
+                    return
+                time.sleep(5)
+            print 'Was not able to subscrite to the pool, aborting.'
+            sys.exit(1)
 
 
 def setup_ddns(entry_domain, host_ip):
