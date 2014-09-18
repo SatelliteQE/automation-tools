@@ -56,7 +56,11 @@ def subscribe(autosubscribe=False):
                     ''.format(rhn_info),
                     warn_only=True
                 )
-                if result.return_code == 0:
+                has_pool = (
+                    'This unit has already had the subscription matching pool '
+                    'ID'
+                )
+                if result.return_code == 0 or has_pool in result:
                     return
                 time.sleep(5)
             print 'Was not able to subscrite to the pool, aborting.'
