@@ -408,12 +408,15 @@ def install_nightly(admin_password=None, org_name=None, loc_name=None):
     run('hammer -u admin -p {0} ping'.format(admin_password))
 
 
-def manage_repos(os_version=None):
+def manage_repos(os_version=None, cdn=False):
     """Enables only required RHEL repos for Satellite 6."""
 
     if os_version is None:
         print "Please provide the OS version."
         sys.exit(1)
+
+    if isinstance(cdn, str):
+        cdn = (cdn.lower() == 'true')
 
     # Clean up system if Beaker-based
     run('rm -rf /etc/yum.repos.d/beaker-*')
@@ -425,8 +428,15 @@ def manage_repos(os_version=None):
     # And disable all repos for now
     run('subscription-manager repos --disable "*"')
 
+    # If installing from CDN, use the real product
+    if cdn is True:
+        run('subscription-manager repos --enable '
+            '"rhel-{0}-server-satellite-6.0-rpms"'.format(
+                os_version))
+    # Enable 'base' OS rpms
     run('subscription-manager repos --enable "rhel-{0}-server-rpms"'.format(
         os_version))
+    # Enable SCL
     run('subscription-manager repos --enable "rhel-server-rhscl-{0}-rpms"'
         ''.format(os_version))
     run('yum repolist')
@@ -462,6 +472,40 @@ def install_satellite(admin_password=None):
     os_version = distro[4]
 
     manage_repos(os_version)
+
+    # Install required packages for the installation
+    run('yum install -y katello libvirt')
+
+    # Make sure that SELinux is enabled
+    run('setenforce 1')
+    run('katello-installer -v -d --foreman-admin-password="{0}"'.format(
+        admin_password))
+
+    # Ensure that the installer worked
+    run('hammer -u admin -p {0} ping'.format(admin_password))
+
+
+def cdn_install():
+    """Installs Satellite 6 from CDN."""
+
+    admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme')
+
+    distro = os.environ.get('DISTRO')
+
+    if distro is None:
+        print 'The DISTRO environment variable should be defined'
+        sys.exit(1)
+
+    os_version = distro[4]
+
+    # First, subscribe the system
+    subscribe()
+
+    # Enable some repos
+    manage_repos(os_version, True)
+
+    # Basic configuration
+    install_prerequisites()
 
     # Install required packages for the installation
     run('yum install -y katello libvirt')
