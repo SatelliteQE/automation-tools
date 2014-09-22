@@ -333,9 +333,12 @@ def install_prerequisites():
     # Full forward and reverse DNS resolution using a fully qualified domain
     # name. Check that hostname and localhost resolve correctly, using the
     # following commands:
-    run('ping -c1 localhost')
-    run('ping -c1 `hostname -s`')
-    run('ping -c1 `hostname -f`')
+    for command in (
+            'ping -c1 localhost', 'ping -c1 $(hostname -s)',
+            'ping -c1 $(hostname -f)'):
+        if run(command, warn_only=True).return_code != 0:
+            time.sleep(5)
+            run(command)
 
     # It is recommended that a time synchronizer such as ntpd is installed and
     # enabled on Satellite Server. To enable ntpd and have it persist at
