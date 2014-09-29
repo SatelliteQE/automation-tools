@@ -9,11 +9,13 @@ Usage examples
 Virtual Machine Management
 --------------------------
 
+To create a virtual machine will be needed a base image, to list all available base images:
+
+    fab -H root@example.com vm_list_base
+
 Creating a virtual machine:
 
     VM_RAM=512 VM_CPU=1 VM_DOMAIN=domain.example.com SOURCE_IMAGE=rhel7-base TARGET_IMAGE=test01 fab -H root@example.com vm_create
-
-Source image examples: `rhel510-base`, `rhel65-base` and `rhel7-base`.
 
 Destroying a virtual machine:
 

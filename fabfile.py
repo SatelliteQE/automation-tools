@@ -320,11 +320,24 @@ def vm_destroy(target_image=None, image_dir=None, delete_image=False):
             image_path=os.path.join(image_dir, image_name)), warn_only=True)
 
 
-def vm_list(list_all=True):
+def vm_list(list_all=False):
+    """List all virtual machines
+
+    If list_all is False then will show only running virtual machines.
+
+    """
     if isinstance(list_all, str):
         list_all = (list_all.lower() == 'true')
 
-    run('virsh list --all')
+    run('virsh list{0}'.format(' --all' if list_all else ''))
+
+
+def vm_list_base(base_image_dir=None):
+    """List all available base images"""
+    if base_image_dir is not None:
+        run('snap-guest --list --base-image-dir {0}'.format(base_image_dir))
+    else:
+        run('snap-guest --list')
 
 
 def install_prerequisites():
