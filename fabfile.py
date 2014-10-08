@@ -1,10 +1,14 @@
+from __future__ import print_function
 import os
 import random
 import sys
 import time
 
 from fabric.api import cd, env, execute, local, put, run
-from StringIO import StringIO
+if sys.version_info[0] is 2:
+    from StringIO import StringIO  # (import-error) pylint:disable=F0401
+else:
+    from io import StringIO
 
 LIBVIRT_IMAGES_DIR = '/var/lib/libvirt/images'
 
@@ -22,7 +26,7 @@ def subscribe(autosubscribe=False):
     if distro is not None:
         distro = distro.lower()
     else:
-        print 'You need to provide a distro.'
+        print('You need to provide a distro.')
         sys.exit(1)
 
     autosubscribe = '--autosubscribe' if autosubscribe else ''
@@ -63,7 +67,7 @@ def subscribe(autosubscribe=False):
                 if result.return_code == 0 or has_pool in result:
                     return
                 time.sleep(5)
-            print 'Was not able to subscrite to the pool, aborting.'
+            print('Was not able to subscrite to the pool, aborting.')
             sys.exit(1)
 
 
@@ -77,12 +81,12 @@ def setup_ddns(entry_domain, host_ip):
     """
     ddns_hash = os.environ.get('DDNS_HASH')
     if ddns_hash is None:
-        print 'The DDNS_HASH environment variable should be defined'
+        print('The DDNS_HASH environment variable should be defined')
         sys.exit(1)
 
     ddns_package_url = os.environ.get('DDNS_PACKAGE_URL')
     if ddns_package_url is None:
-        print 'The DDNS_PACKAGE_URL environment variable should be defined'
+        print('The DDNS_PACKAGE_URL environment variable should be defined')
         sys.exit(1)
 
     target, domain = entry_domain.split('.', 1)
@@ -168,23 +172,23 @@ def setup_default_capsule(interface=None):
         for forwarder in forwarders
     ])
     if len(forwarders) == 0:
-        print 'Was not possible to fetch nameserver information'
+        print('Was not possible to fetch nameserver information')
         sys.exit(1)
 
     oauth_secret = run(
         'grep oauth_consumer_secret /etc/foreman/settings.yaml | '
         'cut -d " " -f 2', quiet=True).strip()
     if len(oauth_secret) == 0:
-        print 'Not able to'
+        print('Not able to')
 
     hostname = run('hostname', quiet=True).strip()
     if len(hostname) == 0:
-        print 'Was not possible to fetch hostname information'
+        print('Was not possible to fetch hostname information')
         sys.exit(1)
 
     domain = hostname.split('.', 1)[1]
     if len(domain) == 0:
-        print 'Was not possible to fetch domain information'
+        print('Was not possible to fetch domain information')
         sys.exit(1)
 
     if interface is None:
@@ -193,7 +197,7 @@ def setup_default_capsule(interface=None):
         # Aways select the first interface
         interface = interface.split('\n', 1)[0].strip()
     if len(interface) == 0:
-        print 'Was not possible to fetch interface information'
+        print('Was not possible to fetch interface information')
         sys.exit(1)
 
     run(
@@ -230,7 +234,7 @@ def setup_fake_manifest_certificate(certificate_url=None):
     certificate_url = certificate_url or os.environ.get(
         'FAKE_MANIFEST_CERT_URL')
     if certificate_url is None:
-        print 'You should specify the fake certificate URL'
+        print('You should specify the fake certificate URL')
         sys.exit(1)
 
     run('wget -O /etc/candlepin/certs/upstream/fake_manifest.crt '
@@ -242,7 +246,7 @@ def setup_fake_manifest_certificate(certificate_url=None):
     elif 'el7' in uname:
         run('service tomcat restart')
     else:
-        print 'Unable to restart tomcat'
+        print('Unable to restart tomcat')
 
 
 def vm_create():
@@ -302,7 +306,7 @@ def vm_create():
 
 def vm_destroy(target_image=None, image_dir=None, delete_image=False):
     if target_image is None:
-        print 'You should specify the virtual machine image'
+        print('You should specify the virtual machine image')
         sys.exit(1)
     if image_dir is None:
         image_dir = LIBVIRT_IMAGES_DIR
@@ -397,7 +401,7 @@ def install_nightly(admin_password=None, org_name=None, loc_name=None):
     distro = os.environ.get('DISTRO')
 
     if distro is None:
-        print 'The DISTRO environment variable should be defined'
+        print('The DISTRO environment variable should be defined')
         sys.exit(1)
 
     os_version = distro[4]
@@ -428,7 +432,7 @@ def manage_repos(os_version=None, cdn=False):
     """Enables only required RHEL repos for Satellite 6."""
 
     if os_version is None:
-        print "Please provide the OS version."
+        print('Please provide the OS version.')
         sys.exit(1)
 
     if isinstance(cdn, str):
@@ -467,13 +471,13 @@ def install_satellite(admin_password=None):
     distro = os.environ.get('DISTRO')
 
     if distro is None:
-        print 'The DISTRO environment variable should be defined'
+        print('The DISTRO environment variable should be defined')
         sys.exit(1)
 
     base_url = os.environ.get('BASE_URL')
 
     if base_url is None:
-        print 'The BASE_URL environment variable should be defined'
+        print('The BASE_URL environment variable should be defined')
         sys.exit(1)
 
     satellite_repo = StringIO()
@@ -510,7 +514,7 @@ def cdn_install():
     distro = os.environ.get('DISTRO')
 
     if distro is None:
-        print 'The DISTRO environment variable should be defined'
+        print('The DISTRO environment variable should be defined')
         sys.exit(1)
 
     os_version = distro[4]
@@ -544,14 +548,14 @@ def iso_install(iso_url=None, check_sigs=False):
     distro = os.environ.get('DISTRO')
 
     if distro is None:
-        print 'The DISTRO environment variable should be defined'
+        print('The DISTRO environment variable should be defined')
         sys.exit(1)
 
     os_version = distro[4]
 
     # Check that we have a URL
     if iso_url is None:
-        print "Please provide a valid URL for the ISO image."
+        print('Please provide a valid URL for the ISO image.')
         sys.exit(1)
     # Wether we should check for package signatures
     if isinstance(check_sigs, str):
@@ -601,8 +605,8 @@ def reservation_install(task_name, admin_password=None, certificate_url=None):
     task_names = ('nightly', 'satellite')
 
     if task_name not in task_names:
-        print 'task_name "{0}" should be one of {1}'.format(
-            task_name, ', '.join(task_names))
+        print('task_name "{0}" should be one of {1}'.format(
+            task_name, ', '.join(task_names)))
         sys.exit(1)
 
     execute(vm_create)
@@ -676,10 +680,10 @@ def create_personal_git_repo(name, private=False):
 # ==================================================
 def clean_rhsm():
     """Removes pre-existing Candlepin certs and resets RHSM."""
-    print "Erasing existing Candlepin certs, if any."
+    print('Erasing existing Candlepin certs, if any.')
     run('yum erase -y $(rpm -qa |grep katello-ca-consumer)',
         warn_only=True, quiet=True)
-    print "Resetting rhsm.conf to point to cdn."
+    print('Resetting rhsm.conf to point to cdn.')
     run("sed -i -e 's/^hostname.*/hostname=subscription.rhn.redhat.com/' "
         "/etc/rhsm/rhsm.conf")
     run("sed -i -e 's/^prefix.*/prefix=\/subscription/' /etc/rhsm/rhsm.conf")
@@ -714,14 +718,14 @@ def client_registration_test(clean_beaker=True, update_packages=True):
     # Org
     org = os.getenv('ORG', 'Default_Organization')
     # Activation Key
-    ak = os.getenv('ACTIVATIONKEY')
-    if not ak:
-        print "You need to provide an activationkey."
+    act_key = os.getenv('ACTIVATIONKEY')
+    if not act_key:
+        print('You need to provide an activationkey.')
         sys.exit(1)
     # Candlepin cert RPM
     cert_url = os.getenv('CERTURL')
     if not cert_url:
-        print "You need to install the Candlepin Cert RPM."
+        print('You need to install the Candlepin Cert RPM.')
         sys.exit(1)
 
     # If this is a Beaker box, 'disable' Beaker repos
@@ -736,34 +740,34 @@ def client_registration_test(clean_beaker=True, update_packages=True):
     run('rpm -Uvh {0}'.format(cert_url), warn_only=True)
 
     # Register and subscribe
-    print "Register/Subscribe using Subscription-manager."
+    print('Register/Subscribe using Subscription-manager.')
     run('subscription-manager register --force'
         ' --org="{0}"'
         ' --activationkey="{1}"'
-        ''.format(org, ak))
-    print "Refreshing Subscription-manager."
+        ''.format(org, act_key))
+    print('Refreshing Subscription-manager.')
     run('subscription-manager refresh')
-    print "Performing yum clean up."
+    print('Performing yum clean up.')
     run('yum clean all', quiet=True)
-    print "'Firefox' and 'Telnet' should not be installed."
+    print('"Firefox" and "Telnet" should not be installed.')
     run('rpm -q firefox telnet', warn_only=True)
-    print "Installing 'Firefox' and 'Telnet'."
+    print('Installing "Firefox" and "Telnet".')
     run('yum install -y firefox telnet', quiet=True)
-    print "'Firefox' and 'Telnet' should be installed."
+    print('"Firefox" and "Telnet" should be installed.')
     run('rpm -q firefox telnet')
-    print "Removing 'Firefox' and 'Telnet'."
+    print('Removing "Firefox" and "Telnet".')
     run('yum remove -y firefox telnet', quiet=True)
-    print "Checking if 'Firefox' and 'Telnet' are installed."
+    print('Checking if "Firefox" and "Telnet" are installed.')
     run('rpm -q firefox telnet', warn_only=True)
-    print "Installing 'Web Server' group."
+    print('Installing "Web Server" group.')
     run('yum groupinstall -y "Web Server"', quiet=True)
-    print "Checking for 'httpd' and starting it."
+    print('Checking for "httpd" and starting it.')
     run('rpm -q httpd')
     run('service httpd start', warn_only=True)
-    print "Stopping 'httpd' service and remove 'Web Server' group."
+    print('Stopping "httpd" service and remove "Web Server" group.')
     run('service httpd stop', warn_only=True)
     run('yum groupremove -y "Web Server"', quiet=True)
-    print "Checking if 'httpd' is really removed."
+    print('Checking if "httpd" is really removed.')
     run('rpm -q httpd', warn_only=True)
     # Install random errata
     install_errata()
@@ -787,15 +791,15 @@ def install_errata():
             rnd_errata = errata[random.randint(0, len(errata) - 1)]
             # ... and parse what we want
             rnd_errata = rnd_errata.split(' ')[0]
-            print "Applying errata: {0}".format(rnd_errata)
+            print('Applying errata: {0}'.format(rnd_errata))
             # Apply the errata
             run(
                 'yum update -y --advisory "{0}"'.format(rnd_errata),
                 quiet=True)
         else:
-            print "NO ERRATA AVAILABLE"
+            print('NO ERRATA AVAILABLE')
     else:
-        print "FAILED TO OBTAIN ERRATA INFORMATION"
+        print('FAILED TO OBTAIN ERRATA INFORMATION')
 
 
 def install_katello_agent():
