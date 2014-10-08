@@ -22,53 +22,44 @@ def unsubscribe():
 def subscribe(autosubscribe=False):
     """Registers and subscribes machine to Red Hat."""
 
-    distro = os.environ.get('DISTRO')
-    if distro is not None:
-        distro = distro.lower()
-    else:
-        print('You need to provide a distro.')
+    # Registration and subscription is only meaningful for Red Hat Enterprise
+    # Linux systems.
+    if 'DISTRO' not in os.environ:
+        print('The DISTRO environment variable must be set.')
         sys.exit(1)
+    if not os.environ['DISTRO'].lower().startswith('rhel'):
+        return
 
-    autosubscribe = '--autosubscribe' if autosubscribe else ''
-
-    if distro.startswith('rhel'):
-        rhn_info = {
-            'rhn_username': os.environ.get('RHN_USERNAME'),
-            'rhn_password': os.environ.get('RHN_PASSWORD'),
-            'rhn_poolid': os.environ.get('RHN_POOLID'),
-        }
-
-        if any([
-            value is None
-            for key, value in rhn_info.items()
-            if key != 'rhn_poolid'
-        ]):
-            print('One of RHN_USERNAME, RHN_PASSWORD environment '
-                  'variables is not defined')
+    # Register the system.
+    for env_var in ('RHN_USERNAME', 'RHN_PASSWORD'):
+        if env_var not in os.environ:
+            print('The {0} environment variable must be set.'.format(env_var))
             sys.exit(1)
+    run(
+        'subscription-manager register --force --user={0} --password={1} {2}'
+        .format(
+            os.environ['RHN_USERNAME'],
+            os.environ['RHN_PASSWORD'],
+            '--autosubscribe' if autosubscribe else ''
+        )
+    )
 
-        run('subscription-manager register --force'
-            ' --user={0[rhn_username]}'
-            ' --password={0[rhn_password]}'
-            ' {1}'
-            ''.format(rhn_info, autosubscribe))
-
-        if rhn_info['rhn_poolid'] is not None:
-            for _ in range(3):
-                result = run(
-                    'subscription-manager subscribe --pool={0[rhn_poolid]}'
-                    ''.format(rhn_info),
-                    warn_only=True
-                )
-                has_pool = (
-                    'This unit has already had the subscription matching pool '
-                    'ID'
-                )
-                if result.return_code == 0 or has_pool in result:
-                    return
-                time.sleep(5)
-            print('Was not able to subscrite to the pool, aborting.')
-            sys.exit(1)
+    # Subscribe the system if a pool ID was provided.
+    rhn_poolid = os.environ.get('RHN_POOLID')
+    if rhn_poolid is not None:
+        has_pool_msg = (
+            'This unit has already had the subscription matching pool ID'
+        )
+        for _ in range(3):
+            result = run(
+                'subscription-manager subscribe --pool={0}'.format(rhn_poolid),
+                warn_only=True
+            )
+            if result.return_code is 0 or has_pool_msg in result:
+                return
+            time.sleep(5)
+        print('Unable to subscribe system to pool. Aborting.')
+        sys.exit(1)
 
 
 def setup_ddns(entry_domain, host_ip):
