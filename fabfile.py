@@ -3,6 +3,7 @@ import os
 import random
 import sys
 import time
+import urlparse
 
 from fabric.api import cd, env, execute, local, put, run
 if sys.version_info[0] is 2:
@@ -562,7 +563,7 @@ def iso_install(iso_url=None, check_sigs=False):
     install_prerequisites()
 
     # Download the ISO
-    run('wget {0}'.format(iso_url), quiet=True)
+    iso_download(iso_url)
 
     # Create a 'check-out' folder, mount ISO to it...
     run('mkdir ISO')
@@ -643,6 +644,51 @@ def fix_hostname():
     ip_addr = run("ping -c 1 $(hostname) | grep 'icmp_seq' "
                   "| awk -F '(' '{print $2}' | awk -F ')' '{print $1}'")
     run('echo "{0} $(hostname)" >> /etc/hosts'.format(ip_addr))
+
+
+def iso_download(iso_url=None):
+    """Downloads the ISO image specified by the ``iso_url`` param.
+
+    The ``iso_url`` could be a full path to the iso file::
+
+        http://example.com/path/to/file.iso
+
+    Or can be a directory path::
+
+        http://example.com/path/to/iso
+
+    When specifying a directory, make sure to have one of MD5SUM, SHA1SUM or
+    SHA256SUM available because the iso filename will be fetched by inspecting
+    the first found file.
+
+    """
+    if iso_url is None:
+        print('Please provide a valid URL for the ISO image.')
+        sys.exit(1)
+
+    if not iso_url.endswith('.iso'):
+        # The following operations will be done remotely because maybe the
+        # machine which is running the task could not have access to the ISO
+        # server
+        iso_filename = None
+
+        for sum_file in ('MD5SUM', 'SHA1SUM', 'SHA256SUM'):
+            result = run(
+                'wget {0} -O - -q'.format(urlparse.urljoin(iso_url, sum_file)),
+                quiet=True,
+                warn_only=True
+            )
+            if result.return_code == 0:
+                iso_filename = result.split('*')[1].strip()
+                break
+
+        if iso_filename is None:
+            print('Unable to fetch the ISO filename')
+            sys.exit(1)
+
+        iso_url = urlparse.urljoin(iso_url, iso_filename)
+
+    run('wget {0}'.format(iso_url), quiet=True)
 
 
 # Miscelaneous tasks ==========================================================
