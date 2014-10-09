@@ -553,14 +553,8 @@ def iso_install(iso_url=None, check_sigs=False):
     if isinstance(check_sigs, str):
         check_sigs = (check_sigs.lower() == 'true')
 
-    # First, subscribe the system
-    subscribe()
-
     # Enable some repos
     manage_repos(os_version)
-
-    # Basic configuration
-    install_prerequisites()
 
     # Download the ISO
     iso_download(iso_url)
@@ -584,23 +578,36 @@ def iso_install(iso_url=None, check_sigs=False):
     run('hammer -u admin -p {0} ping'.format(admin_password))
 
 
-def reservation_install(task_name, admin_password=None, certificate_url=None):
-    """Task to execute reservation, setup_ddns and install_``task_name``
+def provision_install(task_name, certificate_url=None):
+    """Task to be run by the provisioning job in order to provision a clean
+    machine with a fresh Satellite installation.
 
-    The ``admin_password`` parameter will be passed to the
-    install_``task_name`` task.
+    According to the ``task_name`` provided, it will install downstream,
+    upstream or ISO.
 
     If ``certificate_url`` parameter or ``FAKE_MANIFEST_CERT_URL`` env var is
     defined the setup_fake_manifest_certificate task will run.
 
     """
-    task_names = ('nightly', 'satellite')
+    task_names = ('downstream', 'iso', 'upstream')
 
     if task_name not in task_names:
         print('task_name "{0}" should be one of {1}'.format(
             task_name, ', '.join(task_names)))
         sys.exit(1)
 
+    target_image = os.environ.get('TARGET_IMAGE')
+    if target_image is None:
+        print('The TARGET_IMAGE environment variable should be defined')
+        sys.exit(1)
+
+    if task_name == 'iso':
+        iso_url = os.environ.get('ISO_URL')
+        if iso_url is None:
+            print('The ISO_URL environment variable should be defined')
+            sys.exit(1)
+
+    execute(vm_destroy, target_image, delete_image=True)
     execute(vm_create)
     execute(setup_ddns, env['vm_domain'], env['vm_ip'], host=env['vm_ip'])
 
@@ -609,12 +616,16 @@ def reservation_install(task_name, admin_password=None, certificate_url=None):
 
     execute(install_prerequisites, host=env['vm_ip'])
 
-    if task_name == 'nightly':
-        execute(install_nightly, admin_password, host=env['vm_ip'])
-
-    if task_name == 'satellite':
-        execute(install_satellite, admin_password, host=env['vm_ip'])
+    if task_name == 'downstream':
+        execute(install_satellite, host=env['vm_ip'])
         execute(setup_default_capsule, host=env['vm_ip'])
+
+    if task_name == 'iso':
+        execute(iso_install, iso_url, host=env['vm_ip'])
+        execute(setup_default_capsule, host=env['vm_ip'])
+
+    if task_name == 'upstream':
+        execute(install_nightly, host=env['vm_ip'])
 
     certificate_url = certificate_url or os.environ.get(
         'FAKE_MANIFEST_CERT_URL')
