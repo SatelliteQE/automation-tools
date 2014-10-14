@@ -500,7 +500,25 @@ def install_satellite(admin_password=None):
 
 
 def cdn_install():
-    """Installs Satellite 6 from CDN."""
+    """Installs Satellite 6 from CDN.
+
+    Note:
+    The following variables must be set for a successful run of
+    this task:
+
+    1. DISTRO - 'rhel6' or 'rhel7'
+
+    2. RHN_USERNAME - RHN Username
+
+    3. RHN_PASSWORD - RHN Password
+
+    4. RHN_POOLID   - RHN Pool id to subscribe to
+
+    Optional:
+
+    1. ADMIN_PASSWORD - foreman admin password. default: 'changeme'
+
+    """
 
     admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme')
 
