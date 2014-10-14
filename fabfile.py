@@ -3,12 +3,13 @@ import os
 import random
 import sys
 import time
-import urlparse
 
 from fabric.api import cd, env, execute, local, put, run
 if sys.version_info[0] is 2:
+    from urlparse import urljoin  # (import-error) pylint:disable=F0401
     from StringIO import StringIO  # (import-error) pylint:disable=F0401
 else:
+    from urllib.parse import urljoin  # pylint:disable=F0401,E0611
     from io import StringIO
 
 LIBVIRT_IMAGES_DIR = '/var/lib/libvirt/images'
@@ -685,7 +686,7 @@ def iso_download(iso_url=None):
 
         for sum_file in ('MD5SUM', 'SHA1SUM', 'SHA256SUM'):
             result = run(
-                'wget {0} -O - -q'.format(urlparse.urljoin(iso_url, sum_file)),
+                'wget {0} -O - -q'.format(urljoin(iso_url, sum_file)),
                 quiet=True,
                 warn_only=True
             )
@@ -697,7 +698,7 @@ def iso_download(iso_url=None):
             print('Unable to fetch the ISO filename')
             sys.exit(1)
 
-        iso_url = urlparse.urljoin(iso_url, iso_filename)
+        iso_url = urljoin(iso_url, iso_filename)
 
     run('wget {0}'.format(iso_url), quiet=True)
 
@@ -705,22 +706,20 @@ def iso_download(iso_url=None):
 # Miscelaneous tasks ==========================================================
 def create_personal_git_repo(name, private=False):
     """Creates a new personal git repository under the public_git repository"""
-
-    # Since all args are turned to string, if no defaults are used...
+    # Command-line arguments are passed in as strings.
     if isinstance(private, str):
         private = (private.lower() == 'true')
 
+    # Create a repository locally, upload it and delete the local repository.
+    # Do not create a repository directly on the remote machine because its
+    # version of git may be old.
     repo_name = '{0}.git'.format(name)
-
-    local('git init --bare --shared={0} {1}'
-          ''.format('none' if private else 'all', repo_name))
-
-    # Ensure that the public_git directory is created
-    run('mkdir -p ~/public_git')
-    run('chmod 755 ~/public_git')
-
-    put(repo_name, '~/public_git/'.format(repo_name))
-
+    local(
+        'git init --bare --shared={0} {1}'
+        .format('none' if private else 'all', repo_name)
+    )
+    run('install -d -m 755 ~/public_git/')
+    put(repo_name, '~/public_git/')
     local('rm -rf {0}'.format(repo_name))
 
 
@@ -734,11 +733,12 @@ def clean_rhsm():
     print('Resetting rhsm.conf to point to cdn.')
     run("sed -i -e 's/^hostname.*/hostname=subscription.rhn.redhat.com/' "
         "/etc/rhsm/rhsm.conf")
-    run("sed -i -e 's/^prefix.*/prefix=\/subscription/' /etc/rhsm/rhsm.conf")
-    run("sed -i -e 's/^baseurl.*/baseurl=https:\/\/cdn.redhat.com/' "
+    run("sed -i -e 's|^prefix.*|prefix=/subscription|' /etc/rhsm/rhsm.conf")
+    run("sed -i -e 's|^baseurl.*|baseurl=https://cdn.redhat.com|' "
         "/etc/rhsm/rhsm.conf")
-    run("sed -i -e 's/^repo_ca_cert.*/repo_ca_cert=%(ca_cert_dir)"
-        "sredhat-uep.pem/' /etc/rhsm/rhsm.conf")
+    run("sed -i -e "
+        "'s/^repo_ca_cert.*/repo_ca_cert=%(ca_cert_dir)sredhat-uep.pem/' "
+        "/etc/rhsm/rhsm.conf")
 
 
 def update_basic_packages():
