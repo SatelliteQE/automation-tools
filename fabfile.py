@@ -420,6 +420,52 @@ def install_nightly(admin_password=None, org_name=None, loc_name=None):
     run('hammer -u admin -p {0} ping'.format(admin_password))
 
 
+def install_abrt(admin_password=None, org_name=None, loc_name=None):
+    """Task to install abrt on rhel7 foreman """
+    if admin_password is None:
+        admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme')
+    if org_name is None:
+        org_name = os.environ.get('ORGANIZATION_NAME', 'Default_Organization')
+    if loc_name is None:
+        loc_name = os.environ.get('LOCATION_NAME', 'Default_Location')
+
+    distro = os.environ.get('DISTRO')
+
+    if distro is None:
+        print('The DISTRO environment variable should be defined')
+        sys.exit(1)
+
+    os_version = distro[4]
+
+    manage_repos(os_version)
+
+    # Install required packages for the installation
+    run('yum install -y rubygem-smart_proxy_abrt')
+
+    run('service foreman restart')
+    run('yum -y install rubygem-smart_proxy_pulp')
+    run('service foreman restart')
+    host = env['host']
+    run('echo \':foreman_url: https://' + host + '\' '
+        '>> /etc/foreman-proxy/settings.yml')
+    run('sed -i -e "s/^:enabled: false.*/:enabled: true/" '
+        '/etc/foreman-proxy/settings.d/abrt.yml')
+
+    run('yum install abrt-cli')
+    run('systemctl start abrtd')
+    run('systemctl start abrt-ccpp')
+    run('sed -i -e "s,^URL = .*,URL = https://{0}:8443/abrt/," '
+        '/etc/libreport/plugins/ureport.conf'.format(host))
+    run('sed -i -e "s/^SSLVerify = no.*/SSLVerify = yes/" '
+        '/etc/libreport/plugins/ureport.conf')
+    run('sed -i -e "s/^SSLClientAuth = .*/SSLClientAuth = puppet/" '
+        '/etc/libreport/plugins/ureport.conf')
+    run('cp /var/lib/puppet/ssl/certs/ca.pem' ''
+        '/etc/pki/ca-trust/source/anchors/')
+    run('update-ca-trust')
+    run('abrt-auto-reporting enabled')
+
+
 def manage_repos(os_version=None, cdn=False):
     """Enables only required RHEL repos for Satellite 6."""
 
