@@ -48,24 +48,40 @@ Unsubscribe:
 Satellite Installation
 ----------------------
 
-Complete Satellite installation:
+To install a compose build:
 
-    DISTRO=rhel7 RHN_USERNAME=user@example.com RHN_PASSWORD=mysecret \
-    RHN_POOLID=poolid BASE_URL=http://example.com/Satellite/x86_64/os/ \
-    fab -H root@example.com subscribe install_prerequisites install_satellite \
+```sh
+RHN_USERNAME=user@example.com RHN_PASSWORD=mysecret DISTRO=rhel7 \
+RHN_POOLID=poolid BASE_URL=http://example.com/Satellite/x86_64/os/ \
+fab -H root@example.com \
+    subscribe \
+    install_prerequisites \
+    install_satellite \
     setup_default_capsule
+```
 
-CDN Satellite installation:
+To install a nightly build:
 
-    DISTRO=rhel7 fab -H root@example.com cdn_install setup_default_capsule
-
-Installing nightly builds:
-
-    DISTRO=rhel7 RHN_USERNAME=user@example.com RHN_PASSWORD=mysecret \
-    RHN_POOLID=poolid fab -H root@example.com subscribe install_prerequisites \
+```sh
+RHN_USERNAME=user@example.com RHN_PASSWORD=mysecret DISTRO=rhel7 \
+RHN_POOLID=poolid \
+fab -H root@example.com \
+    subscribe \
+    install_prerequisites \
     install_nightly
+```
 
-All installer tasks will setup the admin password to `changeme`.
+To install from the CDN:
+
+```sh
+RHN_USERNAME=user@example.com RHN_PASSWORD=mysecret DISTRO=rhel7 \
+RHN_POOLID=poolid \
+fab -H root@example.com \
+    cdn_install \
+    setup_default_capsule
+```
+
+All installer tasks will set the admin password to `changeme`.
 
 Miscellaneous
 -------------
@@ -73,4 +89,4 @@ Miscellaneous
 Fabric will use your default ssh key, but if you want specify a different one,
 use the `-i` option:
 
-    fab -i path/to/my_ssh_key.pub task
+    fab -i path/to/my_ssh_key task
