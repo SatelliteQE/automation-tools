@@ -32,13 +32,13 @@ def subscribe(autosubscribe=False):
 
     The following environment variables affect this command:
 
-    `DISTRO`
+    DISTRO
         For example: 'rhel7' or 'rhel65'.
-    `RHN_USERNAME`
+    RHN_USERNAME
         Red Hat Network username.
-    `RHN_PASSWORD`
+    RHN_PASSWORD
         Red Hat Network password.
-    `RHN_POOLID`
+    RHN_POOLID
         Optional. Red Hat Network pool ID. Determines what software will be
         available from RHN.
 
@@ -306,14 +306,20 @@ def vm_create():
     """Task to create a VM using snap-guest based on a ``SOURCE_IMAGE`` base
     image.
 
-    Expects the following environment variables::
+    Expects the following environment variables:
 
-    VM_RAM: RAM memory in MB
-    VM_CPU: number of CPU cores
-    VM_DOMAIN: VM's domain name
-    SOURCE_IMAGE: base image name
-    TARGET_IMAGE: target image name
-    IMAGE_DIR: path where the generated image will be stored
+    VM_RAM
+        RAM memory in MB
+    VM_CPU
+        number of CPU cores
+    VM_DOMAIN
+        VM's domain name
+    SOURCE_IMAGE
+        base image name
+    TARGET_IMAGE
+        target image name
+    IMAGE_DIR
+        path where the generated image will be stored
 
     The VM will have the TARGET_IMAGE.VM_DOMAIN hostname, but make sure to have
     setup DDNS entry correctly.
@@ -358,6 +364,7 @@ def vm_create():
 
 
 def vm_destroy(target_image=None, image_dir=None, delete_image=False):
+    """Task to destroy a VM"""
     if target_image is None:
         print('You should specify the virtual machine image')
         sys.exit(1)
@@ -521,11 +528,11 @@ def install_satellite(admin_password=None):
 
     The following environment variables affect this command:
 
-    `ADMIN_PASSWORD`
+    ADMIN_PASSWORD
         Optional, defaults to 'changeme'. Foreman admin password.
-    `DISTRO`
+    DISTRO
         For example: 'rhel7' or 'rhel65'.
-    `BASE_URL`
+    BASE_URL
         URL for the compose repository.
 
     """
@@ -573,16 +580,16 @@ def cdn_install():
 
     The following environment variables affect this command:
 
-    `DISTRO`
+    DISTRO
         For example: 'rhel7' or 'rhel65'.
-    `RHN_USERNAME`
+    RHN_USERNAME
         Red Hat Network username.
-    `RHN_PASSWORD`
+    RHN_PASSWORD
         Red Hat Network password.
-    `RHN_POOLID`
+    RHN_POOLID
         Optional. Red Hat Network pool ID. Determines what software will be
         available from RHN.
-    `ADMIN_PASSWORD`
+    ADMIN_PASSWORD
         Optional, defaults to 'changeme'. Foreman admin password.
 
     """
