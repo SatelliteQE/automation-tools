@@ -446,6 +446,38 @@ def install_nightly(admin_password=None, org_name=None, loc_name=None):
     run('hammer -u admin -p {0} ping'.format(admin_password))
 
 
+def install_abrt():
+    """Task to install abrt on rhel7 foreman """
+
+    # Install required packages for the installation
+    run('yum install -y rubygem-smart_proxy_abrt rubygem-smart_proxy_pulp')
+    run('service foreman restart')
+
+    # edit the config files
+    host = env['host']
+    run('echo \':foreman_url: https://' + host + '\' '
+        '>> /etc/foreman-proxy/settings.yml')
+    run('sed -i -e "s/^:enabled: false.*/:enabled: true/" '
+        '/etc/foreman-proxy/settings.d/abrt.yml')
+
+    # run the required commands
+    run('yum install -y abrt-cli')
+    run('systemctl start abrtd')
+    run('systemctl start abrt-ccpp')
+
+    # edit the config files
+    run('sed -i -e "s,^URL = .*,URL = https://{0}:8443/abrt/," '
+        '/etc/libreport/plugins/ureport.conf'.format(host))
+    run('sed -i -e "s/^SSLVerify = no.*/SSLVerify = yes/" '
+        '/etc/libreport/plugins/ureport.conf')
+    run('sed -i -e "s/^SSLClientAuth = .*/SSLClientAuth = puppet/" '
+        '/etc/libreport/plugins/ureport.conf')
+    run('cp /var/lib/puppet/ssl/certs/ca.pem' ''
+        ' /etc/pki/ca-trust/source/anchors/')
+    run('update-ca-trust')
+    run('abrt-auto-reporting enabled')
+
+
 def manage_repos(os_version=None, cdn=False):
     """Enables only required RHEL repos for Satellite 6."""
 
