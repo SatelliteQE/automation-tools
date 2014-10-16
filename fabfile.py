@@ -1,3 +1,9 @@
+"""A set of tasks for automating interactions with Satellite servers.
+
+Many commands are affected by environment variables. Unless stated otherwise,
+all environment variables are required.
+
+"""
 from __future__ import print_function
 import os
 import random
@@ -22,7 +28,21 @@ def unsubscribe():
 
 
 def subscribe(autosubscribe=False):
-    """Registers and subscribes machine to Red Hat."""
+    """Registers and subscribes machine to Red Hat.
+
+    The following environment variables affect this command:
+
+    `DISTRO`
+        For example: 'rhel7' or 'rhel65'.
+    `RHN_USERNAME`
+        Red Hat Network username.
+    `RHN_PASSWORD`
+        Red Hat Network password.
+    `RHN_POOLID`
+        Optional. Red Hat Network pool ID. Determines what software will be
+        available from RHN.
+
+    """
 
     # Registration and subscription is only meaningful for Red Hat Enterprise
     # Linux systems.
@@ -66,6 +86,11 @@ def subscribe(autosubscribe=False):
 
 def setup_ddns(entry_domain, host_ip):
     """Task to setup DDNS client
+
+    The following environment variables affect this command:
+
+    * `DDNS_HASH`
+    * `DDNS_PACKAGE_URL`
 
     :param str entry_domain: the FQDN of the host
     :param str entry_hash: host FQDN DDNS entry hash
@@ -457,18 +482,27 @@ def manage_repos(os_version=None, cdn=False):
 
 
 def install_satellite(admin_password=None):
-    """Task to install Satellite 6"""
+    """Task to install Satellite 6
+
+    The following environment variables affect this command:
+
+    `ADMIN_PASSWORD`
+        Optional, defaults to 'changeme'. Foreman admin password.
+    `DISTRO`
+        For example: 'rhel7' or 'rhel65'.
+    `BASE_URL`
+        URL for the compose repository.
+
+    """
     if admin_password is None:
         admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme')
 
     distro = os.environ.get('DISTRO')
-
     if distro is None:
         print('The DISTRO environment variable should be defined')
         sys.exit(1)
 
     base_url = os.environ.get('BASE_URL')
-
     if base_url is None:
         print('The BASE_URL environment variable should be defined')
         sys.exit(1)
@@ -502,32 +536,26 @@ def install_satellite(admin_password=None):
 def cdn_install():
     """Installs Satellite 6 from CDN.
 
-    Note:
-    The following variables must be set for a successful run of
-    this task:
+    The following environment variables affect this command:
 
-    1. DISTRO - 'rhel6' or 'rhel7'
-
-    2. RHN_USERNAME - RHN Username
-
-    3. RHN_PASSWORD - RHN Password
-
-    4. RHN_POOLID   - RHN Pool id to subscribe to
-
-    Optional:
-
-    1. ADMIN_PASSWORD - foreman admin password. default: 'changeme'
+    `DISTRO`
+        For example: 'rhel7' or 'rhel65'.
+    `RHN_USERNAME`
+        Red Hat Network username.
+    `RHN_PASSWORD`
+        Red Hat Network password.
+    `RHN_POOLID`
+        Optional. Red Hat Network pool ID. Determines what software will be
+        available from RHN.
+    `ADMIN_PASSWORD`
+        Optional, defaults to 'changeme'. Foreman admin password.
 
     """
-
     admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme')
-
     distro = os.environ.get('DISTRO')
-
     if distro is None:
         print('The DISTRO environment variable should be defined')
         sys.exit(1)
-
     os_version = distro[4]
 
     # First, subscribe the system
