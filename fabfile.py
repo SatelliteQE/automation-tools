@@ -32,8 +32,8 @@ def subscribe(autosubscribe=False):
 
     The following environment variables affect this command:
 
-    DISTRO
-        For example: 'rhel7' or 'rhel65'.
+    OS_NAME
+        Must be 'rhel'.
     RHN_USERNAME
         Red Hat Network username.
     RHN_PASSWORD
@@ -46,10 +46,8 @@ def subscribe(autosubscribe=False):
 
     # Registration and subscription is only meaningful for Red Hat Enterprise
     # Linux systems.
-    if 'DISTRO' not in os.environ:
-        print('The DISTRO environment variable must be set.')
-        sys.exit(1)
-    if not os.environ['DISTRO'].lower().startswith('rhel'):
+    distro = os.environ.get('OS_NAME', 'rhel')
+    if distro.lower() != 'rhel':
         return
 
     # Register the system.
@@ -458,13 +456,8 @@ def install_nightly(admin_password=None, org_name=None, loc_name=None):
     if loc_name is None:
         loc_name = os.environ.get('LOCATION_NAME', 'Default_Location')
 
-    distro = os.environ.get('DISTRO')
-
-    if distro is None:
-        print('The DISTRO environment variable should be defined')
-        sys.exit(1)
-
-    os_version = distro[4]
+    # Default to RHEL version 7 if none is provided
+    os_version = os.environ.get('OS_VERSION', 7)
 
     manage_repos(os_version)
 
@@ -530,8 +523,8 @@ def install_satellite(admin_password=None):
 
     ADMIN_PASSWORD
         Optional, defaults to 'changeme'. Foreman admin password.
-    DISTRO
-        For example: 'rhel7' or 'rhel65'.
+    OS_VERSION
+        For example, if using RHEL, then use the major version: 5, 6 or 7.
     BASE_URL
         URL for the compose repository.
 
@@ -539,10 +532,8 @@ def install_satellite(admin_password=None):
     if admin_password is None:
         admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme')
 
-    distro = os.environ.get('DISTRO')
-    if distro is None:
-        print('The DISTRO environment variable should be defined')
-        sys.exit(1)
+    # Default to RHEL version 7 if none is provided
+    os_version = os.environ.get('OS_VERSION', 7)
 
     base_url = os.environ.get('BASE_URL')
     if base_url is None:
@@ -558,8 +549,6 @@ def install_satellite(admin_password=None):
     put(local_path=satellite_repo,
         remote_path='/etc/yum.repos.d/satellite.repo')
     satellite_repo.close()
-
-    os_version = distro[4]
 
     manage_repos(os_version)
 
@@ -580,8 +569,8 @@ def cdn_install():
 
     The following environment variables affect this command:
 
-    DISTRO
-        For example: 'rhel7' or 'rhel65'.
+    OS_VERSION
+        For example, if using RHEL, then use the major version: 5, 6 or 7.
     RHN_USERNAME
         Red Hat Network username.
     RHN_PASSWORD
@@ -594,11 +583,9 @@ def cdn_install():
 
     """
     admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme')
-    distro = os.environ.get('DISTRO')
-    if distro is None:
-        print('The DISTRO environment variable should be defined')
-        sys.exit(1)
-    os_version = distro[4]
+
+    # Default to RHEL version 7 if none is provided
+    os_version = os.environ.get('OS_VERSION', 7)
 
     # First, subscribe the system
     subscribe()
@@ -626,13 +613,8 @@ def iso_install(iso_url=None, check_sigs=False):
 
     admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme')
 
-    distro = os.environ.get('DISTRO')
-
-    if distro is None:
-        print('The DISTRO environment variable should be defined')
-        sys.exit(1)
-
-    os_version = distro[4]
+    # Default to RHEL version 7 if none is provided
+    os_version = os.environ.get('OS_VERSION', 7)
 
     # Check that we have a URL
     if iso_url is None:
