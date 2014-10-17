@@ -7,6 +7,7 @@ all environment variables are required.
 from __future__ import print_function
 import os
 import random
+import re
 import sys
 import time
 
@@ -32,8 +33,6 @@ def subscribe(autosubscribe=False):
 
     The following environment variables affect this command:
 
-    OS_NAME
-        Must be 'rhel'.
     RHN_USERNAME
         Red Hat Network username.
     RHN_PASSWORD
@@ -46,7 +45,7 @@ def subscribe(autosubscribe=False):
 
     # Registration and subscription is only meaningful for Red Hat Enterprise
     # Linux systems.
-    distro = os.environ.get('OS_NAME', 'rhel')
+    distro = distro_info()[0]
     if distro.lower() != 'rhel':
         return
 
@@ -460,8 +459,7 @@ def install_nightly(admin_password=None, org_name=None, loc_name=None):
     if loc_name is None:
         loc_name = os.environ.get('LOCATION_NAME', 'Default_Location')
 
-    # Default to RHEL version 7 if none is provided
-    os_version = os.environ.get('OS_VERSION', 7)
+    os_version = distro_info()[1]
 
     manage_repos(os_version)
 
@@ -527,8 +525,6 @@ def install_satellite(admin_password=None):
 
     ADMIN_PASSWORD
         Optional, defaults to 'changeme'. Foreman admin password.
-    OS_VERSION
-        For example, if using RHEL, then use the major version: 5, 6 or 7.
     BASE_URL
         URL for the compose repository.
 
@@ -536,8 +532,7 @@ def install_satellite(admin_password=None):
     if admin_password is None:
         admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme')
 
-    # Default to RHEL version 7 if none is provided
-    os_version = os.environ.get('OS_VERSION', 7)
+    os_version = distro_info()[1]
 
     base_url = os.environ.get('BASE_URL')
     if base_url is None:
@@ -573,8 +568,6 @@ def cdn_install():
 
     The following environment variables affect this command:
 
-    OS_VERSION
-        For example, if using RHEL, then use the major version: 5, 6 or 7.
     RHN_USERNAME
         Red Hat Network username.
     RHN_PASSWORD
@@ -588,8 +581,7 @@ def cdn_install():
     """
     admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme')
 
-    # Default to RHEL version 7 if none is provided
-    os_version = os.environ.get('OS_VERSION', 7)
+    os_version = distro_info()[1]
 
     # First, subscribe the system
     subscribe()
@@ -617,8 +609,7 @@ def iso_install(iso_url=None, check_sigs=False):
 
     admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme')
 
-    # Default to RHEL version 7 if none is provided
-    os_version = os.environ.get('OS_VERSION', 7)
+    os_version = distro_info()[1]
 
     # Check that we have a URL
     if iso_url is None:
@@ -701,7 +692,7 @@ def provision_install(task_name, certificate_url=None):
 
     if task_name == 'upstream':
         execute(install_nightly, host=env['vm_ip'])
-        if os.environ.get('OS_VERSION', '') == '7':
+        if distro_info()[1] == '7':
             execute(setup_abrt, host=env['vm_ip'])
         else:
             print('WARNING: ABRT was not set up')
@@ -799,6 +790,52 @@ def create_personal_git_repo(name, private=False):
     run('install -d -m 755 ~/public_git/')
     put(repo_name, '~/public_git/')
     local('rm -rf {0}'.format(repo_name))
+
+
+def distro_info():
+    """Task which figures out the distro information based on the
+    /etc/redhat-release file
+
+    A `(distro, major_version)` tuple is returned if called as a function.
+
+    """
+    # Create/manage host cache
+    cache = env.get('distro_info_cache')
+    host = env['host']
+    if cache is None:
+        cache = env['distro_info_cache'] = {}
+
+    if host not in cache:
+        # Grab the information and store on cache
+        release_info = run('cat /etc/redhat-release', quiet=True)
+        if release_info.return_code != 0:
+            print('Failed to read /etc/redhat-release file')
+            sys.exit(1)
+
+        # Discover the distro
+        if release_info.startswith('Red Hat Enterprise Linux'):
+            distro = 'rhel'
+        elif release_info.startswith('Fedora'):
+            distro = 'fedora'
+        else:
+            distro = None
+
+        # Discover the version
+        match = re.search(r' ([0-9.]+) ', release_info)
+        if match is not None:
+            version = match.group(1).split('.')[0]
+        else:
+            version = None
+
+        if distro is None or version is None:
+            print('Was not possible to fetch distro information')
+            sys.exit(1)
+
+        cache[host] = distro, version
+
+    distro, version = cache[host]
+    print('{0} {1}'.format(distro, version))
+    return distro, version
 
 
 # Client registration
