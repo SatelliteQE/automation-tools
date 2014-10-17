@@ -7,6 +7,7 @@ all environment variables are required.
 from __future__ import print_function
 import os
 import random
+import re
 import sys
 import time
 
@@ -799,6 +800,52 @@ def create_personal_git_repo(name, private=False):
     run('install -d -m 755 ~/public_git/')
     put(repo_name, '~/public_git/')
     local('rm -rf {0}'.format(repo_name))
+
+
+def distro_info():
+    """Task which figures out the distro information based on the
+    /etc/redhat-release file
+
+    A `(distro, major_version)` tuple is returned if called as a function.
+
+    """
+    # Create/manage host cache
+    cache = env.get('distro_info_cache')
+    host = env['host']
+    if cache is None:
+        cache = env['distro_info_cache'] = {}
+
+    if host not in cache:
+        # Grab the information and store on cache
+        release_info = run('cat /etc/redhat-release', quiet=True)
+        if release_info.return_code != 0:
+            print('Failed to read /etc/redhat-release file')
+            sys.exit(1)
+
+        # Discover the distro
+        if release_info.startswith('Red Hat Enterprise Linux'):
+            distro = 'rhel'
+        elif release_info.startswith('Fedora'):
+            distro = 'fedora'
+        else:
+            distro = None
+
+        # Discover the version
+        match = re.search(r' ([0-9.]+) ', release_info)
+        if match is not None:
+            version = match.group(1).split('.')[0]
+        else:
+            version = None
+
+        if distro is None or version is None:
+            print('Was not possible to fetch distro information')
+            sys.exit(1)
+
+        cache[host] = distro, version
+
+    distro, version = cache[host]
+    print('{0} {1}'.format(distro, version))
+    return distro, version
 
 
 # Client registration
