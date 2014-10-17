@@ -266,7 +266,11 @@ def setup_fake_manifest_certificate(certificate_url=None):
 
 
 def setup_abrt():
-    """Task to setup abrt on rhel7 foreman"""
+    """Task to setup abrt on foreman
+
+    Currently only available on RHEL7, check BZ #1150197 for more info
+
+    """
     # Install required packages for the installation
     run(
         'yum install -y '
@@ -697,6 +701,10 @@ def provision_install(task_name, certificate_url=None):
 
     if task_name == 'upstream':
         execute(install_nightly, host=env['vm_ip'])
+        if os.environ.get('OS_VERSION', '') == '7':
+            execute(setup_abrt, host=env['vm_ip'])
+        else:
+            print('WARNING: ABRT was not set up')
 
     certificate_url = certificate_url or os.environ.get(
         'FAKE_MANIFEST_CERT_URL')
