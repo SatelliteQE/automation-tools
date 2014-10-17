@@ -33,8 +33,6 @@ def subscribe(autosubscribe=False):
 
     The following environment variables affect this command:
 
-    OS_NAME
-        Must be 'rhel'.
     RHN_USERNAME
         Red Hat Network username.
     RHN_PASSWORD
@@ -47,7 +45,7 @@ def subscribe(autosubscribe=False):
 
     # Registration and subscription is only meaningful for Red Hat Enterprise
     # Linux systems.
-    distro = os.environ.get('OS_NAME', 'rhel')
+    distro = distro_info()[0]
     if distro.lower() != 'rhel':
         return
 
@@ -461,8 +459,7 @@ def install_nightly(admin_password=None, org_name=None, loc_name=None):
     if loc_name is None:
         loc_name = os.environ.get('LOCATION_NAME', 'Default_Location')
 
-    # Default to RHEL version 7 if none is provided
-    os_version = os.environ.get('OS_VERSION', 7)
+    os_version = distro_info()[1]
 
     manage_repos(os_version)
 
@@ -528,8 +525,6 @@ def install_satellite(admin_password=None):
 
     ADMIN_PASSWORD
         Optional, defaults to 'changeme'. Foreman admin password.
-    OS_VERSION
-        For example, if using RHEL, then use the major version: 5, 6 or 7.
     BASE_URL
         URL for the compose repository.
 
@@ -537,8 +532,7 @@ def install_satellite(admin_password=None):
     if admin_password is None:
         admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme')
 
-    # Default to RHEL version 7 if none is provided
-    os_version = os.environ.get('OS_VERSION', 7)
+    os_version = distro_info()[1]
 
     base_url = os.environ.get('BASE_URL')
     if base_url is None:
@@ -574,8 +568,6 @@ def cdn_install():
 
     The following environment variables affect this command:
 
-    OS_VERSION
-        For example, if using RHEL, then use the major version: 5, 6 or 7.
     RHN_USERNAME
         Red Hat Network username.
     RHN_PASSWORD
@@ -589,8 +581,7 @@ def cdn_install():
     """
     admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme')
 
-    # Default to RHEL version 7 if none is provided
-    os_version = os.environ.get('OS_VERSION', 7)
+    os_version = distro_info()[1]
 
     # First, subscribe the system
     subscribe()
@@ -618,8 +609,7 @@ def iso_install(iso_url=None, check_sigs=False):
 
     admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme')
 
-    # Default to RHEL version 7 if none is provided
-    os_version = os.environ.get('OS_VERSION', 7)
+    os_version = distro_info()[1]
 
     # Check that we have a URL
     if iso_url is None:
@@ -702,7 +692,7 @@ def provision_install(task_name, certificate_url=None):
 
     if task_name == 'upstream':
         execute(install_nightly, host=env['vm_ip'])
-        if os.environ.get('OS_VERSION', '') == '7':
+        if distro_info()[1] == '7':
             execute(setup_abrt, host=env['vm_ip'])
         else:
             print('WARNING: ABRT was not set up')
