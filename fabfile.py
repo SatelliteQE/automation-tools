@@ -517,6 +517,9 @@ def manage_repos(os_version=None, cdn=False):
         ''.format(os_version))
     run('yum repolist')
 
+    # Update packages
+    run('yum update -y', warn_only=True)
+
 
 def install_satellite(admin_password=None):
     """Task to install Satellite 6
