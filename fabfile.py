@@ -7,9 +7,10 @@ all environment variables are required.
 from __future__ import print_function
 import os
 import random
-import re
 import sys
 import time
+from re import search
+from urlparse import urlsplit
 
 from fabric.api import cd, env, execute, local, put, run
 if sys.version_info[0] is 2:
@@ -116,32 +117,74 @@ def setup_ddns(entry_domain, host_ip):
     run('redhat-ddns-client')
 
 
-def setup_http_proxy():
-    """Task to setup HTTP proxy and block non-proxy traffic from your foreman
+def setup_proxy():
+    """Task to setup a proxy and block non-proxy traffic from your foreman
     server.
 
+    Proxy information is passed using the PROXY_INFO environmental variable.
+    e.g. PROXY_INFO=proxy://root:myP4$$@myhost.awesomedomain.com:8888
     """
-    proxy_hostname = os.environ.get('PROXY_HOSTNAME')
-    proxy_port = os.environ.get('PROXY_PORT')
-    proxy_username = os.environ.get('PROXY_USER')
-    proxy_password = os.environ.get('PROXY_PASSWORD')
 
-    eth = run('ping -c 1 $(hostname) | grep "icmp_seq"')
-    proxy = run('ping -c 1 {} | grep "icmp_seq"'.format(proxy_hostname))
-    nameservers = run(
-        'cat /etc/resolv.conf | grep nameserver | cut -d " " -f 2')
-    eth = eth.split('(')[1].split(')')[0]
-    proxy = proxy.split('(')[1].split(')')[0]
+    proxy_info = urlsplit(os.environ.get('PROXY_INFO'))
+    if not proxy_info.hostname or not proxy_info.port:
+        raise Exception("You must include the proxy hostname and port.")
+
+    # Configure pulp to use the proxy (ref BZ1114083)
+    proxy_json = (
+        '{{'
+        '    "proxy_host": "http://{0}", '
+        '    "proxy_port": {1}, '
+        '    "proxy_username": "{2}", '
+        '    "proxy_password": "{3}"'
+        '}}'
+        .format(proxy_info.hostname, proxy_info.port,
+                proxy_info.username, proxy_info.password)
+    )
+
+    # write the json to the appropriate files
+    run("echo '{0}' | tee {1} {2} {3}".format(
+        proxy_json,
+        '/etc/pulp/server/plugins.conf.d/iso_importer.json',
+        '/etc/pulp/server/plugins.conf.d/puppet_importer.json',
+        '/etc/pulp/server/plugins.conf.d/yum_importer.json'
+        ))
+
+    # restart the capsule-related services
+    run(
+        "service httpd restart;"
+        "service pulp_celerybeat restart;"
+        "service pulp_resource_manager restart;"
+        "service pulp_workers restart;"
+    )
+
+    if distro_info()[1] >= 7:
+        # rhel7 replaced iptables with firewalld
+        run("yum -y install iptables-services;"
+            "systemctl mask firewalld.service;"
+            "systemctl enable iptables.service;"
+            "systemctl stop firewalld.service;"
+            "systemctl start iptables.service;")
 
     # Satellite 6 IP
-    run('iptables -I OUTPUT -d {} -j ACCEPT'.format(eth))
+    sat_ip = search(
+        r'\d+ bytes from (.*):',
+        run('ping -c 1 -n $(hostname) | grep "icmp_seq"')
+    ).group(1)
+    run('iptables -I OUTPUT -d {} -j ACCEPT'.format(sat_ip))
 
     # PROXY IP
-    run('iptables -I OUTPUT -d {} -j ACCEPT'.format(proxy))
+    proxy_ip = search(
+        r'\d+ bytes from (.*):',
+        run('ping -c 1 -n $(hostname) | grep "icmp_seq"'
+            .format(proxy_info.hostname))
+    ).group(1)
+    run('iptables -I OUTPUT -d {} -j ACCEPT'.format(proxy_ip))
 
     # Nameservers
+    nameservers = run(
+        'cat /etc/resolv.conf | grep nameserver | cut -d " " -f 2')
     for entry in nameservers.split('\n'):
-        run('iptables -I OUTPUT -d {} -j ACCEPT'.format(entry))
+        run('iptables -I OUTPUT -d {} -j ACCEPT'.format(entry.strip()))
 
     # To make the changes persistent across reboots when using the command line
     # use this command:
@@ -150,27 +193,30 @@ def setup_http_proxy():
     run('service iptables restart')
 
     # Configuring yum to use the proxy
-    run('echo "proxy=http://{}:{}" >> /etc/yum.conf'
-        ''.format(proxy_hostname, proxy_port))
-    run('echo "proxy_username={}" >> /etc/yum.conf'.format(proxy_username))
-    run('echo "proxy_password={}" >> /etc/yum.conf'.format(proxy_password))
+    run('echo "proxy=http://{0}:{1}" >> /etc/yum.conf'
+        .format(proxy_info.hostname, proxy_info.port))
+    run('echo "proxy_username={}" >> /etc/yum.conf'
+        .format(proxy_info.username))
+    run('echo "proxy_password={}" >> /etc/yum.conf'
+        .format(proxy_info.password))
 
     # Configuring rhsm to use the proxy
     run('sed -i -e "s/^proxy_hostname.*/proxy_hostname = {}/" '
-        '/etc/rhsm/rhsm.conf'.format(proxy_hostname))
+        '/etc/rhsm/rhsm.conf'.format(proxy_info.hostname))
     run('sed -i -e "s/^proxy_port.*/proxy_port = {}/" '
-        '/etc/rhsm/rhsm.conf'.format(proxy_port))
+        '/etc/rhsm/rhsm.conf'.format(proxy_info.port))
     run('sed -i -e "s/^proxy_user.*/proxy_user = {}/" '
-        '/etc/rhsm/rhsm.conf'.format(proxy_username))
+        '/etc/rhsm/rhsm.conf'.format(proxy_info.username))
     run('sed -i -e "s/^proxy_password.*/proxy_password = {}/" '
-        '/etc/rhsm/rhsm.conf'.format(proxy_password))
+        '/etc/rhsm/rhsm.conf'.format(proxy_info.password))
 
     # Run the installer
     run('katello-installer -v --foreman-admin-password="changeme" '
-        '--katello-proxy-url=http://{} --katello-proxy-port={} '
-        '--katello-proxy-username={} '
-        '--katello-proxy-password={}'.format(
-            proxy_hostname, proxy_port, proxy_username, proxy_password
+        '--katello-proxy-url=http://{0} --katello-proxy-port={1} '
+        '--katello-proxy-username={2} '
+        '--katello-proxy-password={3}'.format(
+            proxy_info.hostname, proxy_info.port,
+            proxy_info.username, proxy_info.password
         ))
 
 
@@ -824,7 +870,7 @@ def distro_info():
             distro = None
 
         # Discover the version
-        match = re.search(r' ([0-9.]+) ', release_info)
+        match = search(r' ([0-9.]+) ', release_info)
         if match is not None:
             version = match.group(1).split('.')[0]
         else:
