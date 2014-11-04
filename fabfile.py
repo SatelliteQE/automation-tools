@@ -741,7 +741,9 @@ def provision_install(task_name, certificate_url=None):
 
     if task_name == 'upstream':
         execute(install_nightly, host=env['vm_ip'])
-        if distro_info()[1] == '7':
+        # execute return a dict, the result is the first value
+        info = execute(distro_info, host=env['vm_ip']).values()[0]
+        if info[1] == 7:
             execute(setup_abrt, host=env['vm_ip'])
         else:
             print('WARNING: ABRT was not set up')
@@ -845,7 +847,9 @@ def distro_info():
     """Task which figures out the distro information based on the
     /etc/redhat-release file
 
-    A `(distro, major_version)` tuple is returned if called as a function.
+    A `(distro, major_version)` tuple is returned if called as a function. For
+    RHEL X.Y.Z it will return ('rhel', X). For Fedora X it will return
+    ('fedora', X). Be aware that the majon_version is an integer.
 
     """
     # Create/manage host cache
@@ -872,7 +876,8 @@ def distro_info():
         # Discover the version
         match = search(r' ([0-9.]+) ', release_info)
         if match is not None:
-            version = match.group(1).split('.')[0]
+            # extract the major version
+            version = int(match.group(1).split('.')[0])
         else:
             version = None
 
