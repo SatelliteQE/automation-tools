@@ -887,6 +887,40 @@ def distro_info():
     return distro, version
 
 
+def performance_tuning(running_on_vm=True):
+    """Task which tunes up the Satellite 6 performance
+
+    Set running_on_vm to False if improving performance on a bare metal machine
+
+    """
+    # Command-line arguments are passed in as strings.
+    if isinstance(running_on_vm, str):
+        running_on_vm = (running_on_vm.lower() == 'true')
+
+    distro_version = distro_info()[1]
+    if distro_version <= 6:
+        service_management_cmd = 'service {0} {1}'
+    else:
+        service_management_cmd = 'systemctl {1} {0}'
+
+    # httpd configuration
+    run('sed -i -e "s/^KeepAlive.*/KeepAlive On/" '
+        '/etc/httpd/conf/httpd.conf')
+    run(service_management_cmd.format('httpd', 'restart'))
+
+    # tuned setup
+    run('yum install -y tuned', warn_only=True)
+    if distro_version <= 6:
+        run('chkconfig tuned on')
+    else:
+        run('systemctl enable tuned')
+    run(service_management_cmd.format('tuned', 'start'))
+    if running_on_vm:
+        run('tuned-adm profile virtual-guest')
+    else:
+        run('tuned-adm profile throughput-performance')
+
+
 # Client registration
 # ==================================================
 def clean_rhsm():
