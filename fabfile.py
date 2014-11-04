@@ -70,7 +70,7 @@ def subscribe(autosubscribe=False):
         has_pool_msg = (
             'This unit has already had the subscription matching pool ID'
         )
-        for _ in range(3):
+        for _ in range(10):
             result = run(
                 'subscription-manager subscribe --pool={0}'.format(rhn_poolid),
                 warn_only=True
