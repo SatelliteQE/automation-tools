@@ -849,7 +849,7 @@ def distro_info():
 
     A `(distro, major_version)` tuple is returned if called as a function. For
     RHEL X.Y.Z it will return ('rhel', X). For Fedora X it will return
-    ('fedora', X). Be aware that the majon_version is an integer.
+    ('fedora', X). Be aware that the major_version is an integer.
 
     """
     # Create/manage host cache
