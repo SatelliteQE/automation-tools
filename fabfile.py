@@ -518,7 +518,7 @@ def install_nightly(admin_password=None, org_name=None, loc_name=None):
     # Make sure that SELinux is enabled
     run('setenforce 1')
     run('cd katello-deploy && ./setup.rb --skip-installer '
-        'rhel{os_version}'.format(os_version=os_version))
+        '--os rhel{os_version}'.format(os_version=os_version))
     run('katello-installer -v -d '
         '--foreman-admin-password="{0}" '
         '--foreman-initial-organization="{1}" '
