@@ -496,42 +496,6 @@ def install_prerequisites():
     run('iptables-save > /etc/sysconfig/iptables')
 
 
-def install_nightly(admin_password=None, org_name=None, loc_name=None):
-    """Task to install Foreman nightly using katello-deploy script"""
-    if admin_password is None:
-        admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme')
-    if org_name is None:
-        org_name = os.environ.get('ORGANIZATION_NAME', 'Default_Organization')
-    if loc_name is None:
-        loc_name = os.environ.get('LOCATION_NAME', 'Default_Location')
-
-    os_version = distro_info()[1]
-
-    manage_repos(os_version)
-
-    # Install required packages for the installation
-    run('yum install -y git ruby')
-
-    run('if [ -d katello-deploy ]; then rm -rf katello-deploy; fi')
-    run('git clone https://github.com/Katello/katello-deploy.git')
-
-    # Make sure that SELinux is enabled
-    run('setenforce 1')
-    run('yum repolist')
-    run('cd katello-deploy && ./setup.rb --skip-installer '
-        '--os rhel{os_version}'.format(os_version=os_version))
-    run('yum repolist')
-    run('katello-installer -v -d '
-        '--foreman-admin-password="{0}" '
-        '--foreman-initial-organization="{1}" '
-        '--foreman-initial-location="{2}"'
-        ''.format(admin_password, org_name, loc_name))
-    run('yum repolist')
-
-    # Ensure that the installer worked
-    run('hammer -u admin -p {0} ping'.format(admin_password))
-
-
 def manage_repos(os_version=None, cdn=False):
     """Enables only required RHEL repos for Satellite 6."""
 
@@ -570,7 +534,43 @@ def manage_repos(os_version=None, cdn=False):
     run('yum update -y', warn_only=True)
 
 
-def install_satellite(admin_password=None):
+def upstream_install(admin_password=None, org_name=None, loc_name=None):
+    """Task to install Foreman nightly using katello-deploy script"""
+    if admin_password is None:
+        admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme')
+    if org_name is None:
+        org_name = os.environ.get('ORGANIZATION_NAME', 'Default_Organization')
+    if loc_name is None:
+        loc_name = os.environ.get('LOCATION_NAME', 'Default_Location')
+
+    os_version = distro_info()[1]
+
+    manage_repos(os_version)
+
+    # Install required packages for the installation
+    run('yum install -y git ruby')
+
+    run('if [ -d katello-deploy ]; then rm -rf katello-deploy; fi')
+    run('git clone https://github.com/Katello/katello-deploy.git')
+
+    # Make sure that SELinux is enabled
+    run('setenforce 1')
+    run('yum repolist')
+    run('cd katello-deploy && ./setup.rb --skip-installer '
+        '--os rhel{os_version}'.format(os_version=os_version))
+    run('yum repolist')
+    run('katello-installer -v -d '
+        '--foreman-admin-password="{0}" '
+        '--foreman-initial-organization="{1}" '
+        '--foreman-initial-location="{2}"'
+        ''.format(admin_password, org_name, loc_name))
+    run('yum repolist')
+
+    # Ensure that the installer worked
+    run('hammer -u admin -p {0} ping'.format(admin_password))
+
+
+def downstream_install(admin_password=None):
     """Task to install Satellite 6
 
     The following environment variables affect this command:
@@ -696,60 +696,73 @@ def iso_install(iso_url=None, check_sigs=False):
     run('hammer -u admin -p {0} ping'.format(admin_password))
 
 
-def provision_install(task_name, certificate_url=None):
-    """Task to be run by the provisioning job in order to provision a clean
-    machine with a fresh Satellite installation.
+def product_install(distribution, create_vm=False, certificate_url=None):
+    """Task which install every product distribution.
 
-    According to the ``task_name`` provided, it will install downstream,
-    upstream or ISO.
+    Product distributions are cdn, downstream, iso or upstream.
+
+    If ``create_vm`` is True then ``vm_destroy`` and ``vm_create`` tasks will
+    be run. Make sure to set the required environment variables for those
+    tasks. Also, if one of the ``setup_ddns`` required environment variables
+    is set then that task will run.
 
     If ``certificate_url`` parameter or ``FAKE_MANIFEST_CERT_URL`` env var is
     defined the setup_fake_manifest_certificate task will run.
 
+    :param str distribution: product distribution wanted to install
+    :param bool create_vm: creates a virtual machine and then install the
+        product on it. Default: False.
+    :param str certificate_url: where to fetch a fake certificate.
+
     """
-    task_names = ('downstream', 'iso', 'upstream')
+    # Command-line arguments are passed in as strings.
+    if isinstance(create_vm, str):
+        create_vm = (create_vm.lower() == 'true')
 
-    if task_name not in task_names:
-        print('task_name "{0}" should be one of {1}'.format(
-            task_name, ', '.join(task_names)))
+    distributions = ('cdn', 'downstream', 'iso', 'upstream')
+    if distribution not in distributions:
+        print('distribution "{0}" should be one of {1}'.format(
+            distribution, ', '.join(distributions)))
         sys.exit(1)
 
-    target_image = os.environ.get('TARGET_IMAGE')
-    if target_image is None:
-        print('The TARGET_IMAGE environment variable should be defined')
-        sys.exit(1)
-
-    if task_name == 'iso':
+    if distribution == 'iso':
         iso_url = os.environ.get('ISO_URL')
         if iso_url is None:
             print('The ISO_URL environment variable should be defined')
             sys.exit(1)
 
-    execute(vm_destroy, target_image, delete_image=True)
-    execute(vm_create)
-    execute(setup_ddns, env['vm_domain'], env['vm_ip'], host=env['vm_ip'])
+    if create_vm:
+        target_image = os.environ.get('TARGET_IMAGE')
+        if target_image is None:
+            print('The TARGET_IMAGE environment variable should be defined')
+            sys.exit(1)
+
+        execute(vm_destroy, target_image, delete_image=True)
+        execute(vm_create)
+
+        if 'DDNS_HASH' in os.environ or 'DDNS_PACKAGE_URL' in os.environ:
+            execute(
+                setup_ddns, env['vm_domain'], env['vm_ip'], host=env['vm_ip'])
+
+    # When creating a vm the vm_ip will be set, otherwise use the fabric host
+    host = env.get('vm_ip', env['host'])
 
     # Register and subscribe machine to Red Hat
-    execute(subscribe, host=env['vm_ip'])
+    execute(subscribe, host=host)
 
-    execute(install_prerequisites, host=env['vm_ip'])
+    execute(install_prerequisites, host=host)
 
-    if task_name == 'downstream':
-        execute(install_satellite, host=env['vm_ip'])
-        execute(setup_default_capsule, host=env['vm_ip'])
+    execute('{}_install'.format(distribution), host=host)
 
-    if task_name == 'iso':
-        execute(iso_install, iso_url, host=env['vm_ip'])
-        execute(setup_default_capsule, host=env['vm_ip'])
+    if distribution in ('cdn', 'downstream', 'iso'):
+        execute(setup_default_capsule, host=host)
 
-    if task_name == 'upstream':
-        execute(install_nightly, host=env['vm_ip'])
-        # execute return a dict, the result is the first value
-        info = execute(distro_info, host=env['vm_ip']).values()[0]
-        if info[1] == 7:
-            execute(setup_abrt, host=env['vm_ip'])
-        else:
-            print('WARNING: ABRT was not set up')
+    # execute returns a dict, the result is the first value
+    info = execute(distro_info, host=host).values()[0]
+    if info[1] == 7:
+        execute(setup_abrt, host=host)
+    else:
+        print('WARNING: ABRT was not set up')
 
     certificate_url = certificate_url or os.environ.get(
         'FAKE_MANIFEST_CERT_URL')
@@ -757,7 +770,7 @@ def provision_install(task_name, certificate_url=None):
         execute(
             setup_fake_manifest_certificate,
             certificate_url,
-            host=env['vm_ip']
+            host=host
         )
 
 
