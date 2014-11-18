@@ -451,6 +451,94 @@ def vm_list_base(base_image_dir=None):
         run('snap-guest --list')
 
 
+def setup_vm_provisioning(interface=None):
+    """Task which setup required packages to provision VMs"""
+    if interface is None:
+        print('A network interface is required')
+        sys.exit(1)
+
+    # Check for virtualization support
+    result = run('egrep "^flags.*(vmx|svm)" /proc/cpuinfo')
+    if result.return_code:
+        print('Virtualization is not supported on this machine')
+        sys.exit(1)
+
+    # Install virtualization packages
+    run('yum install @virtualization')
+    run('systemctl start libvirtd')
+    run('systemctl enable libvirtd')
+
+    # Install other required packages
+    packages = (
+        'bash',
+        'bridge-utils',
+        'cloud-utils',
+        'genisoimage',
+        'git',
+        'kvm',
+        'libguestfs-mount',
+        'openssl',
+        'perl',
+        'perl-Sys-Guestfs',
+        'python-virtinst',
+        'qemu-img',
+        'sed',
+        'util-linux',
+    )
+    run('yum install -y {}'.format(' '.join(packages)))
+
+    # Setup snap-guest
+    result = run('[ -d /opt/snap-guest ]', warn_only=True)
+    if result.return_code != 0:
+        with cd('/opt'):
+            run('git clone git://github.com/lzap/snap-guest.git')
+        run('sudo ln -s /opt/snap-guest/snap-guest /usr/local/bin/snap-guest')
+    else:
+        print('Snap-guest already setup, pulling from upstream')
+        with cd('/opt/snap-guest'):
+            run('git pull')
+
+    # Setup bridge
+    result = run(
+        '[ -f /etc/sysconfig/network-scripts/ifcfg-br0 ]', warn_only=True)
+    if result.return_code != 0:
+        # Disable NetworkManager
+        run('chkconfig NetworkManager off')
+        run('chkconfig network on')
+        run('service NetworkManager stop')
+        run('service network start')
+
+        # Configure bridge
+        ifcfg = '/etc/sysconfig/network-scripts/ifcfg-{}'.format(interface)
+        run('echo NM_CONTROLLED=no >> {}'.format(ifcfg))
+        run('echo BRIDGE=br0 >> {}'.format(ifcfg))
+
+        ifcfg_br0 = StringIO()
+        ifcfg_br0.write('\n')
+        ifcfg_br0.write('DEVICE=br0\n')
+        ifcfg_br0.write('BOOTPROTO=dhcp\n')
+        ifcfg_br0.write('ONBOOT=yes\n')
+        ifcfg_br0.write('TYPE=Bridge\n')
+        ifcfg_br0.write('NM_CONTROLLED=no\n')
+        put(local_path=ifcfg_br0,
+            remote_path='/etc/sysconfig/network-scripts/ifcfg-br0')
+        ifcfg_br0.close()
+
+        run('service network restart')
+
+        # Configure iptables to allow all traffic to be forwarded across the
+        # bridge
+        run('iptables -I FORWARD -m physdev --physdev-is-bridged -j ACCEPT')
+        run('service iptables save')
+        run('service iptables restart')
+
+        # Restart the libvirt daemon
+        run('service libvirtd reload')
+
+        # Show configured bridges
+        run('brctl show')
+
+
 def install_prerequisites():
     """Task to ensure that the prerequisites for installation are in place"""
 
