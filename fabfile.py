@@ -125,6 +125,8 @@ def setup_proxy():
     e.g. PROXY_INFO=proxy://root:myP4$$@myhost.awesomedomain.com:8888
     """
 
+    os_version = distro_info()[1]
+
     proxy_info = urlsplit(os.environ.get('PROXY_INFO'))
     if not proxy_info.hostname or not proxy_info.port:
         raise Exception("You must include the proxy hostname and port.")
@@ -150,64 +152,63 @@ def setup_proxy():
         ))
 
     # restart the capsule-related services
-    run(
-        "service httpd restart;"
-        "service pulp_celerybeat restart;"
-        "service pulp_resource_manager restart;"
-        "service pulp_workers restart;"
+    daemons = (
+        'httpd', 'pulp_celerybeat', 'pulp_resource_manager', 'pulp_workers',
     )
-
-    if distro_info()[1] >= 7:
-        # rhel7 replaced iptables with firewalld
-        run("yum -y install iptables-services;"
-            "systemctl mask firewalld.service;"
-            "systemctl enable iptables.service;"
-            "systemctl stop firewalld.service;"
-            "systemctl start iptables.service;")
+    if os_version >= 7:
+        run('systemctl restart {0}'.format(' '.join(daemons)), warn_only=True)
+        run('yum install -y iptables-services')  # Install firewall package
+    else:
+        for daemon in daemons:
+            run('service {0} restart'.format(daemon), warn_only=True)
 
     # Satellite 6 IP
     sat_ip = search(
         r'\d+ bytes from (.*):',
         run('ping -c 1 -n $(hostname) | grep "icmp_seq"')
     ).group(1)
-    run('iptables -I OUTPUT -d {} -j ACCEPT'.format(sat_ip))
+    run('iptables -I OUTPUT -d {0} -j ACCEPT'.format(sat_ip))
 
     # PROXY IP
     proxy_ip = search(
         r'\d+ bytes from (.*):',
-        run('ping -c 1 -n $(hostname) | grep "icmp_seq"'
-            .format(proxy_info.hostname))
+        run('ping -c 1 -n {0} | grep "icmp_seq"'.format(proxy_info.hostname))
     ).group(1)
-    run('iptables -I OUTPUT -d {} -j ACCEPT'.format(proxy_ip))
+    run('iptables -I OUTPUT -d {0} -j ACCEPT'.format(proxy_ip))
 
     # Nameservers
     nameservers = run(
         'cat /etc/resolv.conf | grep nameserver | cut -d " " -f 2')
     for entry in nameservers.split('\n'):
-        run('iptables -I OUTPUT -d {} -j ACCEPT'.format(entry.strip()))
+        run('iptables -I OUTPUT -d {0} -j ACCEPT'.format(entry.strip()))
 
     # To make the changes persistent across reboots when using the command line
     # use this command:
     run('iptables-save > /etc/sysconfig/iptables')
 
-    run('service iptables restart')
+    if os_version >= 7:
+        # rhel7 replaced iptables with firewalld
+        run('systemctl enable iptables')
+        run('systemctl restart iptables', warn_only=True)
+    else:
+        run('service iptables restart')
 
     # Configuring yum to use the proxy
     run('echo "proxy=http://{0}:{1}" >> /etc/yum.conf'
         .format(proxy_info.hostname, proxy_info.port))
-    run('echo "proxy_username={}" >> /etc/yum.conf'
+    run('echo "proxy_username={0}" >> /etc/yum.conf'
         .format(proxy_info.username))
-    run('echo "proxy_password={}" >> /etc/yum.conf'
+    run('echo "proxy_password={0}" >> /etc/yum.conf'
         .format(proxy_info.password))
 
     # Configuring rhsm to use the proxy
-    run('sed -i -e "s/^proxy_hostname.*/proxy_hostname = {}/" '
+    run('sed -i -e "s/^proxy_hostname.*/proxy_hostname = {0}/" '
         '/etc/rhsm/rhsm.conf'.format(proxy_info.hostname))
-    run('sed -i -e "s/^proxy_port.*/proxy_port = {}/" '
+    run('sed -i -e "s/^proxy_port.*/proxy_port = {0}/" '
         '/etc/rhsm/rhsm.conf'.format(proxy_info.port))
-    run('sed -i -e "s/^proxy_user.*/proxy_user = {}/" '
+    run('sed -i -e "s/^proxy_user.*/proxy_user = {0}/" '
         '/etc/rhsm/rhsm.conf'.format(proxy_info.username))
-    run('sed -i -e "s/^proxy_password.*/proxy_password = {}/" '
+    run('sed -i -e "s/^proxy_password.*/proxy_password = {0}/" '
         '/etc/rhsm/rhsm.conf'.format(proxy_info.password))
 
     # Run the installer
@@ -301,13 +302,12 @@ def setup_fake_manifest_certificate(certificate_url=None):
     run('wget -O /etc/candlepin/certs/upstream/fake_manifest.crt '
         '{certificate_url}'.format(certificate_url=certificate_url))
 
-    uname = run('uname -r')
-    if 'el6' in uname:
+    os_version = distro_info()[1]
+
+    if os_version <= 6:
         run('service tomcat6 restart')
-    elif 'el7' in uname:
-        run('service tomcat restart')
     else:
-        print('Unable to restart tomcat')
+        run('systemctl restart tomcat')
 
 
 def setup_abrt():
@@ -323,7 +323,8 @@ def setup_abrt():
         'rubygem-smart_proxy_abrt '
         'rubygem-smart_proxy_pulp'
     )
-    run('service foreman restart')
+
+    run('systemctl restart foreman')
 
     # edit the config files
     host = env['host']
@@ -403,7 +404,7 @@ def vm_create():
     # Give some time to machine boot
     time.sleep(60)
 
-    result = run('ping -c 1 {}.local'.format(
+    result = run('ping -c 1 {0}.local'.format(
         options['target_image']))
 
     env['vm_ip'] = result.split('(')[1].split(')')[0]
@@ -453,6 +454,9 @@ def vm_list_base(base_image_dir=None):
 
 def setup_vm_provisioning(interface=None):
     """Task which setup required packages to provision VMs"""
+
+    os_version = distro_info()[1]
+
     if interface is None:
         print('A network interface is required')
         sys.exit(1)
@@ -485,7 +489,7 @@ def setup_vm_provisioning(interface=None):
         'sed',
         'util-linux',
     )
-    run('yum install -y {}'.format(' '.join(packages)))
+    run('yum install -y {0}'.format(' '.join(packages)))
 
     # Setup snap-guest
     result = run('[ -d /opt/snap-guest ]', warn_only=True)
@@ -503,15 +507,21 @@ def setup_vm_provisioning(interface=None):
         '[ -f /etc/sysconfig/network-scripts/ifcfg-br0 ]', warn_only=True)
     if result.return_code != 0:
         # Disable NetworkManager
-        run('chkconfig NetworkManager off')
-        run('chkconfig network on')
-        run('service NetworkManager stop')
-        run('service network start')
+        if distro_info()[1] >= 7:
+            run('systemctl disable NetworkManager')
+            run('systemctl stop NetworkManager')
+            run('systemctl enable network')
+            run('systemctl start network')
+        else:
+            run('chkconfig NetworkManager off')
+            run('chkconfig network on')
+            run('service NetworkManager stop')
+            run('service network start')
 
         # Configure bridge
-        ifcfg = '/etc/sysconfig/network-scripts/ifcfg-{}'.format(interface)
-        run('echo NM_CONTROLLED=no >> {}'.format(ifcfg))
-        run('echo BRIDGE=br0 >> {}'.format(ifcfg))
+        ifcfg = '/etc/sysconfig/network-scripts/ifcfg-{0}'.format(interface)
+        run('echo NM_CONTROLLED=no >> {0}'.format(ifcfg))
+        run('echo BRIDGE=br0 >> {0}'.format(ifcfg))
 
         ifcfg_br0 = StringIO()
         ifcfg_br0.write('\n')
@@ -524,16 +534,25 @@ def setup_vm_provisioning(interface=None):
             remote_path='/etc/sysconfig/network-scripts/ifcfg-br0')
         ifcfg_br0.close()
 
-        run('service network restart')
+        if os_version >= 7:
+            run('systemctl restart network')
+        else:
+            run('service network restart')
 
         # Configure iptables to allow all traffic to be forwarded across the
         # bridge
         run('iptables -I FORWARD -m physdev --physdev-is-bridged -j ACCEPT')
-        run('service iptables save')
-        run('service iptables restart')
+        run('iptables-save > /etc/sysconfig/iptables')
+        if os_version >= 7:
+            run('systemctl restart firewalld')
+        else:
+            run('service iptables restart')
 
         # Restart the libvirt daemon
-        run('service libvirtd reload')
+        if os_version >= 7:
+            run('systemctl reload libvirtd')
+        else:
+            run('service libvirtd reload')
 
         # Show configured bridges
         run('brctl show')
@@ -556,8 +575,16 @@ def install_prerequisites():
     # enabled on Satellite Server. To enable ntpd and have it persist at
     # bootup:
     run('yum install -y ntp', warn_only=True)
-    run('service ntpd start')
-    run('chkconfig ntpd on')
+
+    # The command varies depending on what version of RHEL you have.
+    os_version = distro_info()[1]
+
+    if os_version >= 7:
+        run('systemctl enable ntpd', warn_only=True)
+        run('systemctl start ntpd', warn_only=True)
+    else:
+        run('service ntpd start', warn_only=True)
+        run('chkconfig ntpd on', warn_only=True)
 
     # Port 443 for HTTPS (secure WWW) must be open for incoming connections.
     run('iptables -I INPUT -m state --state NEW -p tcp --dport 443 -j ACCEPT')
@@ -723,14 +750,8 @@ def cdn_install():
 
     os_version = distro_info()[1]
 
-    # First, subscribe the system
-    subscribe()
-
     # Enable some repos
     manage_repos(os_version, True)
-
-    # Basic configuration
-    install_prerequisites()
 
     # Install required packages for the installation
     run('yum install -y katello libvirt')
@@ -840,7 +861,7 @@ def product_install(distribution, create_vm=False, certificate_url=None):
 
     execute(install_prerequisites, host=host)
 
-    execute('{}_install'.format(distribution), host=host)
+    execute('{0}_install'.format(distribution), host=host)
 
     if distribution in ('cdn', 'downstream', 'iso'):
         execute(setup_default_capsule, host=host)
@@ -1166,7 +1187,12 @@ def install_katello_agent():
     # Now, check that the package is installed...
     run('rpm -q katello-agent')
     # ...and that 'goerd' is running.
-    run('service goferd status')
+
+    # The command varies depending on what version of RHEL you have.
+    if distro_info()[1] >= 7:
+        run('systemctl status goferd')
+    else:
+        run('service goferd status')
 
 
 def remove_katello_agent():
@@ -1178,4 +1204,9 @@ def remove_katello_agent():
     # Now, check that the package is indeed gone...
     run('rpm -q katello-agent', warn_only=True)
     # ...and that 'goerd' is not running.
-    run('service goferd status', warn_only=True)
+
+    # The command varies depending on what version of RHEL you have.
+    if distro_info()[1] >= 7:
+        run('systemctl status goferd', warn_only=True)
+    else:
+        run('service goferd status', warn_only=True)
