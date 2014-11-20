@@ -462,13 +462,13 @@ def setup_vm_provisioning(interface=None):
         sys.exit(1)
 
     # Check for virtualization support
-    result = run('egrep "^flags.*(vmx|svm)" /proc/cpuinfo')
-    if result.return_code:
+    result = run('egrep "^flags.*(vmx|svm)" /proc/cpuinfo', quiet=True)
+    if result.return_code != 0:
         print('Virtualization is not supported on this machine')
         sys.exit(1)
 
     # Install virtualization packages
-    run('yum install @virtualization')
+    run('yum install -y @virtualization')
     run('systemctl start libvirtd')
     run('systemctl enable libvirtd')
 
@@ -480,7 +480,7 @@ def setup_vm_provisioning(interface=None):
         'genisoimage',
         'git',
         'kvm',
-        'libguestfs-mount',
+        'libguestfs-tools',
         'openssl',
         'perl',
         'perl-Sys-Guestfs',
@@ -504,19 +504,20 @@ def setup_vm_provisioning(interface=None):
 
     # Setup bridge
     result = run(
-        '[ -f /etc/sysconfig/network-scripts/ifcfg-br0 ]', warn_only=True)
+        '[ -f /etc/sysconfig/network-scripts/ifcfg-br0 ]',
+        quiet=True,
+        warn_only=True
+    )
     if result.return_code != 0:
         # Disable NetworkManager
         if distro_info()[1] >= 7:
             run('systemctl disable NetworkManager')
             run('systemctl stop NetworkManager')
             run('systemctl enable network')
-            run('systemctl start network')
         else:
             run('chkconfig NetworkManager off')
             run('chkconfig network on')
             run('service NetworkManager stop')
-            run('service network start')
 
         # Configure bridge
         ifcfg = '/etc/sysconfig/network-scripts/ifcfg-{0}'.format(interface)
