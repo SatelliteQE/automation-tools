@@ -221,6 +221,49 @@ def setup_proxy():
         ))
 
 
+def setup_default_docker():
+    """Task to configure system to support Docker as a valid
+    Compute Resource for provisioning containers.
+
+    """
+    # Install ``Docker`` package.
+    if distro_info()[1] >= 7:
+        run('yum install -y docker', warn_only=True)
+    else:
+        run('yum install -y docker-io', warn_only=True)
+
+    # Docker should run as the ``apache`` user
+    run('usermod -aG docker apache')
+
+    # SElinux workaround let us use ``http://localhost:2375`` for a
+    # ``Docker`` Compute Resurce.
+    options = [
+        '--selinux-enabled',
+        '-H tcp://0.0.0.0:2375',
+        '-H unix:///var/run/docker.sock',
+    ]
+
+    if distro_info()[1] >= 7:
+        run('echo "OPTIONS={0}" >> /etc/sysconfig/docker'
+            ''.format(' '.join(options)))
+    else:
+        run('echo "other_args=\\"{0}\\"" >> /etc/sysconfig/docker'
+            ''.format(' '.join(options)))
+
+    # Restart ``docker`` service
+    if distro_info()[1] >= 7:
+        run('systemctl restart docker')
+    else:
+        run('service docker restart')
+
+    # Check that things look good
+    run('docker ps')
+
+    # Pull down a very simple/light Docker container to 'seed' the
+    # system with something that can be used right away.
+    run('docker pull busybox')
+
+
 def setup_default_capsule(interface=None):
     """Task to setup a the default capsule for Satellite
 
