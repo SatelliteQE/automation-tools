@@ -1256,7 +1256,7 @@ def remove_katello_agent():
         run('service goferd status', warn_only=True)
 
 
-def tps_upgrade():
+def errata_upgrade():
     """Upgrades the host with the given errata packages.
 
     Note:
@@ -1280,39 +1280,49 @@ def tps_upgrade():
         `satellite6-rhel-server-6`   - rhel6
         `satellite6-rhel-server-7`   - rhel7
 
-    OATS_SOURCE_SERVER
-        Source Server for oats install
+    PACKAGE_1
+        Package 1 to be installed
+
+    SOURCE_SERVER_1
+        Source Server for PACKAGE_1 install
 
     BUSYBOX_SOURCE_SERVER
         Source Server for busybox installation
 
+    PACKAGE_2
+        Package 2 to be used
+
     """
-    # Install oats
-    run('yum localinstall -y http://{0}/mnt/tpsdist/'
-        'oats.noarch.rpm'.format(os.environ['OATS_SOURCE_SERVER']))
+    # Retrieve packages
+    package1 = os.environ['PACKAGE_1']
+    package2 = os.environ['PACKAGE_2']
+    # Install package
+    run('yum localinstall -y http://{0}/mnt/{1}dist/{2}.noarch.rpm'
+        .format(os.environ['SOURCE_SERVER_1'], package2, package1))
     run('yum --nogpgcheck -y install nfs-utils')
     run('yum install -y http://{0}/brewroot/packages/busybox/1.19.4/4.el7/'
-        '$(uname -i)/busybox-1.19.4-4.el7.$(uname -i)'
-        '.rpm'.format(os.environ['BUSYBOX_SOURCE_SERVER']), warn_only=True)
-    run('echo OATS_TEST_PROFILE={0} >> '
-        '/etc/sysconfig/oats.conf'.format(os.environ['TEST_PROFILE']))
+        '$(uname -i)/busybox-1.19.4-4.el7.$(uname -i).rpm'
+        .format(os.environ['BUSYBOX_SOURCE_SERVER']), warn_only=True)
+    run('echo {0}_TEST_PROFILE={1} >> /etc/sysconfig/{2}.conf'
+        .format(package1.upper(), os.environ['TEST_PROFILE'], package1))
     run('echo TREE=$(egrep -m 1 \'^(url|nfs) \' /root/anaconda-ks.cfg | '
         'sed \'s|^[^/]*/\(.*\)$|/\\1| ; s|//|| ; s|"||g\') '
-        '>> \'/etc/sysconfig/oats.conf\'')
-    run('echo OATS_TPS_STABLE=true >> /etc/sysconfig/oats.conf')
-    run('cat /etc/sysconfig/oats.conf')
-    run('rm -f /etc/cron.d/oatsrebuild.cron')
-    # Start oatsd service
+        '>> \'/etc/sysconfig/{0}.conf\''.format(package1))
+    run('echo {0}_{1}_STABLE=true >> /etc/sysconfig/{1}.conf'
+        .format(package1.upper(), package2.upper()))
+    run('cat /etc/sysconfig/{0}.conf'.format(package1))
+    run('rm -f /etc/cron.d/{0}rebuild.cron'.format(package1))
+    # Start <package1>d service
     if distro_info()[1] >= 7:
-        run('systemctl start oatsd')
+        run('systemctl start {0}d'.format(package1))
     else:
-        run('service oatsd start')
+        run('service {0}d start'.format(package1))
     # Note:
     # 1. After the above command it may take a while for the system to
     # install/reboot.
-    # 2. Use `tailf /var/log/oatsd` to monitor the log in the host
+    # 2. Use `tailf /var/log/<package1>d` to monitor the log in the host
     # 3. If you do not see logs using the above command, run
-    # `service oatsd start` again
+    # `service <package1>d start` again
 
 
 def run_errata():
@@ -1323,11 +1333,16 @@ def run_errata():
     ERRATA_NUMBER
         Errata number of the errata to test. Format: xxxx:xxxxx Eg: 2014:19309
 
+    PACKAGE_2
+        Package 2 to be used
+
     """
+    package2 = os.environ['PACKAGE_2']
     if os.environ.get('ERRATA_NUMBER') is None:
         print('The ERRATA_NUMBER variable should be defined')
         sys.exit(1)
-    run('tps-setup-channel-cache')
-    run('tps-cd -c {0} && tps-upgrade'.format(os.environ['ERRATA_NUMBER']))
+    run('{0}-setup-channel-cache'.format(package2))
+    run('{0}-cd -c {1} && {2}-upgrade'
+        .format(package2, os.environ['ERRATA_NUMBER'], package2))
     # After this you can see the upgraded packages
-    # Run `tps-downgrade` if you want to revert to the old packages
+    # Run `<package2>-downgrade` if you want to revert to the old packages
