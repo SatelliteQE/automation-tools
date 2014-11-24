@@ -1254,3 +1254,80 @@ def remove_katello_agent():
         run('systemctl status goferd', warn_only=True)
     else:
         run('service goferd status', warn_only=True)
+
+
+def tps_upgrade():
+    """Upgrades the host with the given errata packages.
+
+    Note:
+    1. If you are running this for satellite6, this method assumes that
+    satellite6 is already installed in the host.
+    2. If you are running this for rhcommon, this method assumes that the
+    katello-agent is already installed in the host.
+
+    The following environment variables affect this command
+
+    TEST_PROFILE
+        Test Profile for the errata test
+        Known test profiles:
+        rhcommon:
+        `satellite6-rhcommon-5`      - rhel5
+        `satellite6-rhcommon-6`      - rhel6
+        TBD                          - rhel7
+
+        satellite6:
+        TBD                          - rhel5
+        `satellite6-rhel-server-6`   - rhel6
+        `satellite6-rhel-server-7`   - rhel7
+
+    OATS_SOURCE_SERVER
+        Source Server for oats install
+
+    BUSYBOX_SOURCE_SERVER
+        Source Server for busybox installation
+
+    """
+    # Install oats
+    run('yum localinstall -y http://{0}/mnt/tpsdist/'
+        'oats.noarch.rpm'.format(os.environ['OATS_SOURCE_SERVER']))
+    run('yum --nogpgcheck -y install nfs-utils')
+    run('yum install -y http://{0}/brewroot/packages/busybox/1.19.4/4.el7/'
+        '$(uname -i)/busybox-1.19.4-4.el7.$(uname -i)'
+        '.rpm'.format(os.environ['BUSYBOX_SOURCE_SERVER']), warn_only=True)
+    run('echo OATS_TEST_PROFILE={0} >> '
+        '/etc/sysconfig/oats.conf'.format(os.environ['TEST_PROFILE']))
+    run('echo TREE=$(egrep -m 1 \'^(url|nfs) \' /root/anaconda-ks.cfg | '
+        'sed \'s|^[^/]*/\(.*\)$|/\\1| ; s|//|| ; s|"||g\') '
+        '>> \'/etc/sysconfig/oats.conf\'')
+    run('echo OATS_TPS_STABLE=true >> /etc/sysconfig/oats.conf')
+    run('cat /etc/sysconfig/oats.conf')
+    run('rm -f /etc/cron.d/oatsrebuild.cron')
+    # Start oatsd service
+    if distro_info()[1] >= 7:
+        run('systemctl start oatsd')
+    else:
+        run('service oatsd start')
+    # Note:
+    # 1. After the above command it may take a while for the system to
+    # install/reboot.
+    # 2. Use `tailf /var/log/oatsd` to monitor the log in the host
+    # 3. If you do not see logs using the above command, run
+    # `service oatsd start` again
+
+
+def run_errata():
+    """Run the errata to upgrade packages
+
+    The following environment variables affect this command
+
+    ERRATA_NUMBER
+        Errata number of the errata to test. Format: xxxx:xxxxx Eg: 2014:19309
+
+    """
+    if os.environ.get('ERRATA_NUMBER') is None:
+        print('The ERRATA_NUMBER variable should be defined')
+        sys.exit(1)
+    run('tps-setup-channel-cache')
+    run('tps-cd -c {0} && tps-upgrade'.format(os.environ['ERRATA_NUMBER']))
+    # After this you can see the upgraded packages
+    # Run `tps-downgrade` if you want to revert to the old packages
