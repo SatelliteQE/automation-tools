@@ -58,20 +58,14 @@ To install a compose build::
     RHN_USERNAME=user@example.com RHN_PASSWORD=mysecret \
     RHN_POOLID=poolid BASE_URL=http://example.com/Satellite/x86_64/os/ \
     fab -H root@example.com \
-    subscribe \
-    install_prerequisites \
-    install_satellite \
-    setup_default_capsule
-
+    product_install:downstream
 
 To install a nightly build::
 
     RHN_USERNAME=user@example.com RHN_PASSWORD=mysecret \
     RHN_POOLID=poolid \
     fab -H root@example.com \
-    subscribe \
-    install_prerequisites \
-    install_nightly
+    product_install:upstream
 
 
 To install from the CDN::
@@ -79,11 +73,10 @@ To install from the CDN::
     RHN_USERNAME=user@example.com RHN_PASSWORD=mysecret \
     RHN_POOLID=poolid \
     fab -H root@example.com \
-    cdn_install \
-    setup_default_capsule
+    product_install:cdn
 
 
-All installer tasks will set the admin password to `changeme`.
+Product install task will set the admin password to `changeme`.
 
 Miscellaneous
 -------------
