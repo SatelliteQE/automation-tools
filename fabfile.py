@@ -305,9 +305,9 @@ def setup_default_capsule(interface=None):
             run('service libvirtd start')
             run('chkconfig libvirtd on')
         run('puppet module install -i /tmp domcleal/katellovirt')
-        run('cd /tmp/katellovirt/')
-        run('grep -v virbr manifests/libvirt.pp > tempfile')
-        run('mv -f tempfile manifests/libvirt.pp')
+        with cd('/tmp/katellovirt/'):
+            run('grep -v virbr manifests/libvirt.pp > tempfile')
+            run('mv -f tempfile manifests/libvirt.pp')
         run('puppet apply -v -e "include katellovirt" --modulepath /tmp')
 
         interface = run('ifconfig | grep virbr | awk \'{print $1}\'')
