@@ -297,13 +297,28 @@ def setup_default_capsule(interface=None):
         sys.exit(1)
 
     if interface is None:
-        interface = run(
-            'ip addr | grep "state UP" | cut -d ":" -f 2', quiet=True)
+        run('yum install -y libvirt')
+        if distro_info()[1] >= 7:
+            run('systemctl enable libvirtd')
+            run('systemctl start libvirtd')
+        else:
+            run('service libvirtd start')
+            run('chkconfig libvirtd on')
+        run('puppet module install -i /tmp domcleal/katellovirt')
+        run('cd /tmp/katellovirt/')
+        run('grep -v virbr manifests/libvirt.pp > tempfile')
+        run('mv -f tempfile manifests/libvirt.pp')
+        run('puppet apply -v -e "include katellovirt" --modulepath /tmp')
+
+        interface = run('ifconfig | grep virbr | awk \'{print $1}\'')
         # Aways select the first interface
         interface = interface.split('\n', 1)[0].strip()
-    if len(interface) == 0:
-        print('Was not possible to fetch interface information')
-        sys.exit(1)
+        # Remove any additional visual character like `:` on RHEL7
+        interface = search(r'(virbr\d+)', interface).group(1)
+
+        if len(interface) == 0:
+            print('Was not possible to fetch interface information')
+            sys.exit(1)
 
     run(
         'katello-installer -v '
