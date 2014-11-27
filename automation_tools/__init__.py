@@ -890,7 +890,13 @@ def product_install(distribution, create_vm=False, certificate_url=None):
     if isinstance(create_vm, str):
         create_vm = (create_vm.lower() == 'true')
 
-    distributions = ('cdn', 'downstream', 'iso', 'upstream')
+    install_tasks = {
+        'cdn': cdn_install,
+        'downstream': downstream_install,
+        'iso': iso_install,
+        'upstream': upstream_install,
+    }
+    distributions = install_tasks.keys()
     if distribution not in distributions:
         print('distribution "{0}" should be one of {1}'.format(
             distribution, ', '.join(distributions)))
@@ -923,7 +929,7 @@ def product_install(distribution, create_vm=False, certificate_url=None):
 
     execute(install_prerequisites, host=host)
 
-    execute('{0}_install'.format(distribution), host=host)
+    execute(install_tasks[distribution], host=host)
 
     if distribution in ('cdn', 'downstream', 'iso'):
         execute(setup_default_capsule, host=host)
