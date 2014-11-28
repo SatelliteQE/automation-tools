@@ -489,7 +489,7 @@ def vm_destroy(target_image=None, image_dir=None, delete_image=False):
 
     if delete_image is True:
         image_name = '{target_image}.img'.format(target_image=target_image)
-        run('rm {image_path}'.format(
+        run('virsh vol-delete --pool default {image_path}'.format(
             image_path=os.path.join(image_dir, image_name)), warn_only=True)
 
 
