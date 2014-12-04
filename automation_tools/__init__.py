@@ -429,6 +429,8 @@ def vm_create():
         target image name
     IMAGE_DIR
         path where the generated image will be stored
+    CPU_FEATURE
+        copies cpu features of base-metal to vm, thus enabling nested_virt
 
     The VM will have the TARGET_IMAGE.VM_DOMAIN hostname, but make sure to have
     setup DDNS entry correctly.
@@ -443,6 +445,7 @@ def vm_create():
         'source_image': os.environ.get('SOURCE_IMAGE'),
         'target_image': os.environ.get('TARGET_IMAGE'),
         'image_dir': os.environ.get('IMAGE_DIR'),
+        'cpu_feature': os.environ.get('CPU_FEATURE'),
     }
 
     command_args = [
@@ -457,6 +460,9 @@ def vm_create():
 
     if options['image_dir'] is not None:
         command_args.append('-p {image_dir}')
+
+    if options['cpu_feature'] is not None:
+	command_args.append('--cpu-feature {cpu_feature}')
 
     command = ' '.join(command_args).format(**options)
 
