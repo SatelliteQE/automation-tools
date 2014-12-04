@@ -904,6 +904,7 @@ def product_install(distribution, create_vm=False, certificate_url=None):
     # Command-line arguments are passed in as strings.
     if isinstance(create_vm, str):
         create_vm = (create_vm.lower() == 'true')
+    distribution = distribution.lower()
 
     install_tasks = {
         'cdn': cdn_install,
