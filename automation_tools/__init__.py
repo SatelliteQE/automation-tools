@@ -529,16 +529,16 @@ def setup_vm_provisioning(interface=None):
         sys.exit(1)
 
     # Check for Nested virtualization support
-    result = run('egrep "^Y" /sys/module/kvm_intel/parameters/nested', quiet=True)
+    result = run('grep -E "^Y" /sys/module/kvm_intel/parameters/nested', quiet=True)
     if result.return_code != 0:
         print('Nested Virtualization is not supported on this machine.')
         print('Enabling the Nested Virtualization support.')
         run('echo \"options kvm-intel nested=y\" > /etc/modprobe.d/kvm-intel.conf')
         print('Please reboot this machine to enable Nested Virtualization')
         sys.exit(1)
-    
+
     # Check for virtualization support
-    result = run('egrep "^flags.*(vmx|svm)" /proc/cpuinfo', quiet=True)
+    result = run('grep -E "^flags.*(vmx|svm)" /proc/cpuinfo', quiet=True)
     if result.return_code != 0:
         print('Virtualization is not supported on this machine')
         sys.exit(1)
@@ -1344,7 +1344,7 @@ def errata_upgrade():
         .format(os.environ['BUSYBOX_SOURCE_SERVER']), warn_only=True)
     run('echo {0}_TEST_PROFILE={1} >> /etc/sysconfig/{2}.conf'
         .format(package1.upper(), os.environ['TEST_PROFILE'], package1))
-    run('echo TREE=$(egrep -m 1 \'^(url|nfs) \' /root/anaconda-ks.cfg | '
+    run('echo TREE=$(grep -E -m 1 \'^(url|nfs) \' /root/anaconda-ks.cfg | '
         'sed \'s|^[^/]*/\(.*\)$|/\\1| ; s|//|| ; s|"||g\') '
         '>> \'/etc/sysconfig/{0}.conf\''.format(package1))
     run('echo {0}_{1}_STABLE=true >> /etc/sysconfig/{1}.conf'
