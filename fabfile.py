@@ -29,7 +29,6 @@ from automation_tools import (
     subscribe,
     unsubscribe,
     update_basic_packages,
-    update_rpms,
     upstream_install,
     vm_create,
     vm_destroy,

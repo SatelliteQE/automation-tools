@@ -1399,12 +1399,3 @@ def run_errata():
         .format(package2, os.environ['ERRATA_NUMBER'], package2))
     # After this you can see the upgraded packages
     # Run `<package2>-downgrade` if you want to revert to the old packages
-
-def update_rpms():
-  """Updates all system packages
-  
-  Use this if you want to simply update all packages on system.  Possibly
-  useful for when doing upgrades, etc.
-
-  """
-  run("yum -y update") 
