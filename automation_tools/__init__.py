@@ -1407,4 +1407,4 @@ def update_system():
   useful for when doing upgrades, etc.
 
   """
-  run("yum -y update") 
+  run('yum -y update', warn_only=True) 
