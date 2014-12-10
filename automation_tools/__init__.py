@@ -49,7 +49,7 @@ def subscribe(autosubscribe=False):
 
     # Registration and subscription is only meaningful for Red Hat Enterprise
     # Linux systems.
-    distro = distro_info()[0]
+    distro, major_version, minor_version = distro_info()
     if distro.lower() != 'rhel':
         return
 
@@ -58,11 +58,18 @@ def subscribe(autosubscribe=False):
         if env_var not in os.environ:
             print('The {0} environment variable must be set.'.format(env_var))
             sys.exit(1)
+    if minor_version is None:
+        minor_version = 'Server'
+    else:
+        minor_version = '.{0}'.format(minor_version)
     run(
-        'subscription-manager register --force --user={0} --password={1} {2}'
+        'subscription-manager register --force --user={0} --password={1} '
+        '--release="{2}{3}" {4}'
         .format(
             os.environ['RHN_USERNAME'],
             os.environ['RHN_PASSWORD'],
+            major_version,
+            minor_version,
             '--autosubscribe' if autosubscribe else ''
         )
     )
@@ -1085,20 +1092,26 @@ def distro_info():
         # Discover the version
         match = search(r' ([0-9.]+) ', release_info)
         if match is not None:
+            parts = match.group(1).split('.')
             # extract the major version
-            version = int(match.group(1).split('.')[0])
+            major_version = int(parts[0])
+            # extract the minor version
+            if len(parts) > 1:
+                minor_version = int(parts[1])
+            else:
+                minor_version = None
         else:
-            version = None
+            major_version = minor_version = None
 
-        if distro is None or version is None:
+        if distro is None or major_version is None:
             print('Was not possible to fetch distro information')
             sys.exit(1)
 
-        cache[host] = distro, version
+        cache[host] = distro, major_version, minor_version
 
-    distro, version = cache[host]
-    print('{0} {1}'.format(distro, version))
-    return distro, version
+    distro, major_version, minor_version = cache[host]
+    print('{0} {1} {2}'.format(distro, major_version, minor_version))
+    return distro, major_version, minor_version
 
 
 def performance_tuning(running_on_vm=True):
