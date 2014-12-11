@@ -1,8 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import automation_tools
-
 try:
     from setuptools import setup
 except ImportError:
@@ -21,7 +19,7 @@ with open('README.rst', 'r') as f:
 
 setup(
     name='automation_tools',
-    version=automation_tools.__version__,
+    version='0.1.0',
     description='Tools to help automating testing Foreman with Robottelo.',
     long_description=readme,
     author=u'Elyézer Rezende',
@@ -32,7 +30,7 @@ setup(
     package_dir={'automation_tools': 'automation_tools'},
     include_package_data=True,
     install_requires=requires,
-    license=automation_tools.__license__,
+    license='GNU GPL v3.0',
     classifiers=(
         'Development Status :: 5 - Production/Stable',
         'Intended Audience :: Developers',
