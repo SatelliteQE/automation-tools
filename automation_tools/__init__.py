@@ -735,7 +735,7 @@ def manage_repos(os_version=None, cdn=False):
     run('yum repolist')
 
     # Update packages
-    run('yum update -y', warn_only=True)
+    update_packages(warn_only=True)
 
 
 def upstream_install(admin_password=None, org_name=None, loc_name=None):
@@ -1174,8 +1174,8 @@ def clean_rhsm():
 def update_basic_packages():
     """Updates some basic packages before we can run some real tests."""
     subscribe(autosubscribe=True)
-    run('yum update -y subscription-manager yum-utils',
-        warn_only=True, quiet=True)
+    update_packages(
+        'subscription-manager', 'yum-utils', warn_only=True, quiet=True)
     run('yum install -y yum-plugin-security yum-security',
         warn_only=True, quiet=True)
     run('rpm -q subscription-manager python-rhsm')
@@ -1271,9 +1271,8 @@ def install_errata():
             rnd_errata = rnd_errata.split(' ')[0]
             print('Applying errata: {0}'.format(rnd_errata))
             # Apply the errata
-            run(
-                'yum update -y --advisory "{0}"'.format(rnd_errata),
-                quiet=True)
+            update_packages(
+                '--advisory', '"{0}"'.format(rnd_errata), quiet=True)
         else:
             print('NO ERRATA AVAILABLE')
     else:
@@ -1405,11 +1404,21 @@ def run_errata():
     # After this you can see the upgraded packages
     # Run `<package2>-downgrade` if you want to revert to the old packages
 
-def update_system():
-  """Updates all system packages
 
-  Use this if you want to simply update all packages on system.  Possibly
-  useful for when doing upgrades, etc.
+def update_packages(*args, **kwargs):
+    """Updates all system packages or only ones specified by `args`
 
-  """
-  run('yum -y update', warn_only=True)
+    Use this if you want to simply update all packages or some on system.
+    Possibly useful for when doing upgrades, etc.
+
+    """
+    if len(args) > 0:
+        arguments = ' '.join(args)
+    else:
+        arguments = ''
+
+    run(
+        'yum update -y {0}'.format(arguments),
+        quiet=kwargs.get('quiet', False),
+        warn_only=kwargs.get('warn_only', False),
+    )
