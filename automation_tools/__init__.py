@@ -20,9 +20,6 @@ else:
     from urllib.parse import urljoin  # pylint:disable=F0401,E0611
     from io import StringIO
 
-__license__ = 'GNU GPL v3.0'
-__version__ = '0.1.0'
-
 LIBVIRT_IMAGES_DIR = '/var/lib/libvirt/images'
 
 
@@ -1402,9 +1399,9 @@ def run_errata():
 
 def update_system():
   """Updates all system packages
-  
+
   Use this if you want to simply update all packages on system.  Possibly
   useful for when doing upgrades, etc.
 
   """
-  run('yum -y update', warn_only=True) 
+  run('yum -y update', warn_only=True)
