@@ -384,13 +384,21 @@ def setup_abrt():
     Currently only available on RHEL7, check BZ #1150197 for more info
 
     """
+    # Check if rubygem-smart_proxy_abrt package is available
+    result = run(
+        'yum list rubygem-smart_proxy_abrt', warn_only=True, quiet=True)
+    if result.return_code != 0:
+        print('WARNING: ABRT was not set up')
+        return
+
     # Install required packages for the installation
-    run(
-        'yum install -y '
-        'abrt-cli '
-        'rubygem-smart_proxy_abrt '
+    packages = [
+        'abrt-cli',
+        'rubygem-smart_proxy_abrt',
         'rubygem-smart_proxy_pulp'
-    )
+    ]
+    for package in packages:
+        run('yum install -y {0}'.format(package))
 
     run('systemctl restart foreman')
 
