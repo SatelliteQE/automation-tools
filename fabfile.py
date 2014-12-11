@@ -29,7 +29,7 @@ from automation_tools import (
     subscribe,
     unsubscribe,
     update_basic_packages,
-    update_system,
+    update_packages,
     upstream_install,
     vm_create,
     vm_destroy,
