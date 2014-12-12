@@ -35,4 +35,4 @@ from automation_tools import (
     vm_destroy,
     vm_list,
     vm_list_base,
-)
+)  # flake8: noqa
