@@ -474,7 +474,7 @@ def vm_create():
         command_args.append('-p {image_dir}')
 
     if options['cpu_feature'] is not None:
-	command_args.append('--cpu-feature {cpu_feature}')
+        command_args.append('--cpu-feature {cpu_feature}')
 
     command = ' '.join(command_args).format(**options)
 
@@ -541,11 +541,15 @@ def setup_vm_provisioning(interface=None):
         sys.exit(1)
 
     # Check for Nested virtualization support
-    result = run('grep -E "^Y" /sys/module/kvm_intel/parameters/nested', quiet=True)
+    result = run(
+        'grep -E "^Y" /sys/module/kvm_intel/parameters/nested', quiet=True)
     if result.return_code != 0:
         print('Nested Virtualization is not supported on this machine.')
         print('Enabling the Nested Virtualization support.')
-        run('echo \"options kvm-intel nested=y\" > /etc/modprobe.d/kvm-intel.conf')
+        run(
+            'echo "options kvm-intel nested=y" > '
+            '/etc/modprobe.d/kvm-intel.conf'
+        )
         print('Please reboot this machine to enable Nested Virtualization')
         sys.exit(1)
 
