@@ -107,8 +107,8 @@ pygments_style = 'sphinx'
 # found.
 nitpicky = True
 
-# A list of (type, target) tuples (by default empty) that should be ignored when
-# generating warnings in “nitpicky mode”.
+# A list of (type, target) tuples (by default empty) that should be ignored
+# when generating warnings in “nitpicky mode”.
 # nitpick_ignore = [('py:obj', 'bool')]
 
 
