@@ -1,5 +1,6 @@
 """Module which publish all automation-tools tasks"""
 from automation_tools import (
+    add_repo,
     cdn_install,
     clean_rhsm,
     client_registration_test,

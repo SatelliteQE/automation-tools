@@ -1158,6 +1158,24 @@ def performance_tuning(running_on_vm=True):
         run('tuned-adm profile throughput-performance')
 
 
+def add_repo(repo_name=None, repo_url=None):
+    """Adds a new repo to the system based on the repo_url"""
+    if repo_url is not None:
+        if repo_name is None:
+            repo_name = urlsplit(repo_url).netloc
+        repo_file = (
+            '[{0}]\n'
+            'name={0}\n'
+            'baseurl={1}\n'
+            'enabled=1\n'.format(repo_name, repo_url)
+        )
+        with cd('/etc/yum.repos.d/'):
+            run('echo "{0}" >> automation-tools.repo'.format(repo_file))
+    else:
+        print('add_repo requires a repo_url to make any changes.')
+        sys.exit(1)
+
+
 # Client registration
 # ==================================================
 def clean_rhsm():
