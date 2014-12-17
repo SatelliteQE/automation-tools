@@ -1361,20 +1361,30 @@ def errata_upgrade():
     run('yum localinstall -y http://{0}/mnt/{1}dist/{2}.noarch.rpm'
         .format(os.environ['SOURCE_SERVER_1'], package2, package1))
     run('yum --nogpgcheck -y install nfs-utils')
-    run('yum install -y http://{0}/brewroot/packages/busybox/1.19.4/4.el7/'
-        '$(uname -i)/busybox-1.19.4-4.el7.$(uname -i).rpm'
-        .format(os.environ['BUSYBOX_SOURCE_SERVER']), warn_only=True)
+    distro = distro_info()[1]
+    if distro >= 7:
+        run('yum install -y http://{0}/brewroot/packages/busybox/1.19.4/4.el7/'
+            '$(uname -i)/busybox-1.19.4-4.el7.$(uname -i).rpm'
+            .format(os.environ['BUSYBOX_SOURCE_SERVER']), warn_only=True)
+    else:
+        run('yum install busybox')
+    # I got an error saying perl-Date-Manip was not found, so manually
+    # installing this package
+    # TODO: Need to fix this for rhel7 handling
+    if distro == 6:
+        run('yum install http://pkgs.repoforge.org/perl-Date-Manip/'
+            'perl-Date-Manip-5.56-1.el6.rfx.noarch.rpm')
     run('echo {0}_TEST_PROFILE={1} >> /etc/sysconfig/{2}.conf'
         .format(package1.upper(), os.environ['TEST_PROFILE'], package1))
     run('echo TREE=$(grep -E -m 1 \'^(url|nfs) \' /root/anaconda-ks.cfg | '
-        'sed \'s|^[^/]*/\(.*\)$|/\\1| ; s|//|| ; s|"||g\') '
-        '>> \'/etc/sysconfig/{0}.conf\''.format(package1))
+        'sed \'s|^[^/]*/\(.*\)$|/\1| ; s|//|| ; s|"||g\') '
+        '>> /etc/sysconfig/{0}.conf'.format(package1))
     run('echo {0}_{1}_STABLE=true >> /etc/sysconfig/{1}.conf'
         .format(package1.upper(), package2.upper()))
     run('cat /etc/sysconfig/{0}.conf'.format(package1))
     run('rm -f /etc/cron.d/{0}rebuild.cron'.format(package1))
     # Start <package1>d service
-    if distro_info()[1] >= 7:
+    if distro_info >= 7:
         run('systemctl start {0}d'.format(package1))
     else:
         run('service {0}d start'.format(package1))
@@ -1399,12 +1409,15 @@ def run_errata():
 
     """
     package2 = os.environ['PACKAGE_2']
-    if os.environ.get('ERRATA_NUMBER') is None:
+    errata_number = os.environ['ERRATA_NUMBER']
+    if errata_number is None:
         print('The ERRATA_NUMBER variable should be defined')
         sys.exit(1)
     run('{0}-setup-channel-cache'.format(package2))
-    run('{0}-cd -c {1} && {2}-upgrade'
-        .format(package2, os.environ['ERRATA_NUMBER'], package2))
+    run('tps-make-lists {0}'.format(errata_number))
+    run('{0}-cd -c {1} && {0}-upgrade'
+        .format(package2, errata_number))
+
     # After this you can see the upgraded packages
     # Run `<package2>-downgrade` if you want to revert to the old packages
 
