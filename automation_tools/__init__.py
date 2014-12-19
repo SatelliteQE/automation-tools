@@ -7,6 +7,7 @@ all environment variables are required.
 from __future__ import print_function
 import os
 import random
+import socket
 import sys
 import time
 from re import search
@@ -1439,3 +1440,35 @@ def update_packages(*args, **kwargs):
         quiet=kwargs.get('quiet', False),
         warn_only=kwargs.get('warn_only', False),
     )
+
+
+def reboot_and_wait(timeout=300):
+    """Task which reboot the system and wait until it is back again"""
+    if isinstance(timeout, str):
+        timeout = int(timeout)
+
+    run('reboot')
+    time.sleep(5)  # Give some time to process reboot request
+    while True:
+        try:
+            sock = socket.socket()
+            sock.settimeout(57)
+            sock.connect((env['host'], 22))
+            sock.close()
+            break
+        except socket.error as err:
+            # During the reboot the following errors are expected:
+            # * Operation timed out (60)
+            # * Connection refused (61)
+            if err.errno not in (60, 61):
+                raise
+            if err.errno == 57:
+                timeout -= sock.gettimeout()
+        finally:
+            sock.close()
+        time.sleep(3)
+        timeout -= 3
+
+        if timeout < 0:
+            print('Timed out while waiting machine to reboot.')
+            sys.exit(1)

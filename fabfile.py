@@ -17,6 +17,7 @@ from automation_tools import (
     partition_disk,
     performance_tuning,
     product_install,
+    reboot_and_wait,
     remove_katello_agent,
     run_errata,
     setup_abrt,
