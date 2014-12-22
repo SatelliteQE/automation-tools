@@ -7,6 +7,7 @@ all environment variables are required.
 from __future__ import print_function
 import os
 import random
+import socket
 import sys
 import time
 from re import search
@@ -1388,12 +1389,37 @@ def errata_upgrade():
         run('systemctl start {0}d'.format(package1))
     else:
         run('service {0}d start'.format(package1))
-    # Note:
-    # 1. After the above command it may take a while for the system to
-    # install/reboot.
-    # 2. Use `tailf /var/log/<package1>d` to monitor the log in the host
-    # 3. If you do not see logs using the above command, run
-    # `service <package1>d start` again
+
+    # Follow the log, run will return when the system is rebooting
+    if distro_info >= 7:
+        run('journalctl --follow -u "{0}d"'.format(package1), warn_only=True)
+    else:
+        run('tail -f /var/log/{0}d'.format(package1), warn_only=True)
+
+    # Monitor the system reboot
+    time.sleep(5)  # Give some time to process reboot request
+    timeout = 300  # Wait up to 5 minutes to machine boot
+    while timeout >= 0:
+        try:
+            sock = socket.socket()
+            sock.settimeout(57)
+            sock.connect((env['host'], 22))
+            sock.close()
+            return
+        except socket.error as err:
+            # During the reboot the following errors are expected:
+            # * Operation timed out (60)
+            # * Connection refused (61)
+            if err.errno not in (60, 61):
+                raise
+            if err.errno == 60:
+                timeout -= sock.gettimeout()
+        finally:
+            sock.close()
+        time.sleep(3)
+        timeout -= 3
+    print('Timed out while waiting machine to reboot.')
+    sys.exit(1)
 
 
 def run_errata():
