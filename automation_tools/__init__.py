@@ -1355,26 +1355,15 @@ def errata_upgrade():
         Package 2 to be used
 
     """
-    # Retrieve packages
     package1 = os.environ['PACKAGE_1']
     package2 = os.environ['PACKAGE_2']
-    # Install package
+
+    # Install packages
     run('yum localinstall -y http://{0}/mnt/{1}dist/{2}.noarch.rpm'
         .format(os.environ['SOURCE_SERVER_1'], package2, package1))
     run('yum --nogpgcheck -y install nfs-utils')
-    distro = distro_info()[1]
-    if distro >= 7:
-        run('yum install -y http://{0}/brewroot/packages/busybox/1.19.4/4.el7/'
-            '$(uname -i)/busybox-1.19.4-4.el7.$(uname -i).rpm'
-            .format(os.environ['BUSYBOX_SOURCE_SERVER']), warn_only=True)
-    else:
-        run('yum install busybox')
-    # I got an error saying perl-Date-Manip was not found, so manually
-    # installing this package
-    # TODO: Need to fix this for rhel7 handling
-    if distro == 6:
-        run('yum install http://pkgs.repoforge.org/perl-Date-Manip/'
-            'perl-Date-Manip-5.56-1.el6.rfx.noarch.rpm')
+    run('yum install -y perl-Date-Manip')
+
     run('echo {0}_TEST_PROFILE={1} >> /etc/sysconfig/{2}.conf'
         .format(package1.upper(), os.environ['TEST_PROFILE'], package1))
     run('echo TREE=$(grep -E -m 1 \'^(url|nfs) \' /root/anaconda-ks.cfg | '
@@ -1384,17 +1373,15 @@ def errata_upgrade():
         .format(package1.upper(), package2.upper()))
     run('cat /etc/sysconfig/{0}.conf'.format(package1))
     run('rm -f /etc/cron.d/{0}rebuild.cron'.format(package1))
+
     # Start <package1>d service
-    if distro_info >= 7:
+    if distro_info()[1] >= 7:
         run('systemctl start {0}d'.format(package1))
     else:
         run('service {0}d start'.format(package1))
 
     # Follow the log, run will return when the system is rebooting
-    if distro_info >= 7:
-        run('journalctl --follow -u "{0}d"'.format(package1), warn_only=True)
-    else:
-        run('tail -f /var/log/{0}d'.format(package1), warn_only=True)
+    run('tail -f /var/log/{0}d'.format(package1), warn_only=True)
 
     # Monitor the system reboot
     time.sleep(5)  # Give some time to process reboot request
