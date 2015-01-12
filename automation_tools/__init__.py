@@ -393,12 +393,15 @@ def setup_abrt():
     packages = [
         'abrt-cli',
         'rubygem-smart_proxy_abrt',
-        'rubygem-smart_proxy_pulp'
+        'rubygem-smart_proxy_pulp',
+        'ruby193-rubygem-foreman_abrt'
     ]
     for package in packages:
         run('yum install -y {0}'.format(package))
 
     run('systemctl restart foreman')
+    # workaround as sometimes foreman service does not restart with systemctl
+    run('touch /usr/share/foreman/tmp/restart.txt')
 
     # edit the config files
     host = env['host']
