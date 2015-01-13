@@ -970,6 +970,8 @@ def product_install(distribution, create_vm=False, certificate_url=None):
     if distribution in ('cdn', 'downstream', 'iso'):
         execute(setup_default_capsule, host=host)
 
+    execute(setup_default_docker, host=host)
+
     # execute returns a dict, the result is the first value
     info = execute(distro_info, host=host).values()[0]
     if info[1] == 7:
