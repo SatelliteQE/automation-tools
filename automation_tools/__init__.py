@@ -234,8 +234,14 @@ def setup_default_docker():
     Compute Resource for provisioning containers.
 
     """
+    os_version = distro_info()[1]
+
+    # Enable required repository
+    run('subscription-manager repos --enable "rhel-{0}-server-extras-rpms"'
+        .format(os_version))
+
     # Install ``Docker`` package.
-    if distro_info()[1] >= 7:
+    if os_version >= 7:
         run('yum install -y docker', warn_only=True)
     else:
         run('yum install -y docker-io', warn_only=True)
@@ -251,7 +257,7 @@ def setup_default_docker():
         '-H unix:///var/run/docker.sock',
     ]
 
-    if distro_info()[1] >= 7:
+    if os_version >= 7:
         run('echo "OPTIONS={0}" >> /etc/sysconfig/docker'
             ''.format(' '.join(options)))
     else:
@@ -259,7 +265,7 @@ def setup_default_docker():
             ''.format(' '.join(options)))
 
     # Restart ``docker`` service
-    if distro_info()[1] >= 7:
+    if os_version >= 7:
         run('systemctl restart docker')
     else:
         run('service docker restart')
