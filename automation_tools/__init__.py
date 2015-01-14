@@ -719,7 +719,11 @@ def manage_repos(os_version=None, cdn=False):
         cdn = (cdn.lower() == 'true')
 
     # Clean up system if Beaker-based
-    run('rm -rf /etc/yum.repos.d/beaker-*')
+    result = run('which yum-config-manager', warn_only=True)
+    if result.return_code == 0:
+        run('yum-config-manager --disable "beaker*"')
+    else:
+        run('mv /etc/yum.repos.d/beaker-* ~/', warn_only=True)
     run('rm -rf /var/cache/yum*')
 
     # Disable yum plugin for sub-man
@@ -1371,9 +1375,6 @@ def errata_upgrade():
     SOURCE_SERVER_1
         Source Server for PACKAGE_1 install
 
-    BUSYBOX_SOURCE_SERVER
-        Source Server for busybox installation
-
     PACKAGE_2
         Package 2 to be used
 
@@ -1382,6 +1383,11 @@ def errata_upgrade():
     package2 = os.environ['PACKAGE_2']
 
     # Install packages
+    result = run('which yum-config-manager', warn_only=True)
+    if result.return_code == 0:
+        run('yum-config-manager --enable "beaker*"')
+    else:
+        run('mv ~/beaker-* /etc/yum.repos.d/', warn_only=True)
     run('yum localinstall -y http://{0}/mnt/{1}dist/{2}.noarch.rpm'
         .format(os.environ['SOURCE_SERVER_1'], package2, package1))
     run('yum --nogpgcheck -y install nfs-utils')
