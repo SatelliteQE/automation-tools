@@ -254,7 +254,7 @@ def setup_default_docker():
     run('sed -i -e "s|^{0}=.*|{0}=\'{1}\'|" /etc/sysconfig/docker'.format(
         'OPTIONS' if os_version >= 7 else 'other_args',
         ' '.join([
-            '--selinux-enabled true',
+            '--selinux-enabled=true',
             '--host tcp://0.0.0.0:2375',
             '--host unix:///var/run/docker.sock',
         ])
