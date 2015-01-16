@@ -251,17 +251,14 @@ def setup_default_docker():
 
     # SElinux workaround let us use ``http://localhost:2375`` for a
     # ``Docker`` Compute Resurce.
-    options = ' '.join([
-        '--selinux-enabled',
-        '-H tcp://0.0.0.0:2375',
-        '-H unix:///var/run/docker.sock',
-    ])
-    if os_version >= 7:
-        run('echo OPTIONS={0} >> /etc/sysconfig/docker'.format(options))
-    else:
-        run(
-            r'echo other_args=\"{0}\" >> /etc/sysconfig/docker'.format(options)
-        )
+    run('sed -i -e "s|^{0}=.*|{0}=\'{1}\'|" /etc/sysconfig/docker'.format(
+        'OPTIONS' if os_version >= 7 else 'other_args',
+        ' '.join([
+            '--selinux-enabled true',
+            '--host tcp://0.0.0.0:2375',
+            '--host unix:///var/run/docker.sock',
+        ])
+    ))
 
     # Restart ``docker`` service
     if os_version >= 7:
