@@ -264,7 +264,14 @@ def setup_default_docker():
     if os_version >= 7:
         run('systemctl restart docker')
     else:
-        run('service docker restart')
+        # This can silently fail if a pseuo-terminals is used, due to docker's
+        # non-standard approach to daemonizing and its naive init script. See:
+        #
+        # https://github.com/fabric/fabric/issues/395#issuecomment-1846383
+        # https://github.com/fabric/fabric/issues/395#issuecomment-32219270
+        # https://github.com/docker/docker/issues/2758
+        #
+        run('service docker restart', pty=False)
 
     # Check that things look good
     run('docker ps')
