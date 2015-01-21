@@ -237,8 +237,16 @@ def setup_default_docker():
     os_version = distro_info()[1]
 
     # Enable required repository
-    run('subscription-manager repos --enable "rhel-{0}-server-extras-rpms"'
-        .format(os_version))
+    if os_version >= 7:
+        run(
+            'subscription-manager repos --enable "rhel-{0}-server-extras-rpms"'
+            .format(os_version)
+        )
+    else:
+        run(
+            'yum -y localinstall '
+            'http://mirror.pnl.gov/epel/6/x86_64/epel-release-6-8.noarch.rpm'
+        )
 
     # Install ``Docker`` package.
     if os_version >= 7:
