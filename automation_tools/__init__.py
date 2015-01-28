@@ -883,20 +883,36 @@ def cdn_install():
     run('hammer -u admin -p {0} ping'.format(admin_password))
 
 
-def iso_install(iso_url=None, check_sigs=False):
-    """Installs Satellite 6 from an ISO image."""
+def iso_install(admin_password=None, check_sigs=False):
+    """Installs Satellite 6 from an ISO image.
 
-    admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme')
+    The following environment variables affect this command:
+
+    RHN_USERNAME
+        Red Hat Network username.
+    RHN_PASSWORD
+        Red Hat Network password.
+    RHN_POOLID
+        Optional. Red Hat Network pool ID. Determines what software will be
+        available from RHN.
+    ISO_URL or BASE_URL
+        The URL where the ISO will be downloaded.
+    ADMIN_PASSWORD
+        Optional, defaults to 'changeme'. Foreman admin password.
+
+    """
+    if isinstance(check_sigs, str):
+        check_sigs = (check_sigs.lower() == 'true')
+
+    if admin_password is None:
+        admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme')
 
     os_version = distro_info()[1]
 
-    # Check that we have a URL
+    iso_url = os.environ.get('ISO_URL') or os.environ.get('BASE_URL')
     if iso_url is None:
         print('Please provide a valid URL for the ISO image.')
         sys.exit(1)
-    # Wether we should check for package signatures
-    if isinstance(check_sigs, str):
-        check_sigs = (check_sigs.lower() == 'true')
 
     # Enable some repos
     manage_repos(os_version)
