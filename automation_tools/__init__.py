@@ -434,9 +434,9 @@ def setup_abrt():
     # edit the config files
     run('sed -i -e "s|^URL = .*|URL = https://{0}:8443/abrt/|" '
         '/etc/libreport/plugins/ureport.conf'.format(host))
-    run('sed -i -e "s/^SSLVerify = no.*/SSLVerify = yes/" '
+    run('sed -i -e "|# SSLVerify = no|SSLVerify = yes|" '
         '/etc/libreport/plugins/ureport.conf')
-    run('sed -i -e "s/^SSLClientAuth = .*/SSLClientAuth = puppet/" '
+    run('sed -i -e "s|# SSLClientAuth = .*|SSLClientAuth = puppet|" '
         '/etc/libreport/plugins/ureport.conf')
     run('cp /var/lib/puppet/ssl/certs/ca.pem '
         '/etc/pki/ca-trust/source/anchors/')
