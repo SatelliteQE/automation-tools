@@ -767,14 +767,10 @@ def manage_repos(os_version=None, cdn=False):
     update_packages(warn_only=True)
 
 
-def upstream_install(admin_password=None, org_name=None, loc_name=None):
+def upstream_install(admin_password=None):
     """Task to install Foreman nightly using katello-deploy script"""
     if admin_password is None:
         admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme')
-    if org_name is None:
-        org_name = os.environ.get('ORGANIZATION_NAME', 'Default_Organization')
-    if loc_name is None:
-        loc_name = os.environ.get('LOCATION_NAME', 'Default_Location')
 
     os_version = distro_info()[1]
 
@@ -792,11 +788,8 @@ def upstream_install(admin_password=None, org_name=None, loc_name=None):
     run('cd katello-deploy && ./setup.rb --skip-installer '
         '--os rhel{os_version}'.format(os_version=os_version))
     run('yum repolist')
-    run('katello-installer -v -d '
-        '--foreman-admin-password="{0}" '
-        '--foreman-initial-organization="{1}" '
-        '--foreman-initial-location="{2}"'
-        ''.format(admin_password, org_name, loc_name))
+    run('katello-installer -v -d --foreman-admin-password="{0}"'
+        .format(admin_password))
     run('yum repolist')
 
     # Ensure that the installer worked
