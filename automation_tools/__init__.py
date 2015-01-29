@@ -1001,13 +1001,7 @@ def product_install(distribution, create_vm=False, certificate_url=None):
         execute(setup_default_capsule, host=host)
 
     execute(setup_default_docker, host=host)
-
-    # execute returns a dict, the result is the first value
-    info = execute(distro_info, host=host).values()[0]
-    if info[1] == 7:
-        execute(setup_abrt, host=host)
-    else:
-        print('WARNING: ABRT was not set up')
+    execute(setup_abrt, host=host)
 
     certificate_url = certificate_url or os.environ.get(
         'FAKE_MANIFEST_CERT_URL')
