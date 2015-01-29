@@ -1065,6 +1065,10 @@ def iso_download(iso_url=None):
         # server
         iso_filename = None
 
+        # append / in order to urljoin not drop the last URL segment
+        if not iso_url.endswith('/'):
+            iso_url += '/'
+
         for sum_file in ('MD5SUM', 'SHA1SUM', 'SHA256SUM'):
             result = run(
                 'wget {0} -O - -q'.format(urljoin(iso_url, sum_file)),
