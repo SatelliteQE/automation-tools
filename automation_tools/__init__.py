@@ -416,7 +416,12 @@ def setup_abrt():
     for package in packages:
         run('yum install -y {0}'.format(package))
 
-    run('systemctl restart foreman')
+    os_version = distro_info()[1]
+
+    if os_version >= 7:
+        run('systemctl restart foreman')
+    else:
+        run('service foreman restart')
     # workaround as sometimes foreman service does not restart with systemctl
     run('touch /usr/share/foreman/tmp/restart.txt')
 
@@ -428,8 +433,12 @@ def setup_abrt():
         '/etc/foreman-proxy/settings.d/abrt.yml')
 
     # run the required commands
-    run('systemctl start abrtd')
-    run('systemctl start abrt-ccpp')
+    if os_version >= 7:
+        run('systemctl start abrtd')
+        run('systemctl start abrt-ccpp')
+    else:
+        run('service abrtd start')
+        run('service abrt-ccpp start')
 
     # edit the config files
     run('sed -i -e "s|^URL = .*|URL = https://{0}:8443/abrt/|" '
