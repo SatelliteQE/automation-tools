@@ -131,10 +131,8 @@ def setup_proxy():
 
     Proxy information is passed using the PROXY_INFO environmental variable.
     e.g. PROXY_INFO=proxy://root:myP4$$@myhost.awesomedomain.com:8888
+
     """
-
-    os_version = distro_info()[1]
-
     proxy_info = urlsplit(os.environ.get('PROXY_INFO'))
     if not proxy_info.hostname or not proxy_info.port:
         raise Exception("You must include the proxy hostname and port.")
@@ -160,15 +158,15 @@ def setup_proxy():
         ))
 
     # restart the capsule-related services
-    daemons = (
-        'httpd', 'pulp_celerybeat', 'pulp_resource_manager', 'pulp_workers',
-    )
-    if os_version >= 7:
-        run('systemctl restart {0}'.format(' '.join(daemons)), warn_only=True)
+    if distro_info()[1] >= 7:
         run('yum install -y iptables-services')  # Install firewall package
-    else:
-        for daemon in daemons:
-            run('service {0} restart'.format(daemon), warn_only=True)
+    for daemon in (
+            'httpd',
+            'pulp_celerybeat',
+            'pulp_resource_manager',
+            'pulp_workers',
+    ):
+        manage_daemon('restart', daemon, warn_only=True)
 
     # Satellite 6 IP
     sat_ip = search(
@@ -194,12 +192,8 @@ def setup_proxy():
     # use this command:
     run('iptables-save > /etc/sysconfig/iptables')
 
-    if os_version >= 7:
-        # rhel7 replaced iptables with firewalld
-        run('systemctl enable iptables')
-        run('systemctl restart iptables', warn_only=True)
-    else:
-        run('service iptables restart')
+    manage_daemon('enable', 'iptables')
+    manage_daemon('restart', 'iptables', warn_only=True)
 
     # Configuring yum to use the proxy
     run('echo "proxy=http://{0}:{1}" >> /etc/yum.conf'
@@ -269,17 +263,14 @@ def setup_default_docker():
     ))
 
     # Restart ``docker`` service
-    if os_version >= 7:
-        run('systemctl restart docker')
-    else:
-        # This can silently fail if a pseuo-terminals is used, due to docker's
-        # non-standard approach to daemonizing and its naive init script. See:
-        #
-        # https://github.com/fabric/fabric/issues/395#issuecomment-1846383
-        # https://github.com/fabric/fabric/issues/395#issuecomment-32219270
-        # https://github.com/docker/docker/issues/2758
-        #
-        run('service docker restart', pty=False)
+    # This can silently fail if a pseuo-terminal is used on RHEL 6, due to
+    # docker's non-standard approach to daemonizing and its naive init script.
+    # See:
+    #
+    # https://github.com/fabric/fabric/issues/395#issuecomment-1846383
+    # https://github.com/fabric/fabric/issues/395#issuecomment-32219270
+    # https://github.com/docker/docker/issues/2758
+    manage_daemon('restart', 'docker', pty=(os_version >= 7))
 
     # Check that things look good
     run('docker ps')
@@ -323,12 +314,8 @@ def setup_default_capsule(interface=None):
 
     if interface is None:
         run('yum install -y libvirt')
-        if distro_info()[1] >= 7:
-            run('systemctl enable libvirtd')
-            run('systemctl start libvirtd')
-        else:
-            run('service libvirtd start')
-            run('chkconfig libvirtd on')
+        manage_daemon('enable', 'libvirtd')
+        manage_daemon('start', 'libvirtd')
         run('puppet module install -i /tmp domcleal/katellovirt')
         with cd('/tmp/katellovirt/'):
             run('grep -v virbr manifests/libvirt.pp > tempfile')
@@ -385,12 +372,7 @@ def setup_fake_manifest_certificate(certificate_url=None):
     run('wget -O /etc/candlepin/certs/upstream/fake_manifest.crt '
         '{certificate_url}'.format(certificate_url=certificate_url))
 
-    os_version = distro_info()[1]
-
-    if os_version <= 6:
-        run('service tomcat6 restart')
-    else:
-        run('systemctl restart tomcat')
+    manage_daemon('restart', 'tomcat6' if distro_info()[1] <= 6 else 'tomcat')
 
 
 def setup_abrt():
@@ -416,12 +398,8 @@ def setup_abrt():
     for package in packages:
         run('yum install -y {0}'.format(package))
 
-    os_version = distro_info()[1]
+    manage_daemon('restart', 'foreman')
 
-    if os_version >= 7:
-        run('systemctl restart foreman')
-    else:
-        run('service foreman restart')
     # workaround as sometimes foreman service does not restart with systemctl
     run('touch /usr/share/foreman/tmp/restart.txt')
 
@@ -433,12 +411,8 @@ def setup_abrt():
         '/etc/foreman-proxy/settings.d/abrt.yml')
 
     # run the required commands
-    if os_version >= 7:
-        run('systemctl start abrtd')
-        run('systemctl start abrt-ccpp')
-    else:
-        run('service abrtd start')
-        run('service abrt-ccpp start')
+    manage_daemon('start', 'abrtd')
+    manage_daemon('start', 'abrt-ccpp')
 
     # edit the config files
     run('sed -i -e "s|^URL = .*|URL = https://{0}:8443/abrt/|" '
@@ -563,9 +537,6 @@ def vm_list_base(base_image_dir=None):
 
 def setup_vm_provisioning(interface=None):
     """Task which setup required packages to provision VMs"""
-
-    os_version = distro_info()[1]
-
     if interface is None:
         print('A network interface is required')
         sys.exit(1)
@@ -591,8 +562,8 @@ def setup_vm_provisioning(interface=None):
 
     # Install virtualization packages
     run('yum install -y @virtualization')
-    run('systemctl start libvirtd')
-    run('systemctl enable libvirtd')
+    manage_daemon('start', 'libvirtd')
+    manage_daemon('enable', 'libvirtd')
 
     # Install other required packages
     packages = (
@@ -632,14 +603,9 @@ def setup_vm_provisioning(interface=None):
     )
     if result.return_code != 0:
         # Disable NetworkManager
-        if distro_info()[1] >= 7:
-            run('systemctl disable NetworkManager')
-            run('systemctl stop NetworkManager')
-            run('systemctl enable network')
-        else:
-            run('chkconfig NetworkManager off')
-            run('chkconfig network on')
-            run('service NetworkManager stop')
+        manage_daemon('disable', 'NetworkManager')
+        manage_daemon('stop', 'NetworkManager')
+        manage_daemon('enable', 'network')
 
         # Configure bridge
         ifcfg = '/etc/sysconfig/network-scripts/ifcfg-{0}'.format(interface)
@@ -657,25 +623,16 @@ def setup_vm_provisioning(interface=None):
             remote_path='/etc/sysconfig/network-scripts/ifcfg-br0')
         ifcfg_br0.close()
 
-        if os_version >= 7:
-            run('systemctl restart network')
-        else:
-            run('service network restart')
+        manage_daemon('restart', 'network')
 
         # Configure iptables to allow all traffic to be forwarded across the
         # bridge
         run('iptables -I FORWARD -m physdev --physdev-is-bridged -j ACCEPT')
         run('iptables-save > /etc/sysconfig/iptables')
-        if os_version >= 7:
-            run('systemctl restart firewalld')
-        else:
-            run('service iptables restart')
-
+        manage_daemon(
+            'restart', 'firewalld' if distro_info()[1] >= 7 else 'iptables')
         # Restart the libvirt daemon
-        if os_version >= 7:
-            run('systemctl reload libvirtd')
-        else:
-            run('service libvirtd reload')
+        manage_daemon('reload', 'libvirtd')
 
         # Show configured bridges
         run('brctl show')
@@ -698,16 +655,8 @@ def install_prerequisites():
     # enabled on Satellite Server. To enable ntpd and have it persist at
     # bootup:
     run('yum install -y ntp', warn_only=True)
-
-    # The command varies depending on what version of RHEL you have.
-    os_version = distro_info()[1]
-
-    if os_version >= 7:
-        run('systemctl enable ntpd', warn_only=True)
-        run('systemctl start ntpd', warn_only=True)
-    else:
-        run('service ntpd start', warn_only=True)
-        run('chkconfig ntpd on', warn_only=True)
+    manage_daemon('enable', 'ntpd', warn_only=True)
+    manage_daemon('start', 'ntpd', warn_only=True)
 
     # Port 443 for HTTPS (secure WWW) must be open for incoming connections.
     run('iptables -I INPUT -m state --state NEW -p tcp --dport 443 -j ACCEPT')
@@ -1176,24 +1125,15 @@ def performance_tuning(running_on_vm=True):
     if isinstance(running_on_vm, str):
         running_on_vm = (running_on_vm.lower() == 'true')
 
-    distro_version = distro_info()[1]
-    if distro_version <= 6:
-        service_management_cmd = 'service {0} {1}'
-    else:
-        service_management_cmd = 'systemctl {1} {0}'
-
     # httpd configuration
     run('sed -i -e "s/^KeepAlive.*/KeepAlive On/" '
         '/etc/httpd/conf/httpd.conf')
-    run(service_management_cmd.format('httpd', 'restart'))
+    manage_daemon('restart', 'httpd')
 
     # tuned setup
     run('yum install -y tuned', warn_only=True)
-    if distro_version <= 6:
-        run('chkconfig tuned on')
-    else:
-        run('systemctl enable tuned')
-    run(service_management_cmd.format('tuned', 'start'))
+    manage_daemon('enable', 'tuned')
+    manage_daemon('start', 'tuned')
     if running_on_vm:
         run('tuned-adm profile virtual-guest')
     else:
@@ -1306,9 +1246,9 @@ def client_registration_test(clean_beaker=True, update_packages=True):
     run('yum groupinstall -y "Web Server"', quiet=True)
     print('Checking for "httpd" and starting it.')
     run('rpm -q httpd')
-    run('service httpd start', warn_only=True)
+    manage_daemon('start', 'httpd', warn_only=True)
     print('Stopping "httpd" service and remove "Web Server" group.')
-    run('service httpd stop', warn_only=True)
+    manage_daemon('stop', 'httpd', warn_only=True)
     run('yum groupremove -y "Web Server"', quiet=True)
     print('Checking if "httpd" is really removed.')
     run('rpm -q httpd', warn_only=True)
@@ -1353,12 +1293,7 @@ def install_katello_agent():
     # Now, check that the package is installed...
     run('rpm -q katello-agent')
     # ...and that 'goerd' is running.
-
-    # The command varies depending on what version of RHEL you have.
-    if distro_info()[1] >= 7:
-        run('systemctl status goferd')
-    else:
-        run('service goferd status')
+    manage_daemon('status', 'goferd')
 
 
 def remove_katello_agent():
@@ -1370,12 +1305,7 @@ def remove_katello_agent():
     # Now, check that the package is indeed gone...
     run('rpm -q katello-agent', warn_only=True)
     # ...and that 'goerd' is not running.
-
-    # The command varies depending on what version of RHEL you have.
-    if distro_info()[1] >= 7:
-        run('systemctl status goferd', warn_only=True)
-    else:
-        run('service goferd status', warn_only=True)
+    manage_daemon('status', 'goferd', warn_only=True)
 
 
 def errata_upgrade():
@@ -1437,10 +1367,7 @@ def errata_upgrade():
     run('rm -f /etc/cron.d/{0}rebuild.cron'.format(package1))
 
     # Start <package1>d service
-    if distro_info()[1] >= 7:
-        run('systemctl start {0}d'.format(package1))
-    else:
-        run('service {0}d start'.format(package1))
+    manage_daemon('start', '{0}d'.format(package1))
 
     # Follow the log, run will return when the system is rebooting
     run('tail -f /var/log/{0}d'.format(package1), warn_only=True)
@@ -1514,3 +1441,29 @@ def update_packages(*args, **kwargs):
         quiet=kwargs.get('quiet', False),
         warn_only=kwargs.get('warn_only', False),
     )
+
+
+# =============================================================================
+# Helper functions
+# =============================================================================
+def manage_daemon(action, daemon, pty=True, warn_only=False):
+    """Manage a system daemon
+
+    :param str action: Daemon action like start, stop, restart, info
+    :param str daemon: Daemon name to perform the action
+    :param bool pty: Controls the creation of a pseudo-terminal when managing
+        the daemon. Some daemons actions fail with pty=True.
+    :param bool warn_only: Will be passed directly to Fabric's run
+
+    """
+    if distro_info()[1] >= 7:
+        command = 'systemctl {} {}'.format(action, daemon)
+    else:
+        if action in ('enable', 'disable'):
+            command = 'chkconfig {} {}'.format(
+                daemon,
+                'on' if action == 'enable' else 'off'
+            )
+        else:
+            command = 'service {} {}'.format(daemon, action)
+    return run(command, pty=pty, warn_only=warn_only)
