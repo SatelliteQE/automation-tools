@@ -1458,3 +1458,27 @@ def manage_daemon(action, daemon, pty=True, warn_only=False):
         else:
             command = 'service {} {}'.format(daemon, action)
     return run(command, pty=pty, warn_only=warn_only)
+
+
+def setenforce(mode):
+    """Modify the mode SELinux is running in
+
+    :param mode: Use 'enforcing' or 1 or True to put SELinux in enforcing mode.
+        Use 'permissive' or 0 or False to put SELinux in permissive mode.
+
+    """
+    if isinstance(mode, str):
+        mode = mode.lower()
+
+    enforcing_modes = ('enforcing', 1, True)
+    permissive_modes = ('permissive', 0, False)
+    if mode in enforcing_modes:
+        mode = 1
+    elif mode in permissive_modes:
+        mode = 0
+    else:
+        raise ValueError('Mode should be one of {0}'.format(
+            enforcing_modes + permissive_modes
+        ))
+
+    run('setenforce {0}'.format(mode))
