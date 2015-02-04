@@ -737,8 +737,6 @@ def upstream_install(admin_password=None):
     run('if [ -d katello-deploy ]; then rm -rf katello-deploy; fi')
     run('git clone https://github.com/Katello/katello-deploy.git')
 
-    # Make sure that SELinux is enabled
-    run('setenforce 1')
     run('yum repolist')
     run('cd katello-deploy && ./setup.rb --skip-installer '
         '--os rhel{os_version}'.format(os_version=os_version))
@@ -785,8 +783,6 @@ def downstream_install(admin_password=None):
     # Install required packages for the installation
     run('yum install -y katello libvirt')
 
-    # Make sure that SELinux is enabled
-    run('setenforce 1')
     run('katello-installer -v -d --foreman-admin-password="{0}"'.format(
         admin_password))
 
@@ -818,8 +814,6 @@ def cdn_install():
     # Install required packages for the installation
     run('yum install -y katello libvirt')
 
-    # Make sure that SELinux is enabled
-    run('setenforce 1')
     run('katello-installer -v -d --foreman-admin-password="{0}"'.format(
         admin_password))
 
@@ -872,8 +866,6 @@ def iso_install(admin_password=None, check_sigs=False):
         else:
             run('./install_packages --nogpgsigs')
 
-    # Make sure that SELinux is enabled
-    run('setenforce 1')
     run('katello-installer -v -d --foreman-admin-password="{0}"'.format(
         admin_password))
 
@@ -881,7 +873,8 @@ def iso_install(admin_password=None, check_sigs=False):
     run('hammer -u admin -p {0} ping'.format(admin_password))
 
 
-def product_install(distribution, create_vm=False, certificate_url=None):
+def product_install(distribution, create_vm=False, certificate_url=None,
+                    selinux_mode=None):
     """Task which install every product distribution.
 
     Product distributions are cdn, downstream, iso or upstream.
@@ -917,6 +910,9 @@ def product_install(distribution, create_vm=False, certificate_url=None):
             distribution, ', '.join(distributions)))
         sys.exit(1)
 
+    if selinux_mode is None:
+        selinux_mode = os.environ.get('SELINUX_MODE', 'enforcing')
+
     if distribution == 'iso':
         iso_url = os.environ.get('ISO_URL')
         if iso_url is None:
@@ -943,7 +939,7 @@ def product_install(distribution, create_vm=False, certificate_url=None):
     execute(subscribe, host=host)
 
     execute(install_prerequisites, host=host)
-
+    setenforce(selinux_mode)
     execute(install_tasks[distribution], host=host)
 
     if distribution in ('cdn', 'downstream', 'iso'):
