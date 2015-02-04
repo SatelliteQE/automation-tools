@@ -683,12 +683,8 @@ def install_prerequisites():
     run('iptables-save > /etc/sysconfig/iptables')
 
 
-def manage_repos(os_version=None, cdn=False):
+def manage_repos(cdn=False):
     """Enables only required RHEL repos for Satellite 6."""
-
-    if os_version is None:
-        print('Please provide the OS version.')
-        sys.exit(1)
 
     if isinstance(cdn, str):
         cdn = (cdn.lower() == 'true')
@@ -707,6 +703,7 @@ def manage_repos(os_version=None, cdn=False):
     # And disable all repos for now
     run('subscription-manager repos --disable "*"')
 
+    os_version = distro_info()[1]
     # If installing from CDN, use the real product
     if cdn is True:
         run(
@@ -732,7 +729,7 @@ def upstream_install(admin_password=None):
 
     os_version = distro_info()[1]
 
-    manage_repos(os_version)
+    manage_repos()
 
     # Install required packages for the installation
     run('yum install -y git ruby')
@@ -768,8 +765,6 @@ def downstream_install(admin_password=None):
     if admin_password is None:
         admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme')
 
-    os_version = distro_info()[1]
-
     base_url = os.environ.get('BASE_URL')
     if base_url is None:
         print('The BASE_URL environment variable should be defined')
@@ -785,7 +780,7 @@ def downstream_install(admin_password=None):
         remote_path='/etc/yum.repos.d/satellite.repo')
     satellite_repo.close()
 
-    manage_repos(os_version)
+    manage_repos()
 
     # Install required packages for the installation
     run('yum install -y katello libvirt')
@@ -817,10 +812,8 @@ def cdn_install():
     """
     admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme')
 
-    os_version = distro_info()[1]
-
     # Enable some repos
-    manage_repos(os_version, True)
+    manage_repos(cdn=True)
 
     # Install required packages for the installation
     run('yum install -y katello libvirt')
@@ -858,15 +851,13 @@ def iso_install(admin_password=None, check_sigs=False):
     if admin_password is None:
         admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme')
 
-    os_version = distro_info()[1]
-
     iso_url = os.environ.get('ISO_URL') or os.environ.get('BASE_URL')
     if iso_url is None:
         print('Please provide a valid URL for the ISO image.')
         sys.exit(1)
 
     # Enable some repos
-    manage_repos(os_version)
+    manage_repos()
 
     # Download the ISO
     iso_download(iso_url)
