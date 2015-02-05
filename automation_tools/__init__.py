@@ -939,7 +939,7 @@ def product_install(distribution, create_vm=False, certificate_url=None,
     execute(subscribe, host=host)
 
     execute(install_prerequisites, host=host)
-    execute(setenforce(selinux_mode), host=host)
+    execute(setenforce, selinux_mode, host=host)
     execute(install_tasks[distribution], host=host)
 
     if distribution in ('cdn', 'downstream', 'iso'):
