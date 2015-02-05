@@ -892,7 +892,8 @@ def product_install(distribution, create_vm=False, certificate_url=None,
                     selinux_mode=None):
     """Task which install every product distribution.
 
-    Product distributions are cdn, downstream, iso or upstream.
+    Product distributions are sam-upstream, satellite6-cdn,
+    satellite6-downstream, satellite6-iso or satellite6-upstream.
 
     If ``create_vm`` is True then ``vm_destroy`` and ``vm_create`` tasks will
     be run. Make sure to set the required environment variables for those
@@ -914,11 +915,11 @@ def product_install(distribution, create_vm=False, certificate_url=None,
     distribution = distribution.lower()
 
     install_tasks = {
-        'cdn': cdn_install,
-        'downstream': downstream_install,
-        'iso': iso_install,
-        'upstream': upstream_install,
         'sam-upstream': sam_upstream_install,
+        'satellite6-cdn': cdn_install,
+        'satellite6-downstream': downstream_install,
+        'satellite6-iso': iso_install,
+        'satellite6-upstream': upstream_install,
     }
     distributions = install_tasks.keys()
     if distribution not in distributions:
@@ -958,17 +959,19 @@ def product_install(distribution, create_vm=False, certificate_url=None,
     execute(setenforce, selinux_mode, host=host)
     execute(install_tasks[distribution], host=host)
 
-    if distribution in ('cdn', 'downstream', 'iso'):
+    if distribution in (
+            'satellite6-cdn', 'satellite6-downstream', 'satellite6-iso'):
         execute(setup_default_capsule, host=host)
 
-    execute(setup_default_docker, host=host)
-    # execute returns a dict, the result is the first value. OS version is the
-    # resulting index 1
-    if execute(distro_info, host=host).values()[0][1] == 6:
-        with warn_only():
+    if distribution.startswith('satellite6'):
+        execute(setup_default_docker, host=host)
+        # execute returns a dict, the result is the first value. OS version is
+        # the resulting index 1
+        if execute(distro_info, host=host).values()[0][1] == 6:
+            with warn_only():
+                execute(setup_abrt, host=host)
+        else:
             execute(setup_abrt, host=host)
-    else:
-        execute(setup_abrt, host=host)
 
     certificate_url = certificate_url or os.environ.get(
         'FAKE_MANIFEST_CERT_URL')

@@ -58,14 +58,14 @@ To install a compose build::
     RHN_USERNAME=user@example.com RHN_PASSWORD=mysecret \
     RHN_POOLID=poolid BASE_URL=http://example.com/Satellite/x86_64/os/ \
     fab -H root@example.com \
-    product_install:downstream
+    product_install:satellite6-downstream
 
 To install a nightly build::
 
     RHN_USERNAME=user@example.com RHN_PASSWORD=mysecret \
     RHN_POOLID=poolid \
     fab -H root@example.com \
-    product_install:upstream
+    product_install:satellite6-upstream
 
 
 To install from the CDN::
@@ -73,8 +73,20 @@ To install from the CDN::
     RHN_USERNAME=user@example.com RHN_PASSWORD=mysecret \
     RHN_POOLID=poolid \
     fab -H root@example.com \
-    product_install:cdn
+    product_install:satellite6-cdn
 
+
+Product install task will set the admin password to `changeme`.
+
+SAM Installation
+----------------
+
+To install a nightly build::
+
+    RHN_USERNAME=user@example.com RHN_PASSWORD=mysecret \
+    RHN_POOLID=poolid \
+    fab -H root@example.com \
+    product_install:sam-upstream
 
 Product install task will set the admin password to `changeme`.
 
