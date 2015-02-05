@@ -722,7 +722,7 @@ def manage_repos(cdn=False):
     update_packages(warn_only=True)
 
 
-def upstream_install(admin_password=None):
+def upstream_install(admin_password=None, sam=False):
     """Task to install Foreman nightly using katello-deploy script"""
     if admin_password is None:
         admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme')
@@ -739,10 +739,15 @@ def upstream_install(admin_password=None):
 
     run('yum repolist')
     run('cd katello-deploy && ./setup.rb --skip-installer '
-        '--os rhel{os_version}'.format(os_version=os_version))
+        '--os rhel{os_version} {sam}'.format(
+            os_version=os_version,
+            sam='--sam' if sam else ''
+        ))
     run('yum repolist')
-    run('katello-installer -v -d --foreman-admin-password="{0}"'
-        .format(admin_password))
+    run('{0} -v -d --foreman-admin-password="{1}"'.format(
+        'sam-installer' if sam else 'katello-installer',
+        admin_password
+    ))
     run('yum repolist')
 
     # Ensure that the installer worked
@@ -873,6 +878,11 @@ def iso_install(admin_password=None, check_sigs=False):
     run('hammer -u admin -p {0} ping'.format(admin_password))
 
 
+def sam_upstream_install(admin_password=None):
+    """Task to install SAM nightly using katello-deploy script"""
+    upstream_install(admin_password, sam=True)
+
+
 def product_install(distribution, create_vm=False, certificate_url=None,
                     selinux_mode=None):
     """Task which install every product distribution.
@@ -903,6 +913,7 @@ def product_install(distribution, create_vm=False, certificate_url=None,
         'downstream': downstream_install,
         'iso': iso_install,
         'upstream': upstream_install,
+        'sam-upstream': sam_upstream_install,
     }
     distributions = install_tasks.keys()
     if distribution not in distributions:
