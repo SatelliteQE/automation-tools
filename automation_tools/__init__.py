@@ -946,7 +946,9 @@ def product_install(distribution, create_vm=False, certificate_url=None,
         execute(setup_default_capsule, host=host)
 
     execute(setup_default_docker, host=host)
-    if distro_info()[1] == 6:
+    # execute returns a dict, the result is the first value. OS version is the
+    # resulting index 1
+    if execute(distro_info, host=host).values()[0][1] == 6:
         with warn_only():
             execute(setup_abrt, host=host)
     else:
