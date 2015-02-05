@@ -567,6 +567,7 @@ def setup_vm_provisioning(interface=None):
 
     # Install other required packages
     packages = (
+        'avahi',
         'bash',
         'bridge-utils',
         'cloud-utils',
@@ -583,6 +584,10 @@ def setup_vm_provisioning(interface=None):
         'util-linux',
     )
     run('yum install -y {0}'.format(' '.join(packages)))
+
+    # Setup avahi
+    manage_daemon('start', 'avahi-daemon')
+    manage_daemon('enable', 'avahi-daemon')
 
     # Setup snap-guest
     result = run('[ -d /opt/snap-guest ]', warn_only=True)
