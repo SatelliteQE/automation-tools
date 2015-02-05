@@ -13,7 +13,7 @@ import time
 from re import search
 from urlparse import urlsplit
 
-from fabric.api import cd, env, execute, local, put, run
+from fabric.api import cd, env, execute, local, put, run, warn_only
 if sys.version_info[0] is 2:
     from urlparse import urljoin  # (import-error) pylint:disable=F0401
     from StringIO import StringIO  # (import-error) pylint:disable=F0401
@@ -946,7 +946,11 @@ def product_install(distribution, create_vm=False, certificate_url=None,
         execute(setup_default_capsule, host=host)
 
     execute(setup_default_docker, host=host)
-    execute(setup_abrt, host=host)
+    if distro_info()[1] == 6:
+        with warn_only():
+            execute(setup_abrt, host=host)
+    else:
+        execute(setup_abrt, host=host)
 
     certificate_url = certificate_url or os.environ.get(
         'FAKE_MANIFEST_CERT_URL')
