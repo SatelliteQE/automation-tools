@@ -1411,13 +1411,12 @@ def errata_upgrade():
 
 
 def run_errata():
-    """Run the errata to upgrade packages
+    """Run the errata to upgrade packages.
 
-    The following environment variables affect this command
+    The following environment variables affect this command:
 
     ERRATA_NUMBER
         Errata number of the errata to test. Format: xxxx:xxxxx Eg: 2014:19309
-
     PACKAGE_2
         Package 2 to be used
 
@@ -1427,10 +1426,13 @@ def run_errata():
     if errata_number is None:
         print('The ERRATA_NUMBER variable should be defined')
         sys.exit(1)
+
+    # See: https://bugzilla.redhat.com/show_bug.cgi?id=1182352
+    run('update-{0}d-settings'.format(package2))
+
     run('{0}-setup-channel-cache'.format(package2))
-    run('tps-make-lists {0}'.format(errata_number))
-    run('{0}-cd -c {1} && {0}-upgrade'
-        .format(package2, errata_number))
+    run('{0}-make-lists {1}'.format(package2, errata_number))
+    run('{0}-cd -c {1} && {0}-upgrade'.format(package2, errata_number))
 
     # After this you can see the upgraded packages
     # Run `<package2>-downgrade` if you want to revert to the old packages
