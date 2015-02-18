@@ -13,7 +13,7 @@ import time
 from re import search
 from urlparse import urlsplit
 
-from fabric.api import cd, env, execute, local, put, run, warn_only
+from fabric.api import cd, env, execute, get, local, put, run, warn_only
 if sys.version_info[0] is 2:
     from urlparse import urljoin  # (import-error) pylint:disable=F0401
     from StringIO import StringIO  # (import-error) pylint:disable=F0401
@@ -1455,6 +1455,34 @@ def update_packages(*args, **kwargs):
         quiet=kwargs.get('quiet', False),
         warn_only=kwargs.get('warn_only', False),
     )
+
+
+# =============================================================================
+# Utility tasks
+# =============================================================================
+def foreman_debug(tarball_name=None):
+    """Generates and download the foreman-debug generated tarball
+
+    :param str tarball_name: The tarball file name which will be downloaded
+        relative to the current working directory. If ``None`` the tarball will
+        be named foreman-debug-<timestamp>.
+
+    """
+    if tarball_name is None:
+        tarball_name = 'foreman-debug-{0}'.format(int(time.time()))
+
+    with cd('/tmp'):
+        run('foreman-debug -q -d {0}'.format(tarball_name), quiet=True)
+        get(
+            local_path='%(basename)s',
+            remote_path='/tmp/{0}/{0}.tar.xz'.format(tarball_name),
+        )
+
+    release = run(
+        'cat /etc/yum.repos.d/satellite.repo | grep baseurl | cut -d "/" -f 7',
+        quiet=True
+    )
+    print('Satellite release: {0}'.format(release))
 
 
 # =============================================================================

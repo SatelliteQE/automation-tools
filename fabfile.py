@@ -9,6 +9,7 @@ from automation_tools import (
     downstream_install,
     errata_upgrade,
     fix_hostname,
+    foreman_debug,
     install_errata,
     install_katello_agent,
     install_prerequisites,
