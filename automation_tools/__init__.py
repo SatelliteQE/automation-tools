@@ -1431,8 +1431,7 @@ def run_errata():
     run('update-{0}d-settings'.format(package2))
 
     run('{0}-setup-channel-cache'.format(package2))
-    run('{0}-make-lists {1}'.format(package2, errata_number))
-    run('{0}-cd -c {1} && {0}-upgrade'.format(package2, errata_number))
+    run('{0}-cd --create {1} && {0}-upgrade'.format(package2, errata_number))
 
     # After this you can see the upgraded packages
     # Run `<package2>-downgrade` if you want to revert to the old packages
