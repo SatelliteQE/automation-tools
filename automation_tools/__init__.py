@@ -1460,12 +1460,15 @@ def update_packages(*args, **kwargs):
 # =============================================================================
 # Utility tasks
 # =============================================================================
-def foreman_debug(tarball_name=None):
+def foreman_debug(tarball_name=None, local_path=None):
     """Generates and download the foreman-debug generated tarball
 
     :param str tarball_name: The tarball file name which will be downloaded
         relative to the current working directory. If ``None`` the tarball will
         be named foreman-debug-<timestamp>.
+    :param str local_path: The local path given by user to save foreman-debug
+        tar file eg., /home/$user/Downloads/.  By default, the tar file will
+        be saved in automation-tools root folder.
 
     """
     if tarball_name is None:
@@ -1474,7 +1477,7 @@ def foreman_debug(tarball_name=None):
     with cd('/tmp'):
         run('foreman-debug -q -d {0}'.format(tarball_name), quiet=True)
         get(
-            local_path='%(basename)s',
+            local_path=local_path if local_path else '%(basename)s',
             remote_path='/tmp/{0}/{0}.tar.xz'.format(tarball_name),
         )
 
