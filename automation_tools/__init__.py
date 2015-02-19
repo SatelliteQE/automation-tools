@@ -683,6 +683,9 @@ def install_prerequisites():
     # Port 22 must be open for connections via ssh
     run('iptables -I INPUT -m state --state NEW -p tcp --dport 22 -j ACCEPT')
 
+    # Port 5000 must be open for Docker registry communication.
+    run('iptables -I INPUT -m state --state NEW -p tcp --dport 5000 -j ACCEPT')
+
     # To make the changes persistent across reboots when using the command line
     # use this command:
     run('iptables-save > /etc/sysconfig/iptables')
