@@ -575,6 +575,7 @@ def setup_vm_provisioning(interface=None):
         'git',
         'kvm',
         'libguestfs-tools',
+        'nss-mdns',
         'openssl',
         'perl',
         'perl-Sys-Guestfs',
