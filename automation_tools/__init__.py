@@ -47,7 +47,7 @@ def subscribe(autosubscribe=False):
 
     # Registration and subscription is only meaningful for Red Hat Enterprise
     # Linux systems.
-    distro, major_version, minor_version = distro_info()
+    distro, major_version, _ = distro_info()
     if distro.lower() != 'rhel':
         return
 
@@ -56,18 +56,13 @@ def subscribe(autosubscribe=False):
         if env_var not in os.environ:
             print('The {0} environment variable must be set.'.format(env_var))
             sys.exit(1)
-    if minor_version is None:
-        minor_version = 'Server'
-    else:
-        minor_version = '.{0}'.format(minor_version)
     run(
         'subscription-manager register --force --user={0} --password={1} '
-        '--release="{2}{3}" {4}'
+        '--release="{2}Server" {3}'
         .format(
             os.environ['RHN_USERNAME'],
             os.environ['RHN_PASSWORD'],
             major_version,
-            minor_version,
             '--autosubscribe' if autosubscribe else ''
         )
     )
