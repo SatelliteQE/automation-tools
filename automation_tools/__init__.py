@@ -790,7 +790,7 @@ def downstream_install(admin_password=None):
     manage_repos()
 
     # Install required packages for the installation
-    run('yum install -y katello libvirt')
+    run('yum install -y katello')
 
     run('katello-installer -v -d --foreman-admin-password="{0}"'.format(
         admin_password))
@@ -821,7 +821,7 @@ def cdn_install():
     manage_repos(cdn=True)
 
     # Install required packages for the installation
-    run('yum install -y katello libvirt')
+    run('yum install -y katello')
 
     run('katello-installer -v -d --foreman-admin-password="{0}"'.format(
         admin_password))
