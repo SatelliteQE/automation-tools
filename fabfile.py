@@ -26,6 +26,7 @@ from automation_tools import (
     setup_default_capsule,
     setup_default_docker,
     setup_fake_manifest_certificate,
+    setup_firewall,
     setup_proxy,
     setup_vm_provisioning,
     subscribe,

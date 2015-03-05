@@ -370,6 +370,45 @@ def setup_fake_manifest_certificate(certificate_url=None):
     manage_daemon('restart', 'tomcat6' if distro_info()[1] <= 6 else 'tomcat')
 
 
+def setup_firewall():
+    """Setup firewall rules that Satellite 6 needs to work properly"""
+    ports = (
+        # Port 443 for HTTPS (secure WWW) must be open for incoming
+        # connections.
+        443,
+        # Port 5671 must be open for SSL communication with managed systems.
+        5671,
+        # Port 80 for HTTP (WWW) must be open to download the bootstrap files.
+        80,
+        # Port 8140 must be open for incoming Puppet connections with the
+        # managed systems.
+        8140,
+        # Port 9090 must be open for Foreman Smart Proxy connections with the
+        # managed systems.
+        9090,
+        # Port 22 must be open for connections via ssh
+        22,
+        # Port 5000 must be open for Docker registry communication.
+        5000,
+    )
+
+    for port in ports:
+        rule_exists = run(
+            r'iptables -nL INPUT | grep -E "^ACCEPT\s+tcp.*{0}"'.format(port),
+            quiet=True,
+            warn_only=True
+        ).return_code == 0
+        if not rule_exists:
+            run(
+                'iptables -I INPUT -m state --state NEW -p tcp --dport {0} '
+                '-j ACCEPT'.format(port)
+            )
+
+    # To make the changes persistent across reboots when using the command line
+    # use this command:
+    run('iptables-save > /etc/sysconfig/iptables')
+
+
 def setup_abrt():
     """Task to setup abrt on foreman
 
@@ -659,33 +698,6 @@ def install_prerequisites():
     manage_daemon('enable', 'ntpd', warn_only=True)
     manage_daemon('start', 'ntpd', warn_only=True)
 
-    # Port 443 for HTTPS (secure WWW) must be open for incoming connections.
-    run('iptables -I INPUT -m state --state NEW -p tcp --dport 443 -j ACCEPT')
-
-    # Port 5671 must be open for SSL communication with managed systems.
-    run('iptables -I INPUT -m state --state NEW -p tcp --dport 5671 -j ACCEPT')
-
-    # Port 80 for HTTP (WWW) must be open to download the bootstrap files.
-    run('iptables -I INPUT -m state --state NEW -p tcp --dport 80 -j ACCEPT')
-
-    # Port 8140 must be open for incoming Puppet connections with the managed
-    # systems.
-    run('iptables -I INPUT -m state --state NEW -p tcp --dport 8140 -j ACCEPT')
-
-    # Port 9090 must be open for Foreman Smart Proxy connections with the
-    # managed systems.
-    run('iptables -I INPUT -m state --state NEW -p tcp --dport 9090 -j ACCEPT')
-
-    # Port 22 must be open for connections via ssh
-    run('iptables -I INPUT -m state --state NEW -p tcp --dport 22 -j ACCEPT')
-
-    # Port 5000 must be open for Docker registry communication.
-    run('iptables -I INPUT -m state --state NEW -p tcp --dport 5000 -j ACCEPT')
-
-    # To make the changes persistent across reboots when using the command line
-    # use this command:
-    run('iptables-save > /etc/sysconfig/iptables')
-
 
 def manage_repos(cdn=False):
     """Enables only required RHEL repos for Satellite 6."""
@@ -961,6 +973,10 @@ def product_install(distribution, create_vm=False, certificate_url=None,
     if distribution in (
             'satellite6-cdn', 'satellite6-downstream', 'satellite6-iso'):
         execute(setup_default_capsule, host=host)
+
+    # Firewall should be setup after setup_default_capsule clean the puppet
+    # module it installs clean already created rules
+    setup_firewall()
 
     if distribution.startswith('satellite6'):
         execute(setup_default_docker, host=host)
