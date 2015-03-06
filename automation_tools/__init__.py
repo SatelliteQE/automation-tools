@@ -78,7 +78,7 @@ def subscribe(autosubscribe=False):
                 'subscription-manager subscribe --pool={0}'.format(rhn_poolid),
                 warn_only=True
             )
-            if result.return_code is 0 or has_pool_msg in result:
+            if result.succeeded or has_pool_msg in result:
                 return
             time.sleep(5)
         print('Unable to subscribe system to pool. Aborting.')
@@ -398,7 +398,7 @@ def setup_firewall():
         rule_exists = run(
             r'iptables -nL INPUT | grep -E "^ACCEPT\s+tcp.*{0}"'.format(port),
             quiet=True,
-        ).return_code == 0
+        ).succeeded
         if not rule_exists:
             run(
                 'iptables -I INPUT -m state --state NEW -p tcp --dport {0} '
@@ -418,7 +418,7 @@ def setup_abrt():
     """
     # Check if rubygem-smart_proxy_abrt package is available
     result = run('yum list rubygem-smart_proxy_abrt', quiet=True)
-    if result.return_code != 0:
+    if result.failed:
         print('WARNING: ABRT was not set up')
         return
 
@@ -578,7 +578,7 @@ def setup_vm_provisioning(interface=None):
     # Check for Nested virtualization support
     result = run(
         'grep -E "^Y" /sys/module/kvm_intel/parameters/nested', quiet=True)
-    if result.return_code != 0:
+    if result.failed:
         print('Nested Virtualization is not supported on this machine.')
         print('Enabling the Nested Virtualization support.')
         run(
@@ -590,7 +590,7 @@ def setup_vm_provisioning(interface=None):
 
     # Check for virtualization support
     result = run('grep -E "^flags.*(vmx|svm)" /proc/cpuinfo', quiet=True)
-    if result.return_code != 0:
+    if result.failed:
         print('Virtualization is not supported on this machine')
         sys.exit(1)
 
@@ -626,7 +626,7 @@ def setup_vm_provisioning(interface=None):
 
     # Setup snap-guest
     result = run('[ -d /opt/snap-guest ]', warn_only=True)
-    if result.return_code != 0:
+    if result.failed:
         with cd('/opt'):
             run('git clone git://github.com/lzap/snap-guest.git')
         run('sudo ln -s /opt/snap-guest/snap-guest /usr/local/bin/snap-guest')
@@ -637,7 +637,7 @@ def setup_vm_provisioning(interface=None):
 
     # Setup bridge
     result = run('[ -f /etc/sysconfig/network-scripts/ifcfg-br0 ]', quiet=True)
-    if result.return_code != 0:
+    if result.failed:
         # Disable NetworkManager
         manage_daemon('disable', 'NetworkManager')
         manage_daemon('stop', 'NetworkManager')
@@ -683,7 +683,7 @@ def install_prerequisites():
     for command in (
             'ping -c1 localhost', 'ping -c1 $(hostname -s)',
             'ping -c1 $(hostname -f)'):
-        if run(command, warn_only=True).return_code != 0:
+        if run(command, warn_only=True).failed:
             time.sleep(5)
             run(command)
 
@@ -703,7 +703,7 @@ def manage_repos(cdn=False):
 
     # Clean up system if Beaker-based
     result = run('which yum-config-manager', warn_only=True)
-    if result.return_code == 0:
+    if result.succeeded:
         run('yum-config-manager --disable "beaker*"')
     else:
         run('mv /etc/yum.repos.d/beaker-* ~/', warn_only=True)
@@ -1049,7 +1049,7 @@ def iso_download(iso_url=None):
                 'wget {0} -O - -q'.format(urljoin(iso_url, sum_file)),
                 quiet=True,
             )
-            if result.return_code == 0:
+            if result.succeeded:
                 iso_filename = result.split('*')[1].strip()
                 break
 
@@ -1100,7 +1100,7 @@ def distro_info():
     if host not in cache:
         # Grab the information and store on cache
         release_info = run('cat /etc/redhat-release', quiet=True)
-        if release_info.return_code != 0:
+        if release_info.failed:
             print('Failed to read /etc/redhat-release file')
             sys.exit(1)
 
@@ -1366,7 +1366,7 @@ def errata_upgrade():
 
     # Install packages
     result = run('which yum-config-manager', warn_only=True)
-    if result.return_code == 0:
+    if result.succeeded:
         run('yum-config-manager --enable "beaker*"')
     else:
         run('mv ~/beaker-* /etc/yum.repos.d/', warn_only=True)
