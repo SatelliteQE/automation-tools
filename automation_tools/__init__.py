@@ -398,7 +398,6 @@ def setup_firewall():
         rule_exists = run(
             r'iptables -nL INPUT | grep -E "^ACCEPT\s+tcp.*{0}"'.format(port),
             quiet=True,
-            warn_only=True
         ).return_code == 0
         if not rule_exists:
             run(
@@ -418,8 +417,7 @@ def setup_abrt():
 
     """
     # Check if rubygem-smart_proxy_abrt package is available
-    result = run(
-        'yum list rubygem-smart_proxy_abrt', warn_only=True, quiet=True)
+    result = run('yum list rubygem-smart_proxy_abrt', quiet=True)
     if result.return_code != 0:
         print('WARNING: ABRT was not set up')
         return
@@ -638,11 +636,7 @@ def setup_vm_provisioning(interface=None):
             run('git pull')
 
     # Setup bridge
-    result = run(
-        '[ -f /etc/sysconfig/network-scripts/ifcfg-br0 ]',
-        quiet=True,
-        warn_only=True
-    )
+    result = run('[ -f /etc/sysconfig/network-scripts/ifcfg-br0 ]', quiet=True)
     if result.return_code != 0:
         # Disable NetworkManager
         manage_daemon('disable', 'NetworkManager')
@@ -1054,7 +1048,6 @@ def iso_download(iso_url=None):
             result = run(
                 'wget {0} -O - -q'.format(urljoin(iso_url, sum_file)),
                 quiet=True,
-                warn_only=True
             )
             if result.return_code == 0:
                 iso_filename = result.split('*')[1].strip()
@@ -1192,8 +1185,7 @@ def add_repo(repo_name=None, repo_url=None):
 def clean_rhsm():
     """Removes pre-existing Candlepin certs and resets RHSM."""
     print('Erasing existing Candlepin certs, if any.')
-    run('yum erase -y $(rpm -qa |grep katello-ca-consumer)',
-        warn_only=True, quiet=True)
+    run('yum erase -y $(rpm -qa |grep katello-ca-consumer)', quiet=True)
     print('Resetting rhsm.conf to point to cdn.')
     run("sed -i -e 's/^hostname.*/hostname=subscription.rhn.redhat.com/' "
         "/etc/rhsm/rhsm.conf")
@@ -1208,10 +1200,8 @@ def clean_rhsm():
 def update_basic_packages():
     """Updates some basic packages before we can run some real tests."""
     subscribe(autosubscribe=True)
-    update_packages(
-        'subscription-manager', 'yum-utils', warn_only=True, quiet=True)
-    run('yum install -y yum-plugin-security yum-security',
-        warn_only=True, quiet=True)
+    update_packages('subscription-manager', 'yum-utils', quiet=True)
+    run('yum install -y yum-plugin-security yum-security', quiet=True)
     run('rpm -q subscription-manager python-rhsm')
     # Clean up
     unsubscribe()
@@ -1292,7 +1282,7 @@ def client_registration_test(clean_beaker=True, update_packages=True):
 def install_errata():
     """Randomly selects an errata and installs it."""
 
-    erratum = run('yum list-sec', warn_only=True, quiet=True)
+    erratum = run('yum list-sec', quiet=True)
 
     if erratum:
         erratum = erratum.split('\r\n')
