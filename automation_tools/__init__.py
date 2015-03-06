@@ -244,7 +244,9 @@ def setup_default_docker():
         run('yum install -y docker-io', warn_only=True)
 
     # Docker should run as the ``apache`` user
-    run('usermod -aG docker apache')
+    for group in ('docker', 'dockerroot'):
+        if run('id -g {0}'.format(group), quiet=True).succeeded:
+            run('usermod -aG {0} apache'.format(group))
 
     # SElinux workaround let us use ``http://localhost:2375`` for a
     # ``Docker`` Compute Resurce.
