@@ -972,7 +972,7 @@ def product_install(distribution, create_vm=False, certificate_url=None,
 
     # Firewall should be setup after setup_default_capsule clean the puppet
     # module it installs clean already created rules
-    setup_firewall()
+    execute(setup_firewall, host=host)
 
     if distribution.startswith('satellite6'):
         execute(setup_default_docker, host=host)
