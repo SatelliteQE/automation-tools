@@ -25,6 +25,7 @@ from automation_tools import (
     setup_ddns,
     setup_default_capsule,
     setup_default_docker,
+    setup_email_notification,
     setup_fake_manifest_certificate,
     setup_firewall,
     setup_proxy,
