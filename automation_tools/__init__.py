@@ -392,6 +392,11 @@ def setup_firewall():
         22,
         # Port 5000 must be open for Docker registry communication.
         5000,
+        # Ports 5466 and 5467 for qpidd
+        5466,
+        5467,
+        # Port 8443 for Katello access the Islated Capsule
+        8443,
     )
 
     for port in ports:
