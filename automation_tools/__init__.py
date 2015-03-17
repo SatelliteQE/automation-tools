@@ -125,12 +125,31 @@ def setup_proxy():
     server.
 
     Proxy information is passed using the PROXY_INFO environmental variable.
-    e.g. PROXY_INFO=proxy://root:myP4$$@myhost.awesomedomain.com:8888
+    The expected format is::
+
+        PROXY_INFO=proxy://<username>:<password>@<hostname>:<port>
+
+    ``username`` and ``password`` fields can be omitted if the proxy does not
+    require authentication, for example::
+
+        PROXY_INFO=proxy://<hostname>:<port>
 
     """
-    proxy_info = urlsplit(os.environ.get('PROXY_INFO'))
+    proxy_info = os.environ.get('PROXY_INFO')
+    if proxy_info is None:
+        print('The PROXY_INFO environment variable should be defined')
+        sys.exit(1)
+
+    proxy_info = urlsplit(proxy_info)
     if not proxy_info.hostname or not proxy_info.port:
-        raise Exception("You must include the proxy hostname and port.")
+        raise Exception(
+            'Proxy configuration should include at least the hostname and port'
+        )
+
+    proxy_hostname = proxy_info.hostname
+    proxy_port = proxy_info.port
+    proxy_username = '' if proxy_info.username is None else proxy_info.username
+    proxy_password = '' if proxy_info.password is None else proxy_info.password
 
     # Configure pulp to use the proxy (ref BZ1114083)
     proxy_json = (
@@ -140,8 +159,12 @@ def setup_proxy():
         '    "proxy_username": "{2}", '
         '    "proxy_password": "{3}"'
         '}}'
-        .format(proxy_info.hostname, proxy_info.port,
-                proxy_info.username, proxy_info.password)
+        .format(
+            proxy_hostname,
+            proxy_port,
+            proxy_username,
+            proxy_password
+        )
     )
 
     # write the json to the appropriate files
@@ -150,7 +173,7 @@ def setup_proxy():
         '/etc/pulp/server/plugins.conf.d/iso_importer.json',
         '/etc/pulp/server/plugins.conf.d/puppet_importer.json',
         '/etc/pulp/server/plugins.conf.d/yum_importer.json'
-        ))
+    ))
 
     # restart the capsule-related services
     if distro_info()[1] >= 7:
@@ -173,7 +196,7 @@ def setup_proxy():
     # PROXY IP
     proxy_ip = search(
         r'\d+ bytes from (.*):',
-        run('ping -c 1 -n {0} | grep "icmp_seq"'.format(proxy_info.hostname))
+        run('ping -c 1 -n {0} | grep "icmp_seq"'.format(proxy_hostname))
     ).group(1)
     run('iptables -I OUTPUT -d {0} -j ACCEPT'.format(proxy_ip))
 
@@ -192,30 +215,34 @@ def setup_proxy():
 
     # Configuring yum to use the proxy
     run('echo "proxy=http://{0}:{1}" >> /etc/yum.conf'
-        .format(proxy_info.hostname, proxy_info.port))
+        .format(proxy_hostname, proxy_port))
     run('echo "proxy_username={0}" >> /etc/yum.conf'
-        .format(proxy_info.username))
+        .format(proxy_username))
     run('echo "proxy_password={0}" >> /etc/yum.conf'
-        .format(proxy_info.password))
+        .format(proxy_password))
 
     # Configuring rhsm to use the proxy
     run('sed -i -e "s/^proxy_hostname.*/proxy_hostname = {0}/" '
-        '/etc/rhsm/rhsm.conf'.format(proxy_info.hostname))
+        '/etc/rhsm/rhsm.conf'.format(proxy_hostname))
     run('sed -i -e "s/^proxy_port.*/proxy_port = {0}/" '
-        '/etc/rhsm/rhsm.conf'.format(proxy_info.port))
+        '/etc/rhsm/rhsm.conf'.format(proxy_port))
     run('sed -i -e "s/^proxy_user.*/proxy_user = {0}/" '
-        '/etc/rhsm/rhsm.conf'.format(proxy_info.username))
+        '/etc/rhsm/rhsm.conf'.format(proxy_username))
     run('sed -i -e "s/^proxy_password.*/proxy_password = {0}/" '
-        '/etc/rhsm/rhsm.conf'.format(proxy_info.password))
+        '/etc/rhsm/rhsm.conf'.format(proxy_password))
 
     # Run the installer
-    run('katello-installer -v --foreman-admin-password="changeme" '
+    run(
+        'katello-installer -v --foreman-admin-password="changeme" '
         '--katello-proxy-url=http://{0} --katello-proxy-port={1} '
         '--katello-proxy-username={2} '
         '--katello-proxy-password={3}'.format(
-            proxy_info.hostname, proxy_info.port,
-            proxy_info.username, proxy_info.password
-        ))
+            proxy_hostname,
+            proxy_port,
+            proxy_username,
+            proxy_password
+        )
+    )
 
 
 def setup_default_docker():
@@ -1005,6 +1032,8 @@ def product_install(distribution, create_vm=False, certificate_url=None,
                 execute(setup_abrt, host=host)
         else:
             execute(setup_abrt, host=host)
+        if os.environ.get('PROXY_INFO'):
+            execute(setup_proxy, host=host)
 
     certificate_url = certificate_url or os.environ.get(
         'FAKE_MANIFEST_CERT_URL')
