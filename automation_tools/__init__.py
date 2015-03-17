@@ -353,6 +353,23 @@ def setup_default_capsule(interface=None):
     )
 
 
+def setup_email_notification(smtp=None):
+    """Configures system to handle email notification.
+
+    NOTE: this task needs a 'katello-service restart', so choose wisely when to
+    call it, preferably before another task that restarts the stack, such as
+    the 'setup_default_capsule' task.
+
+    :param str smtp: A valid URL to a SMTP server.
+
+    """
+
+    # edit the config file
+    if smtp is not None:
+        run('sed -i -e "s|address.*|address: {0}|" '
+            '/etc/foreman/email.yaml'.format(smtp))
+
+
 def setup_fake_manifest_certificate(certificate_url=None):
     """Task to setup a fake manifest certificate
 
