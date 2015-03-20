@@ -13,7 +13,7 @@ import time
 from re import search
 from urlparse import urlsplit
 
-from fabric.api import cd, env, execute, get, local, put, run, warn_only
+from fabric.api import cd, env, execute, get, local, put, run
 if sys.version_info[0] is 2:
     from urlparse import urljoin  # (import-error) pylint:disable=F0401
     from StringIO import StringIO  # (import-error) pylint:disable=F0401
@@ -120,7 +120,7 @@ def setup_ddns(entry_domain, host_ip):
     run('redhat-ddns-client')
 
 
-def setup_proxy():
+def setup_proxy(run_katello_installer=True):
     """Task to setup a proxy and block non-proxy traffic from your foreman
     server.
 
@@ -135,114 +135,30 @@ def setup_proxy():
         PROXY_INFO=proxy://<hostname>:<port>
 
     """
+    if isinstance(run_katello_installer, str):
+        run_katello_installer = (run_katello_installer.lower() == 'true')
     proxy_info = os.environ.get('PROXY_INFO')
     if proxy_info is None:
         print('The PROXY_INFO environment variable should be defined')
         sys.exit(1)
-
     proxy_info = urlsplit(proxy_info)
     if not proxy_info.hostname or not proxy_info.port:
         raise Exception(
             'Proxy configuration should include at least the hostname and port'
         )
 
-    proxy_hostname = proxy_info.hostname
-    proxy_port = proxy_info.port
-    proxy_username = '' if proxy_info.username is None else proxy_info.username
-    proxy_password = '' if proxy_info.password is None else proxy_info.password
-
-    # Configure pulp to use the proxy (ref BZ1114083)
-    proxy_json = (
-        '{{'
-        '    "proxy_host": "http://{0}", '
-        '    "proxy_port": {1}, '
-        '    "proxy_username": "{2}", '
-        '    "proxy_password": "{3}"'
-        '}}'
-        .format(
-            proxy_hostname,
-            proxy_port,
-            proxy_username,
-            proxy_password
-        )
-    )
-
-    # write the json to the appropriate files
-    run("echo '{0}' | tee {1} {2} {3}".format(
-        proxy_json,
-        '/etc/pulp/server/plugins.conf.d/iso_importer.json',
-        '/etc/pulp/server/plugins.conf.d/puppet_importer.json',
-        '/etc/pulp/server/plugins.conf.d/yum_importer.json'
-    ))
-
-    # restart the capsule-related services
-    if distro_info()[1] >= 7:
-        run('yum install -y iptables-services')  # Install firewall package
-    for daemon in (
-            'httpd',
-            'pulp_celerybeat',
-            'pulp_resource_manager',
-            'pulp_workers',
-    ):
-        manage_daemon('restart', daemon, warn_only=True)
-
-    # Satellite 6 IP
-    sat_ip = search(
-        r'\d+ bytes from (.*):',
-        run('ping -c 1 -n $(hostname) | grep "icmp_seq"')
-    ).group(1)
-    run('iptables -I OUTPUT -d {0} -j ACCEPT'.format(sat_ip))
-
-    # PROXY IP
-    proxy_ip = search(
-        r'\d+ bytes from (.*):',
-        run('ping -c 1 -n {0} | grep "icmp_seq"'.format(proxy_hostname))
-    ).group(1)
-    run('iptables -I OUTPUT -d {0} -j ACCEPT'.format(proxy_ip))
-
-    # Nameservers
-    nameservers = run(
-        'cat /etc/resolv.conf | grep nameserver | cut -d " " -f 2')
-    for entry in nameservers.split('\n'):
-        run('iptables -I OUTPUT -d {0} -j ACCEPT'.format(entry.strip()))
-
-    # To make the changes persistent across reboots when using the command line
-    # use this command:
-    run('iptables-save > /etc/sysconfig/iptables')
-
-    manage_daemon('enable', 'iptables')
-    manage_daemon('restart', 'iptables', warn_only=True)
-
-    # Configuring yum to use the proxy
-    run('echo "proxy=http://{0}:{1}" >> /etc/yum.conf'
-        .format(proxy_hostname, proxy_port))
-    run('echo "proxy_username={0}" >> /etc/yum.conf'
-        .format(proxy_username))
-    run('echo "proxy_password={0}" >> /etc/yum.conf'
-        .format(proxy_password))
-
-    # Configuring rhsm to use the proxy
-    run('sed -i -e "s/^proxy_hostname.*/proxy_hostname = {0}/" '
-        '/etc/rhsm/rhsm.conf'.format(proxy_hostname))
-    run('sed -i -e "s/^proxy_port.*/proxy_port = {0}/" '
-        '/etc/rhsm/rhsm.conf'.format(proxy_port))
-    run('sed -i -e "s/^proxy_user.*/proxy_user = {0}/" '
-        '/etc/rhsm/rhsm.conf'.format(proxy_username))
-    run('sed -i -e "s/^proxy_password.*/proxy_password = {0}/" '
-        '/etc/rhsm/rhsm.conf'.format(proxy_password))
-
-    # Run the installer
-    run(
-        'katello-installer -v --foreman-admin-password="changeme" '
-        '--katello-proxy-url=http://{0} --katello-proxy-port={1} '
-        '--katello-proxy-username={2} '
-        '--katello-proxy-password={3}'.format(
-            proxy_hostname,
-            proxy_port,
-            proxy_username,
-            proxy_password
-        )
-    )
+    installer_options = {
+        'katello-proxy-url': 'http://{0}'.format(proxy_info.hostname),
+        'katello-proxy-port': proxy_info.port,
+    }
+    if proxy_info.username is None:
+        installer_options['katello-proxy-username'] = proxy_info.username
+    if proxy_info.password is None:
+        installer_options['katello-proxy-password'] = proxy_info.password
+    if run_katello_installer:
+        katello_installer(**installer_options)
+    else:
+        return installer_options
 
 
 def setup_default_docker():
@@ -304,27 +220,21 @@ def setup_default_docker():
     run('docker pull busybox')
 
 
-def setup_default_capsule(interface=None):
+def setup_default_capsule(interface=None, run_katello_installer=True):
     """Task to setup a the default capsule for Satellite
 
     :param str interface: Network interface name to be used
 
     """
+    if isinstance(run_katello_installer, str):
+        run_katello_installer = (run_katello_installer.lower() == 'true')
+
     forwarders = run('cat /etc/resolv.conf | grep nameserver | '
                      'awk \'{print $2}\'', quiet=True).split('\n')
-    forwarders = ' '.join([
-        '--capsule-dns-forwarders {0}'.format(forwarder.strip())
-        for forwarder in forwarders
-    ])
+    forwarders = [forwarder.strip() for forwarder in forwarders]
     if len(forwarders) == 0:
         print('Was not possible to fetch nameserver information')
         sys.exit(1)
-
-    oauth_secret = run(
-        'grep oauth_consumer_secret /etc/foreman/settings.yaml | '
-        'cut -d " " -f 2', quiet=True).strip()
-    if len(oauth_secret) == 0:
-        print('Not able to')
 
     hostname = run('hostname', quiet=True).strip()
     if len(hostname) == 0:
@@ -356,28 +266,22 @@ def setup_default_capsule(interface=None):
             print('Was not possible to fetch interface information')
             sys.exit(1)
 
-    run(
-        'katello-installer -v '
-        '--capsule-parent-fqdn {hostname} '
-        '--capsule-dns true '
-        '{forwarders} '
-        '--capsule-dns-interface {interface} '
-        '--capsule-dns-zone {domain} '
-        '--capsule-dhcp true '
-        '--capsule-dhcp-interface {interface} '
-        '--capsule-tftp true '
-        '--capsule-puppet true '
-        '--capsule-puppetca true '
-        '--capsule-register-in-foreman true '
-        '--capsule-foreman-oauth-secret {oauth_secret}'
-        ''.format(
-            hostname=hostname,
-            forwarders=forwarders,
-            interface=interface,
-            domain=domain,
-            oauth_secret=oauth_secret
-        )
-    )
+    installer_options = {
+        'capsule-dns': 'true',
+        'capsule-dns-forwarders': forwarders,
+        'capsule-dns-interface': interface,
+        'capsule-dns-zone': domain,
+        'capsule-dhcp': 'true',
+        'capsule-dhcp-interface': interface,
+        'capsule-tftp': 'true',
+        'capsule-puppet': 'true',
+        'capsule-puppetca': 'true',
+        'capsule-register-in-foreman': 'true',
+    }
+    if run_katello_installer:
+        katello_installer(**installer_options)
+    else:
+        return installer_options
 
 
 def setup_email_notification(smtp=None):
@@ -783,7 +687,8 @@ def manage_repos(cdn=False):
     update_packages(warn_only=True)
 
 
-def upstream_install(admin_password=None, sam=False):
+def upstream_install(
+        admin_password=None, sam=False, run_katello_installer=True):
     """Task to install Foreman nightly using katello-deploy script"""
     if admin_password is None:
         admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme')
@@ -804,18 +709,19 @@ def upstream_install(admin_password=None, sam=False):
             os_version=os_version,
             sam='--sam' if sam else ''
         ))
-    run('yum repolist')
-    run('{0} -v -d --foreman-admin-password="{1}"'.format(
-        'sam-installer' if sam else 'katello-installer',
-        admin_password
-    ))
-    run('yum repolist')
 
-    # Ensure that the installer worked
-    run('hammer -u admin -p {0} ping'.format(admin_password))
+    installer_options = {
+        'foreman-admin-password': admin_password,
+    }
+    if run_katello_installer:
+        katello_installer(sam=sam, **installer_options)
+        # Ensure that the installer worked
+        run('hammer -u admin -p {0} ping'.format(admin_password))
+    else:
+        return installer_options
 
 
-def downstream_install(admin_password=None):
+def downstream_install(admin_password=None, run_katello_installer=True):
     """Task to install Satellite 6
 
     The following environment variables affect this command:
@@ -849,14 +755,18 @@ def downstream_install(admin_password=None):
     # Install required packages for the installation
     run('yum install -y katello')
 
-    run('katello-installer -v -d --foreman-admin-password="{0}"'.format(
-        admin_password))
+    installer_options = {
+        'foreman-admin-password': admin_password,
+    }
+    if run_katello_installer:
+        katello_installer(**installer_options)
+        # Ensure that the installer worked
+        run('hammer -u admin -p {0} ping'.format(admin_password))
+    else:
+        return installer_options
 
-    # Ensure that the installer worked
-    run('hammer -u admin -p {0} ping'.format(admin_password))
 
-
-def cdn_install():
+def cdn_install(run_katello_installer=True):
     """Installs Satellite 6 from CDN.
 
     The following environment variables affect this command:
@@ -880,14 +790,19 @@ def cdn_install():
     # Install required packages for the installation
     run('yum install -y katello')
 
-    run('katello-installer -v -d --foreman-admin-password="{0}"'.format(
-        admin_password))
+    installer_options = {
+        'foreman-admin-password': admin_password,
+    }
+    if run_katello_installer:
+        katello_installer(**installer_options)
+        # Ensure that the installer worked
+        run('hammer -u admin -p {0} ping'.format(admin_password))
+    else:
+        return installer_options
 
-    # Ensure that the installer worked
-    run('hammer -u admin -p {0} ping'.format(admin_password))
 
-
-def iso_install(admin_password=None, check_sigs=False):
+def iso_install(
+        admin_password=None, check_sigs=False, run_katello_installer=True):
     """Installs Satellite 6 from an ISO image.
 
     The following environment variables affect this command:
@@ -932,11 +847,15 @@ def iso_install(admin_password=None, check_sigs=False):
         else:
             run('./install_packages --nogpgsigs')
 
-    run('katello-installer -v -d --foreman-admin-password="{0}"'.format(
-        admin_password))
-
-    # Ensure that the installer worked
-    run('hammer -u admin -p {0} ping'.format(admin_password))
+    installer_options = {
+        'foreman-admin-password': admin_password,
+    }
+    if run_katello_installer:
+        katello_installer(**installer_options)
+        # Ensure that the installer worked
+        run('hammer -u admin -p {0} ping'.format(admin_password))
+    else:
+        return installer_options
 
 
 def sam_upstream_install(admin_password=None):
@@ -968,7 +887,6 @@ def product_install(distribution, create_vm=False, certificate_url=None,
     # Command-line arguments are passed in as strings.
     if isinstance(create_vm, str):
         create_vm = (create_vm.lower() == 'true')
-    distribution = distribution.lower()
 
     install_tasks = {
         'sam-upstream': sam_upstream_install,
@@ -977,7 +895,10 @@ def product_install(distribution, create_vm=False, certificate_url=None,
         'satellite6-iso': iso_install,
         'satellite6-upstream': upstream_install,
     }
+    distribution = distribution.lower()
     distributions = install_tasks.keys()
+    installer_options = {}
+
     if distribution not in distributions:
         print('distribution "{0}" should be one of {1}'.format(
             distribution, ', '.join(distributions)))
@@ -1013,11 +934,19 @@ def product_install(distribution, create_vm=False, certificate_url=None,
 
     execute(install_prerequisites, host=host)
     execute(setenforce, selinux_mode, host=host)
-    execute(install_tasks[distribution], host=host)
+    # execute returns a dictionary mapping host strings to the given task's
+    # return value
+    installer_options.update(execute(
+        install_tasks[distribution], host=host, run_katello_installer=False
+    )[host])
 
     if distribution in (
             'satellite6-cdn', 'satellite6-downstream', 'satellite6-iso'):
-        execute(setup_default_capsule, host=host)
+        # execute returns a dictionary mapping host strings to the given task's
+        # return value
+        installer_options.update(execute(
+            setup_default_capsule, host=host, run_katello_installer=False
+        )[host])
 
     # Firewall should be setup after setup_default_capsule clean the puppet
     # module it installs clean already created rules
@@ -1025,15 +954,19 @@ def product_install(distribution, create_vm=False, certificate_url=None,
 
     if distribution.startswith('satellite6'):
         execute(setup_default_docker, host=host)
-        # execute returns a dict, the result is the first value. OS version is
-        # the resulting index 1
-        if execute(distro_info, host=host).values()[0][1] == 6:
-            with warn_only():
-                execute(setup_abrt, host=host)
-        else:
-            execute(setup_abrt, host=host)
         if os.environ.get('PROXY_INFO'):
-            execute(setup_proxy, host=host)
+            # execute returns a dictionary mapping host strings to the given
+            # task's return value
+            installer_options.update(execute(
+                setup_proxy, host=host, run_katello_installer=False
+            )[host])
+
+    execute(
+        katello_installer,
+        host=host,
+        sam=distribution.startswith('sam'),
+        **installer_options
+    )
 
     certificate_url = certificate_url or os.environ.get(
         'FAKE_MANIFEST_CERT_URL')
@@ -1548,6 +1481,33 @@ def foreman_debug(tarball_name=None, local_path=None):
 # =============================================================================
 # Helper functions
 # =============================================================================
+def katello_installer(debug=True, sam=False, verbose=True, **kwargs):
+    """Runs the installer with ``kwargs`` as command options. If ``sam`` is
+    True
+
+    """
+    # capsule-dns-forwarders should be repeated if setting more than one value
+    # check if a list is being received and repeat the option with different
+    # values
+    extra_options = []
+    if ('capsule-dns-forwarders' in kwargs and
+            isinstance(kwargs['capsule-dns-forwarders'], list)):
+        forwarders = kwargs.pop('capsule-dns-forwarders')
+        for forwarder in forwarders:
+            extra_options.append(
+                '--capsule-dns-forwarders="{0}"'.format(forwarder))
+
+    run('{0}-installer {1} {2} {3} {4}'.format(
+        'sam' if sam else 'katello',
+        '-d' if debug else '',
+        '-v' if verbose else '',
+        ' '.join([
+            '--{0}="{1}"'.format(key, val) for key, val in kwargs.items()
+        ]),
+        ' '.join(extra_options)
+    ))
+
+
 def manage_daemon(action, daemon, pty=True, warn_only=False):
     """Manage a system daemon
 
