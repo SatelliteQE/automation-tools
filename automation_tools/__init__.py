@@ -151,9 +151,9 @@ def setup_proxy(run_katello_installer=True):
         'katello-proxy-url': 'http://{0}'.format(proxy_info.hostname),
         'katello-proxy-port': proxy_info.port,
     }
-    if proxy_info.username is None:
+    if proxy_info.username is not None:
         installer_options['katello-proxy-username'] = proxy_info.username
-    if proxy_info.password is None:
+    if proxy_info.password is not None:
         installer_options['katello-proxy-password'] = proxy_info.password
     if run_katello_installer:
         katello_installer(**installer_options)
