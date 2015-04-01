@@ -229,8 +229,10 @@ def setup_default_capsule(interface=None, run_katello_installer=True):
     if isinstance(run_katello_installer, str):
         run_katello_installer = (run_katello_installer.lower() == 'true')
 
-    forwarders = run('cat /etc/resolv.conf | grep nameserver | '
-                     'awk \'{print $2}\'', quiet=True).split('\n')
+    forwarders = run(
+        'cat /etc/resolv.conf | grep "^nameserver" | awk \'{print $2}\'',
+        quiet=True
+    ).split('\n')
     forwarders = [forwarder.strip() for forwarder in forwarders]
     if len(forwarders) == 0:
         print('Was not possible to fetch nameserver information')
