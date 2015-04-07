@@ -697,8 +697,6 @@ def upstream_install(
 
     os_version = distro_info()[1]
 
-    manage_repos()
-
     # Install required packages for the installation
     run('yum install -y git ruby')
 
@@ -752,8 +750,6 @@ def downstream_install(admin_password=None, run_katello_installer=True):
         remote_path='/etc/yum.repos.d/satellite.repo')
     satellite_repo.close()
 
-    manage_repos()
-
     # Install required packages for the installation
     run('yum install -y katello')
 
@@ -785,9 +781,6 @@ def cdn_install(run_katello_installer=True):
 
     """
     admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme')
-
-    # Enable some repos
-    manage_repos(cdn=True)
 
     # Install required packages for the installation
     run('yum install -y katello')
@@ -832,9 +825,6 @@ def iso_install(
     if iso_url is None:
         print('Please provide a valid URL for the ISO image.')
         sys.exit(1)
-
-    # Enable some repos
-    manage_repos()
 
     # Download the ISO
     iso_download(iso_url)
@@ -936,6 +926,7 @@ def product_install(distribution, create_vm=False, certificate_url=None,
 
     execute(install_prerequisites, host=host)
     execute(setenforce, selinux_mode, host=host)
+    execute(manage_repos, cdn=distribution.endswith('cdn'), host=host)
     # execute returns a dictionary mapping host strings to the given task's
     # return value
     installer_options.update(execute(
