@@ -13,6 +13,8 @@ import time
 from re import search
 from urlparse import urlsplit
 
+from automation_tools.repository import enable_satellite_repos
+from automation_tools.utils import distro_info, update_packages
 from fabric.api import cd, env, execute, get, local, put, run
 if sys.version_info[0] is 2:
     from urlparse import urljoin  # (import-error) pylint:disable=F0401
@@ -650,45 +652,6 @@ def install_prerequisites():
     manage_daemon('start', 'ntpd', warn_only=True)
 
 
-def manage_repos(cdn=False):
-    """Enables only required RHEL repos for Satellite 6."""
-
-    if isinstance(cdn, str):
-        cdn = (cdn.lower() == 'true')
-
-    # Clean up system if Beaker-based
-    result = run('which yum-config-manager', warn_only=True)
-    if result.succeeded:
-        run('yum-config-manager --disable "beaker*"')
-    else:
-        run('mv /etc/yum.repos.d/beaker-* ~/', warn_only=True)
-    run('rm -rf /var/cache/yum*')
-
-    # Disable yum plugin for sub-man
-    run('sed -i -e "s/^enabled.*/enabled=0/" '
-        '/etc/yum/pluginconf.d/subscription-manager.conf')
-    # And disable all repos for now
-    run('subscription-manager repos --disable "*"')
-
-    os_version = distro_info()[1]
-    # If installing from CDN, use the real product
-    if cdn is True:
-        run(
-            'subscription-manager repos --enable '
-            '"rhel-{0}-server-satellite-6.0-rpms"'.format(os_version)
-        )
-    # Enable 'base' OS rpms
-    run('subscription-manager repos --enable "rhel-{0}-server-rpms"'.format(
-        os_version))
-    # Enable SCL
-    run('subscription-manager repos --enable "rhel-server-rhscl-{0}-rpms"'
-        ''.format(os_version))
-    run('yum repolist')
-
-    # Update packages
-    update_packages(warn_only=True)
-
-
 def upstream_install(
         admin_password=None, sam=False, run_katello_installer=True):
     """Task to install Foreman nightly using katello-deploy script"""
@@ -1003,7 +966,13 @@ def product_install(distribution, create_vm=False, certificate_url=None,
 
     execute(install_prerequisites, host=host)
     execute(setenforce, selinux_mode, host=host)
-    execute(manage_repos, cdn=distribution.endswith('cdn'), host=host)
+    execute(
+        enable_satellite_repos,
+        cdn=distribution.endswith('cdn'),
+        host=host
+    )
+    execute(update_packages, warn_only=True)
+
     # execute returns a dictionary mapping host strings to the given task's
     # return value
     installer_options.update(execute(
@@ -1134,61 +1103,6 @@ def create_personal_git_repo(name, private=False):
     run('install -d -m 755 ~/public_git/')
     put(repo_name, '~/public_git/')
     local('rm -rf {0}'.format(repo_name))
-
-
-def distro_info():
-    """Task which figures out the distro information based on the
-    /etc/redhat-release file
-
-    A `(distro, major_version)` tuple is returned if called as a function. For
-    RHEL X.Y.Z it will return ('rhel', X). For Fedora X it will return
-    ('fedora', X). Be aware that the major_version is an integer.
-
-    """
-    # Create/manage host cache
-    cache = env.get('distro_info_cache')
-    host = env['host']
-    if cache is None:
-        cache = env['distro_info_cache'] = {}
-
-    if host not in cache:
-        # Grab the information and store on cache
-        release_info = run('cat /etc/redhat-release', quiet=True)
-        if release_info.failed:
-            print('Failed to read /etc/redhat-release file')
-            sys.exit(1)
-
-        # Discover the distro
-        if release_info.startswith('Red Hat Enterprise Linux'):
-            distro = 'rhel'
-        elif release_info.startswith('Fedora'):
-            distro = 'fedora'
-        else:
-            distro = None
-
-        # Discover the version
-        match = search(r' ([0-9.]+) ', release_info)
-        if match is not None:
-            parts = match.group(1).split('.')
-            # extract the major version
-            major_version = int(parts[0])
-            # extract the minor version
-            if len(parts) > 1:
-                minor_version = int(parts[1])
-            else:
-                minor_version = None
-        else:
-            major_version = minor_version = None
-
-        if distro is None or major_version is None:
-            print('Was not possible to fetch distro information')
-            sys.exit(1)
-
-        cache[host] = distro, major_version, minor_version
-
-    distro, major_version, minor_version = cache[host]
-    print('{0} {1} {2}'.format(distro, major_version, minor_version))
-    return distro, major_version, minor_version
 
 
 def performance_tuning(running_on_vm=True):
@@ -1496,25 +1410,6 @@ def run_errata():
 
     # After this you can see the upgraded packages
     # Run `<package2>-downgrade` if you want to revert to the old packages
-
-
-def update_packages(*args, **kwargs):
-    """Updates all system packages or only ones specified by `args`
-
-    Use this if you want to simply update all packages or some on system.
-    Possibly useful for when doing upgrades, etc.
-
-    """
-    if len(args) > 0:
-        arguments = ' '.join(args)
-    else:
-        arguments = ''
-
-    run(
-        'yum update -y {0}'.format(arguments),
-        quiet=kwargs.get('quiet', False),
-        warn_only=kwargs.get('warn_only', False),
-    )
 
 
 # =============================================================================
