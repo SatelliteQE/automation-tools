@@ -850,6 +850,82 @@ def iso_install(
         return installer_options
 
 
+def satellite5_iso_install(
+        admin_password=None, check_sigs=False, run_katello_installer=True):
+    """Installs Satellite 5 from an ISO image.
+
+    The following environment variables affect this command:
+
+    """
+    if isinstance(check_sigs, str):
+        check_sigs = (check_sigs.lower() == 'true')
+
+    if admin_password is None:
+        admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme')
+
+    iso_url = os.environ.get('ISO_URL') or os.environ.get('BASE_URL')
+    if iso_url is None:
+        print('Please provide a valid URL for the ISO image.')
+        sys.exit(1)
+
+    # Download the ISO
+    print('Downloading ISO...')
+    iso_download(iso_url)
+    # Create a 'check-out' folder, mount ISO to it...
+    run('mkdir -p ISO')
+    run('mount *.iso ISO -t iso9660 -o loop')
+
+    # prepare the answer file
+    opts = {
+        'admin-email': os.environ.get('ADMIN_EMAIL', ''),
+        'rhn-username': os.environ.get('RHN_USERNAME', ''),
+        'rhn-password': os.environ.get('RHN_PASSWORD', ''),
+        'rhn-profile-name': os.environ.get('RHN_PROFILE', ''),
+        'rhn-http-proxy': os.environ.get('RHN_HTTP_PROXY', ''),
+        'rhn-http-proxy-username':
+        os.environ.get('RHN_HTTP_PROXY_USERNAME', ''),
+        'rhn-http-proxy-password':
+        os.environ.get('RHN_HTTP_PROXY_PASSWORD', ''),
+        'ssl-set-org': os.environ.get('SSL_SET_ORG', ''),
+        'ssl-set-org-unit': os.environ.get('SSL_SET_ORG_UNIT', ''),
+        'ssl-set-city': os.environ.get('SSL_SET_CITY', ''),
+        'ssl-set-state': os.environ.get('SSL_SET_STATE', ''),
+        'ssl-set-country': os.environ.get('SSL_SET_COUNTRY', ''),
+        'ssl-password': os.environ.get('SSL_PASSWORD', ''),
+        'satellite-cert-file': os.environ.get('SATELLITE_CERT_FILE', '')
+    }
+    run(
+        'cat <<EOF > /answers.txt\n'
+        'admin-email={admin-email}\n'
+        'rhn-username={rhn-username}\n'
+        'rhn-password={rhn-password}\n'
+        'rhn-profile-name={rhn-profile-name}\n'
+        'rhn-http-proxy={rhn-http-proxy}\n'
+        'rhn-http-proxy-username={rhn-http-proxy-username}\n'
+        'rhn-http-proxy-password={rhn-http-proxy-password}\n'
+        'ssl-config-sslvhost=y\n'
+        'ssl-set-org={ssl-set-org}\n'
+        'ssl-set-org-unit={ssl-set-org-unit}\n'
+        'ssl-set-city={ssl-set-city}\n'
+        'ssl-set-state={ssl-set-state}\n'
+        'ssl-set-country={ssl-set-country}\n'
+        'ssl-set-email={admin-email}\n'
+        'ssl-password={ssl-password}\n'
+        'satellite-cert-file=/root/satellite-engineering-qa-5.7.cert\n'
+        'enable-tftp=yes\n'
+        'EOF\n'.format(**opts)
+    )
+
+    # download a certificate
+    print('Downloading Certificate...')
+    run('wget {satellite-cert-file}'.format(**opts))
+    # ...and run the installer script.
+    with cd('/root/ISO'):
+        run('./install.pl --answer-file=/answers.txt --non-interactive '
+            '--re-register --run-updater=yes --enable-tftp=yes')
+        run('yum -y update')
+
+
 def sam_upstream_install(admin_password=None):
     """Task to install SAM nightly using katello-deploy script"""
     upstream_install(admin_password, sam=True)
@@ -885,6 +961,7 @@ def product_install(distribution, create_vm=False, certificate_url=None,
         'satellite6-cdn': cdn_install,
         'satellite6-downstream': downstream_install,
         'satellite6-iso': iso_install,
+        'satellite5-iso': satellite5_iso_install,
         'satellite6-upstream': upstream_install,
     }
     distribution = distribution.lower()
