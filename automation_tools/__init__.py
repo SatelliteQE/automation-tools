@@ -1027,7 +1027,7 @@ def iso_download(iso_url=None):
                 quiet=True,
             )
             if result.succeeded:
-                iso_filename = result.split('*')[1].strip()
+                iso_filename = search('\w+\s+\*?([^\s]+)', result).group(1)
                 break
 
         if iso_filename is None:
