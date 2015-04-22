@@ -1,11 +1,10 @@
 """Module which publish all automation-tools tasks"""
-from automation_tools import (
+from automation_tools import (  # flake8: noqa
     add_repo,
     cdn_install,
     clean_rhsm,
     client_registration_test,
     create_personal_git_repo,
-    distro_info,
     downstream_install,
     errata_upgrade,
     fix_hostname,
@@ -15,7 +14,6 @@ from automation_tools import (
     install_prerequisites,
     iso_download,
     iso_install,
-    manage_repos,
     partition_disk,
     performance_tuning,
     product_install,
@@ -33,10 +31,22 @@ from automation_tools import (
     subscribe,
     unsubscribe,
     update_basic_packages,
-    update_packages,
     upstream_install,
     vm_create,
     vm_destroy,
     vm_list,
     vm_list_base,
-)  # flake8: noqa
+)
+from automation_tools.repository import (
+    create_custom_repos,
+    delete_custom_repos,
+    disable_beaker_repos,
+    disable_repos,
+    enable_repos,
+    enable_satellite_repos,
+    manage_custom_repos,
+)
+from automation_tools.utils import (
+    distro_info,
+    update_packages
+)
