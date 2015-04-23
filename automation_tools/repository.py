@@ -20,12 +20,13 @@ def disable_repos(*args):
 
         disable_repos('repo1', 'repo2')
 
-    Will run the command ``subscription-manager repos --disable repo1 repo2``.
+    Will run the command ``subscription-manager repos --disable "repo1"
+    --disable "repo2"``.
 
 
     """
-    run('subscription-manager repos --disable {0}'
-        .format(' '.join(['"{0}"'.format(repo) for repo in args])))
+    run('subscription-manager repos {0}'
+        .format(' '.join(['--disable "{0}"'.format(repo) for repo in args])))
 
 
 def delete_custom_repos(**args):
@@ -54,11 +55,12 @@ def enable_repos(*args, **kwargs):
 
         enable_repos('repo1', 'repo2')
 
-    Will run the command ``subscription-manager repos --enable repo1 repo2``.
+    Will run the command ``subscription-manager repos --enable "repo1" --enable
+    "repo2"``.
 
     """
-    run('subscription-manager repos --enable {0}'
-        .format(' '.join(['"{0}"'.format(repo) for repo in args])))
+    run('subscription-manager repos {0}'
+        .format(' '.join(['--enable "{0}"'.format(repo) for repo in args])))
 
 
 def create_custom_repos(**kwargs):
