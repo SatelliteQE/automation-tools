@@ -893,6 +893,8 @@ def satellite5_iso_install(
             '--re-register --run-updater=yes --enable-tftp=yes')
         run('yum -y update')
 
+    return {}
+
 
 def sam_upstream_install(admin_password=None):
     """Task to install SAM nightly using katello-deploy script"""
