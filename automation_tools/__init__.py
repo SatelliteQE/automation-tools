@@ -418,6 +418,11 @@ def setup_abrt():
     run('abrt-auto-reporting enabled')
 
 
+def setup_scap_client():
+    """Task to setup puppet-foreman_scap_client."""
+    run('yum -y install puppet-foreman_scap_client', warn_only=True)
+
+
 def vm_create():
     """Task to create a VM using snap-guest based on a ``SOURCE_IMAGE`` base
     image.
@@ -1006,6 +1011,8 @@ def product_install(distribution, create_vm=False, certificate_url=None,
         sam=distribution.startswith('sam'),
         **installer_options
     )
+
+    execute(setup_scap_client, host=host)
 
     certificate_url = certificate_url or os.environ.get(
         'FAKE_MANIFEST_CERT_URL')
