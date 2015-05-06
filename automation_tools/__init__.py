@@ -303,6 +303,8 @@ def setup_email_notification(smtp=None):
     if smtp is not None:
         run('sed -i -e "s|address.*|address: {0}|" '
             '/etc/foreman/email.yaml'.format(smtp))
+        run('echo "    enable_starttls_auto: false" '
+            '>> /etc/foreman/email.yaml')
 
 
 def setup_fake_manifest_certificate(certificate_url=None):
