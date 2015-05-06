@@ -46,6 +46,10 @@ from automation_tools.repository import (
     enable_satellite_repos,
     manage_custom_repos,
 )
+from automation_tools.satellite5 import (
+    satellite5_installer,
+    satellite5_product_install,
+)
 from automation_tools.utils import (
     distro_info,
     update_packages
