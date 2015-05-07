@@ -278,6 +278,7 @@ def setup_default_capsule(interface=None, run_katello_installer=True):
         'capsule-dhcp': 'true',
         'capsule-dhcp-interface': interface,
         'capsule-tftp': 'true',
+        'capsule-tftp-servername': hostname,
         'capsule-puppet': 'true',
         'capsule-puppetca': 'true',
         'capsule-register-in-foreman': 'true',
