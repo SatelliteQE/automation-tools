@@ -721,13 +721,6 @@ def downstream_install(admin_password=None, run_katello_installer=True):
         remote_path='/etc/yum.repos.d/satellite.repo')
     satellite_repo.close()
 
-    info = distro_info()
-    if info == ('rhel', 6, 6):
-        # For default java-1.8.0-openjdk will be installed on RHEL 6.6 but it
-        # makes the katello-installer fail. Install java-1.7.0-openjdk which is
-        # the recommended version for RHEL 6.6.
-        run('yum install -y java-1.7.0-openjdk')
-
     # Install required packages for the installation
     run('yum install -y katello')
 
@@ -911,6 +904,8 @@ def product_install(distribution, create_vm=False, certificate_url=None,
     )
     execute(update_packages, warn_only=True)
 
+    if distribution in ('satellite6-downstream', 'satellite6-iso'):
+        execute(java_workaround, host=host)
     # execute returns a dictionary mapping host strings to the given task's
     # return value
     installer_options.update(execute(
@@ -1386,6 +1381,16 @@ def foreman_debug(tarball_name=None, local_path=None):
 # =============================================================================
 # Helper functions
 # =============================================================================
+def java_workaround():
+    """By default java-1.8.0-openjdk will be installed on RHEL 6.6 but it makes
+    the katello-installer fail. Install java-1.7.0-openjdk which is the
+    recommended version for RHEL 6.6.
+
+    """
+    if distro_info() == ('rhel', 6, 6):
+        run('yum install -y java-1.7.0-openjdk')
+
+
 def katello_installer(debug=True, sam=False, verbose=True, **kwargs):
     """Runs the installer with ``kwargs`` as command options. If ``sam`` is
     True
