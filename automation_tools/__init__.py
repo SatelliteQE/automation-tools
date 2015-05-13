@@ -721,6 +721,13 @@ def downstream_install(admin_password=None, run_katello_installer=True):
         remote_path='/etc/yum.repos.d/satellite.repo')
     satellite_repo.close()
 
+    info = distro_info()
+    if info == ('rhel', 6, 6):
+        # For default java-1.8.0-openjdk will be installed on RHEL 6.6 but it
+        # makes the katello-installer fail. Install java-1.7.0-openjdk which is
+        # the recommended version for RHEL 6.6.
+        run('yum install -y java-1.7.0-openjdk')
+
     # Install required packages for the installation
     run('yum install -y katello')
 
