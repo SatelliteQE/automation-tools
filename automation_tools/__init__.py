@@ -350,6 +350,8 @@ def setup_firewall():
         # Ports 5646 and 5647 for qpidd
         5646,
         5647,
+        # Port 8000 for foreman-proxy service
+        8000,
         # Port 8443 for Katello access the Islated Capsule
         8443,
     )
