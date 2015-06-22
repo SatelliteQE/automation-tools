@@ -855,6 +855,7 @@ def product_install(distribution, create_vm=False, certificate_url=None,
 
     install_tasks = {
         'sam-upstream': sam_upstream_install,
+        'satellite6-beta': cdn_install,
         'satellite6-cdn': cdn_install,
         'satellite6-downstream': downstream_install,
         'satellite6-iso': iso_install,
@@ -902,6 +903,7 @@ def product_install(distribution, create_vm=False, certificate_url=None,
     execute(
         enable_satellite_repos,
         cdn=distribution.endswith('cdn'),
+        beta=distribution.endswith('beta'),
         host=host
     )
     execute(update_packages, warn_only=True)

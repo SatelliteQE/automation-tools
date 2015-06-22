@@ -99,15 +99,22 @@ def create_custom_repos(**kwargs):
         repo_file.close()
 
 
-def enable_satellite_repos(cdn=False, disable_enabled=True):
+def enable_satellite_repos(cdn=False, beta=False, disable_enabled=True):
     """Enable repositories required to install Satellite 6
 
-    If ``disable_enabled`` is ``True``, then this task will first disable any
-    already enabled repository, including beaker ones.
+    :param cdn: Indicates if the CDN Satellite 6 repo should be enabled or not
+    :param beta: Indicates if the Beta Satellite 6 repo should be enabled or
+        not. The Beta repo is available through the CDN and, if both ``cdn``
+        and ``beta`` are ``True``, the beta repo will be used instead of the
+        stable one.
+    :param disable_enabled: If True, disable all repositories (including beaker
+        repositories) before enabling repositories.
 
     """
     if isinstance(cdn, str):
         cdn = (cdn.lower() == 'true')
+    if isinstance(beta, str):
+        beta = (beta.lower() == 'true')
     if isinstance(disable_enabled, str):
         disable_enabled = (disable_enabled.lower() == 'true')
 
@@ -119,12 +126,12 @@ def enable_satellite_repos(cdn=False, disable_enabled=True):
         'rhel-{0}-server-rpms',
         'rhel-server-rhscl-{0}-rpms',
     ]
-
-    if cdn is True:
+    if beta is True:
+        repos.append('rhel-server-{0}-satellite-6-beta-rpms')
+    elif cdn is True:
         repos.append('rhel-{0}-server-satellite-6.0-rpms')
 
     enable_repos(*[repo.format(distro_info()[1]) for repo in repos])
-
     run('yum repolist')
 
 
