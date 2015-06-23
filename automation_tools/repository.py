@@ -4,7 +4,8 @@ from __future__ import print_function
 import sys
 
 from automation_tools.utils import distro_info
-from fabric.api import put, run
+from fabric.api import hide, put, run
+from functools import wraps
 
 if sys.version_info[0] == 2:
     from StringIO import StringIO  # pylint:disable=import-error
@@ -12,7 +13,26 @@ else:
     from io import StringIO
 
 
-def disable_repos(*args):
+def _silencer(func):
+    """Decorator which runs the wrapped function with hide('stdout') if the
+    ``silent`` keyword argument is provided.
+
+    The ``silent`` keyword argument will be removed from the kwargs before
+    calling the wrapped function.
+
+    """
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        silent = kwargs.pop('silent', False)
+        if silent:
+            with hide('stdout'):
+                return func(*args, **kwargs)
+        return func(*args, **kwargs)
+    return wrapper
+
+
+@_silencer
+def disable_repos(*args, **kwargs):
     """Disable repos passed as ``args`` using ``subscription-manager repos
     --disable``.
 
@@ -23,6 +43,8 @@ def disable_repos(*args):
     Will run the command ``subscription-manager repos --disable "repo1"
     --disable "repo2"``.
 
+    If the keyword argument ``silent`` is ``True`` then the stdout output will
+    be hidden.
 
     """
     run('subscription-manager repos {0}'
@@ -47,6 +69,7 @@ def delete_custom_repos(**args):
         run('rm -f /etc/yum.repos.d/{0}.repo'.format(name), warn_only=True)
 
 
+@_silencer
 def enable_repos(*args, **kwargs):
     """Enable repos passed as ``args`` using ``subscription-manager repos
     --enable``.
@@ -57,6 +80,9 @@ def enable_repos(*args, **kwargs):
 
     Will run the command ``subscription-manager repos --enable "repo1" --enable
     "repo2"``.
+
+    If the keyword argument ``silent`` is ``True`` then the stdout output will
+    be hidden.
 
     """
     run('subscription-manager repos {0}'
@@ -119,8 +145,8 @@ def enable_satellite_repos(cdn=False, beta=False, disable_enabled=True):
         disable_enabled = (disable_enabled.lower() == 'true')
 
     if disable_enabled is True:
-        disable_beaker_repos()
-        disable_repos('*')
+        disable_beaker_repos(silent=True)
+        disable_repos('*', silent=True)
 
     repos = [
         'rhel-{0}-server-rpms',
@@ -135,15 +161,19 @@ def enable_satellite_repos(cdn=False, beta=False, disable_enabled=True):
     run('yum repolist')
 
 
-def disable_beaker_repos():
+@_silencer
+def disable_beaker_repos(**kwargs):
     """Disable beaker repositories
 
     If yum-config-manager is available this task will disable the repos, if not
     it will move the beaker repo files to the running user home directory
 
+    If the keyword argument ``silent`` is ``True`` then the stdout output will
+    be hidden.
+
     """
     # Clean up system if Beaker-based
-    result = run('which yum-config-manager', warn_only=True)
+    result = run('which yum-config-manager', quiet=True)
     if result.succeeded:
         run('yum-config-manager --disable "beaker*"')
     else:
