@@ -1,2 +1,2 @@
 Fabric
-novaclient
+python-novaclient
