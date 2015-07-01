@@ -10,12 +10,16 @@ import random
 import socket
 import sys
 import time
+import novaclient
 from re import search
 from urlparse import urlsplit
 
-from automation_tools.repository import enable_satellite_repos
+from automation_tools.repository import (
+    enable_satellite_repos, enable_repos, disable_repos)
 from automation_tools.utils import distro_info, update_packages
 from fabric.api import cd, env, execute, get, local, put, run
+from novaclient.v2 import client
+
 if sys.version_info[0] is 2:
     from urlparse import urljoin  # (import-error) pylint:disable=F0401
     from StringIO import StringIO  # (import-error) pylint:disable=F0401
@@ -1467,3 +1471,240 @@ def setenforce(mode):
         ))
 
     run('setenforce {0}'.format(mode))
+
+
+def get_hostname_from_ip(ip):
+    """Retrives the hostname by logging into remote machine by IP.
+    Specially for the systems who doesnt support reverse DNS.
+    e.g usersys machines.
+
+    :param ip: A string. The IP address of the remote host.
+
+    """
+    return execute(lambda: run('hostname'), host=ip)[ip]
+
+
+def get_openstack_client():
+    """Creates client object instance from openstack novaclient API.
+    And returns the client object for further use.
+
+    The following environment variables affect this command:
+
+    USERNAME
+        The username of an openstack project to login.
+    PASSWORD
+        The password of an openstack project to login.
+    AUTH_URL
+        The authentication url of the project.
+    PROJECT_ID
+        Project ID of an openstack project.
+
+    """
+    username = os.environ.get('USERNAME')
+    if username is None:
+        print('The USERNAME environment variable should be defined.')
+    password = os.environ.get('PASSWORD')
+    if password is None:
+        print('The PASSWORD environment variable should be defined.')
+    auth_url = os.environ.get('AUTH_URL')
+    if auth_url is None:
+        print('The AUTH_URL environment variable should be defined.')
+    project_id = os.environ.get('PROJECT_ID')
+    if project_id is None:
+        print('The PROJECT_ID environment variable should be defined.')
+    with client.Client(
+        username=username,
+        api_key=password,
+        auth_url=auth_url,
+        project_id=project_id
+    ) as openstack_client:
+        openstack_client.authenticate()
+        return openstack_client
+
+
+def create_openstack_instance(instance_name, image_name, flavor_name, ssh_key):
+    """Creates openstack Instance from Image and Assigns a floating IP
+    to instance.
+
+    :param instance_name: A string. Openstack Instance name to create.
+    :param image_name: A string. Openstack image name from which instance
+        to be created.
+    :param flavor_name: A string. Openstack flavor_name for instance.
+        e.g m1.small.
+    :param ssh_key: A string. ssh_key 'name' that required to add
+        into this instance.
+
+    ssh_key should be added to openstack project before running automation.
+    Else the automation will fail.
+
+    The following environment variables affect this command:
+
+    USERNAME
+        The username of an openstack project to login.
+    PASSWORD
+        The password of an openstack project to login.
+    AUTH_URL
+        The authentication url of the project.
+    PROJECT_ID
+        Project ID of an openstack project.
+
+    """
+    network_name = 'satellite-jenkins'
+    openstack_client = get_openstack_client()
+    # Validate ssh_key is added into openstack project
+    openstack_client.keypairs.find(name=ssh_key)
+    image = openstack_client.images.find(name=image_name)
+    flavor = openstack_client.flavors.find(name=flavor_name)
+    network = openstack_client.networks.find(label=network_name)
+    floating_ip = openstack_client.floating_ips.create(
+        openstack_client.floating_ip_pools.list()[0].name
+    )
+    # Create instance from the given parameters
+    instance = openstack_client.servers.create(
+        name=instance_name,
+        image=image.id,
+        flavor=flavor.id,
+        key_name=ssh_key,
+        network=network.id
+    )
+    # Assigning floating ip to instance
+    while True:
+        try:
+            instance.add_floating_ip(floating_ip)
+            break
+        except novaclient.exceptions.BadRequest:
+            time.sleep(5)
+    # Wait till DNS resolves the IP
+    time.sleep(600)
+    # Getting Hostname from IP
+    env['instance_host'] = get_hostname_from_ip(str(floating_ip.ip))
+
+
+def delete_openstack_instance(instance_name):
+    """Deletes openstack Instance.
+
+    :param instance_name: A string. Openstack instance name to delete.
+
+    The following environment variables affect this command:
+
+    USERNAME
+        The username of an openstack project to login.
+    PASSWORD
+        The password of an openstack project to login.
+    AUTH_URL
+        The authentication url of the project.
+    PROJECT_ID
+        Project ID of an openstack project.
+
+    """
+    openstack_client = get_openstack_client()
+    try:
+        instance = openstack_client.servers.find(name=instance_name)
+    except novaclient.exceptions.NotFound:
+        print('Instance {0} not found in Openstack project.'.format(
+            instance_name
+        ))
+        return
+    instance.delete()
+
+
+def satellite6_upgrade(admin_password=None):
+    """Upgrades satellite from already created Openstack image
+    of old Satellite version to latest Satellite version compose.
+
+    The following environment variables affect this command:
+
+    ADMIN_PASSWORD
+        Optional, defaults to 'changeme'. Foreman admin password.
+    BASE_URL
+        URL for the compose repository.
+
+    """
+    base_url = os.environ.get('BASE_URL')
+    if base_url is None:
+        print('The BASE_URL environment variable should be defined')
+        sys.exit(1)
+    if admin_password is None:
+        admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme')
+    # Removing rhel-released and rhel-optional repo
+    run('rm -rf /etc/yum.repos.d/rhel-{optional,released}.repo')
+    # Update the packages
+    update_packages(quiet=True)
+    # Setting Satellite61 Repos
+    major_ver = distro_info()[1]
+    enable_repos('rhel-{0}-server-satellite-6.1-rpms'.format(major_ver))
+    disable_repos('rhel-{0}-server-satellite-6.0-rpms'.format(major_ver))
+    # Add Sat6 repo from latest compose
+    satellite_repo = StringIO()
+    satellite_repo.write('[sat6]\n')
+    satellite_repo.write('name=satellite 6\n')
+    satellite_repo.write('baseurl={0}\n'.format(base_url))
+    satellite_repo.write('enabled=1\n')
+    satellite_repo.write('gpgcheck=0\n')
+    put(local_path=satellite_repo, remote_path='/etc/yum.repos.d/sat6.repo')
+    satellite_repo.close()
+    # Stop katello services, except mongod
+    run('katello-service stop')
+    run('service-wait mongod start')
+    # yum cleaning all
+    run('yum clean all', warn_only=True)
+    # Updating the packages again after setting sat6 repo
+    update_packages(quiet=True)
+    # Upgrading Katello installer
+    run('katello-installer --upgrade')
+    # Test the Upgrade is successful
+    run('hammer -u admin -p {0} ping'.format(admin_password))
+
+
+def product_upgrade(product, instance_name, image_name, flavor_name, ssh_key):
+    """Task which upgrades the product.
+
+    Product is satellite.
+
+    :param product: A string. product name wanted to upgrade
+    :param instance_name: A string. Openstack Instance name
+        onto which upgrade will run.
+    :param image_name: A string. Openstack image name
+        from which instance to create.
+    :param flavor_name: A string. Openstack flavor_name for instance to create.
+        e.g m1.small.
+    :param ssh_key: A string. ssh_key 'name' that is required
+        to add into this instance.
+
+    The following environment variables affect this command:
+
+    ADMIN_PASSWORD
+        Optional, defaults to 'changeme'. Foreman admin password.
+    BASE_URL
+        URL for the compose repository.
+    USERNAME
+        The username of an openstack project to login.
+    PASSWORD
+        The password of an openstack project to login.
+    AUTH_URL
+        The authentication url of the project.
+    PROJECT_ID
+        Project ID of an openstack project.
+
+    Note: ssh_key should be added to openstack project before
+    running automation, else the automation will fail.
+
+    """
+    upgrade_tasks = {'satellite': satellite6_upgrade}
+    product = product.lower()
+    products = upgrade_tasks.keys()
+
+    if product not in products:
+        print ('Product name should be one of {0}'.format(', '.join(products)))
+        sys.exit(1)
+    execute(delete_openstack_instance, instance_name)
+    execute(
+        create_openstack_instance,
+        instance_name,
+        image_name,
+        flavor_name,
+        ssh_key
+    )
+    # Getting the host name on to which upgrade will run
+    host = env.get('instance_host')
+    execute(upgrade_tasks[product], host=host)
