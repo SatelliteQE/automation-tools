@@ -6,14 +6,6 @@ try:
 except ImportError:
     from distutils.core import setup
 
-packages = [
-    'automation_tools',
-]
-
-requires = [
-    'Fabric',
-]
-
 with open('README.rst', 'r') as f:
     readme = f.read()
 
@@ -25,11 +17,11 @@ setup(
     author=u'Elyézer Rezende',
     author_email='erezende@redhat.com',
     url='https://github.com/SatelliteQE/automation-tools',
-    packages=packages,
+    packages=['automation_tools'],
     package_data={'': ['LICENSE']},
     package_dir={'automation_tools': 'automation_tools'},
     include_package_data=True,
-    install_requires=requires,
+    install_requires=['Fabric', 'python-novaclient'],
     license='GNU GPL v3.0',
     classifiers=(
         'Development Status :: 5 - Production/Stable',
