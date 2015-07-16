@@ -1118,15 +1118,41 @@ def update_basic_packages():
     unsubscribe()
 
 
-def client_registration_test(clean_beaker=True, update_packages=True):
-    """Register client against Satellite 6 and runs tests."""
+def client_registration_test(clean_beaker=True, update_package=True,
+                             product_type=None, reset_system=True):
+    """Register client against Satellite 6 and run tests.
 
+    :param clean_beaker: Clean beaker repositories if ``True``.
+    :param update_package: Update the host with latest packages if ``True``.
+    :param product_type: Set the product type. Legal values:
+
+        ``None``
+            default
+        ``compute``
+            for compute products
+        ``desktop``
+            for desktop products
+
+    :param reset_system: Reset the subscription management back to RHSM.
+
+    Affected by the following environment variables:
+
+        ``ORG``
+            (Optional) Org to register.  Default is Default_Organization
+        ``ACTIVATIONKEY``
+            (Mandatory) Activation key to register
+        ``CERTURL``
+            (Mandatory) The server cert url to install
+        ``RELVER``
+            (Optional) Release version to register
+
+    """
     # Since all arguments are turned to string, if no defaults are
     # used...
     if isinstance(clean_beaker, str):
         clean_beaker = (clean_beaker.lower() == 'true')
-    if isinstance(update_packages, str):
-        update_packages = (update_packages.lower() == 'true')
+    if isinstance(update_package, str):
+        update_package = (update_package.lower() == 'true')
 
     # Org
     org = os.getenv('ORG', 'Default_Organization')
@@ -1140,13 +1166,15 @@ def client_registration_test(clean_beaker=True, update_packages=True):
     if not cert_url:
         print('You need to install the Candlepin Cert RPM.')
         sys.exit(1)
-
+    # Release version for the client - Optional - no need to error out if not
+    # available
+    rel_ver = os.getenv('RELVER')
     # If this is a Beaker box, 'disable' Beaker repos
     if clean_beaker is True:
         run('mv /etc/yum.repos.d/beaker* .', warn_only=True)
 
     # Update some basic packages before we try to register
-    if update_packages is True:
+    if update_package is True:
         update_basic_packages()
 
     # Install the cert file
@@ -1154,40 +1182,87 @@ def client_registration_test(clean_beaker=True, update_packages=True):
 
     # Register and subscribe
     print('Register/Subscribe using Subscription-manager.')
-    run('subscription-manager register --force'
-        ' --org="{0}"'
-        ' --activationkey="{1}"'
-        ''.format(org, act_key))
+    cmd = (
+        'subscription-manager register --force --org="{0}" '
+        '--activationkey="{1}"'.format(org, act_key)
+    )
+    if rel_ver:
+        cmd += ' --release="{0}"'.format(rel_ver)
+    run(cmd)
     print('Refreshing Subscription-manager.')
     run('subscription-manager refresh')
     print('Performing yum clean up.')
     run('yum clean all', quiet=True)
+
+    # Checking Package installation
     print('"Firefox" and "Telnet" should not be installed.')
     run('rpm -q firefox telnet', warn_only=True)
-    print('Installing "Firefox" and "Telnet".')
-    run('yum install -y firefox telnet', quiet=True)
-    print('"Firefox" and "Telnet" should be installed.')
-    run('rpm -q firefox telnet')
-    print('Removing "Firefox" and "Telnet".')
-    run('yum remove -y firefox telnet', quiet=True)
-    print('Checking if "Firefox" and "Telnet" are installed.')
-    run('rpm -q firefox telnet', warn_only=True)
-    print('Installing "Web Server" group.')
-    run('yum groupinstall -y "Web Server"', quiet=True)
-    print('Checking for "httpd" and starting it.')
-    run('rpm -q httpd')
-    manage_daemon('start', 'httpd', warn_only=True)
-    print('Stopping "httpd" service and remove "Web Server" group.')
-    manage_daemon('stop', 'httpd', warn_only=True)
-    run('yum groupremove -y "Web Server"', quiet=True)
-    print('Checking if "httpd" is really removed.')
-    run('rpm -q httpd', warn_only=True)
+    print('Installing "Telnet".')
+    result = run('yum install -y telnet', quiet=True)
+    if result.succeeded:
+        print('"Telnet" is installed.')
+    run('rpm -q telnet')  # This will fail if telnet is not installed
+    print('Removing "Telnet".')
+    run('yum remove -y telnet', quiet=True)
+    print('Checking if "Telnet" is installed.')
+    run('rpm -q telnet', warn_only=True)
+
+    # Firefox is not available in compute product
+    if product_type != 'compute':
+        print('Installing "Firefox"')
+        result = run('yum install -y firefox', quiet=True)
+        if result.succeeded:
+            print('"Firefox" is installed.')
+        run('rpm -q firefox')  # This will fail if firefox is not installed
+        print('Removing "Firefox"')
+        run('yum remove -y firefox', quiet=True)
+        print('Checking if "Firefox" is installed.')
+        run('rpm -q firefox ', warn_only=True)
+
+    # Group packages differ depending on the rhel product variance
+    if product_type is None:
+        # This is the default behavior if product_type is not passed
+        print('Installing "Web Server" group.')
+        run('yum groupinstall -y "Web Server"', quiet=True)
+        print('Checking for "httpd" and starting it.')
+        run('rpm -q httpd')
+        manage_daemon('start', 'httpd', warn_only=True)
+        print('Stopping "httpd" service and remove "Web Server" group.')
+        manage_daemon('stop', 'httpd', warn_only=True)
+        run('yum groupremove -y "Web Server"', quiet=True)
+        print('Checking if "httpd" is really removed.')
+        run('rpm -q httpd', warn_only=True)
+    elif product_type == 'desktop':
+        # For desktop products install Networking Tools
+        print('Installing "Networking Tools" group.')
+        run('yum groupinstall -y "Networking Tools"', quiet=True)
+        print('Checking for "nc" package.')
+        run('rpm -q nc')
+        print('Remove "Networking Tools" group.')
+        run('yum groupremove -y "Networking Tools"', quiet=True)
+        print('Checking if "nc" is really removed.')
+        run('rpm -q nc', warn_only=True)
+    elif product_type == 'compute':
+        # For compute products install PostgreSQL Database client
+        print('Installing "PostgreSQL Database client" group.')
+        run('yum groupinstall -y "PostgreSQL Database client"', quiet=True)
+        print('Checking for "postgresql" package.')
+        run('rpm -q postgresql')
+        print('Remove "PostgreSQL Database client" group.')
+        run('yum groupremove -y "PostgreSQL Database client"', quiet=True)
+        print('Checking if "postgresql" is really removed.')
+        run('rpm -q postgresql', warn_only=True)
     # Install random errata
     install_errata()
-
+    print('Listing yum history for verification.')
+    run('yum history list')
     # Clean up
-    unsubscribe()
-    clean_rhsm()
+    if reset_system is True:
+        # 'reset_system' input parameter should be set to false if registration
+        # should be persisted after testing.  Default is True so as to test
+        # the unregister feature
+        unsubscribe()
+        clean_rhsm()
 
 
 def install_errata():
