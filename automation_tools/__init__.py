@@ -774,7 +774,8 @@ def cdn_install(run_katello_installer=True):
 
 
 def iso_install(
-        admin_password=None, check_sigs=False, run_katello_installer=True):
+        admin_password=None, check_gpg_signatures=False,
+        run_katello_installer=True):
     """Installs Satellite 6 from an ISO image.
 
     The following environment variables affect this command:
@@ -790,18 +791,25 @@ def iso_install(
         The URL where the ISO will be downloaded.
     ADMIN_PASSWORD
         Optional, defaults to 'changeme'. Foreman admin password.
+    CHECK_GPG_SIGNATURES
+       Optional, all values other than 'true' will default to 'false'.
 
     """
-    if isinstance(check_sigs, str):
-        check_sigs = (check_sigs.lower() == 'true')
-
-    if admin_password is None:
-        admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme')
-
     iso_url = os.environ.get('ISO_URL') or os.environ.get('BASE_URL')
     if iso_url is None:
         print('Please provide a valid URL for the ISO image.')
         sys.exit(1)
+
+    if isinstance(check_gpg_signatures, str):
+        check_gpg_signatures = (check_gpg_signatures.lower() == 'true')
+
+    if admin_password is None:
+        admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme')
+
+    check_gpg_signatures = (
+        check_gpg_signatures or
+        os.environ.get('CHECK_GPG_SIGNATURES', '') == 'true'
+    )
 
     # Download the ISO
     iso_download(iso_url)
@@ -811,7 +819,7 @@ def iso_install(
     run('mount *.iso ISO -t iso9660 -o loop')
     # ...and run the installer script.
     with cd('/root/ISO'):
-        if check_sigs is True:
+        if check_gpg_signatures is True:
             run('./install_packages')
         else:
             run('./install_packages --nogpgsigs')
