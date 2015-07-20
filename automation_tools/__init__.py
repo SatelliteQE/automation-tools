@@ -1520,15 +1520,15 @@ def manage_daemon(action, daemon, pty=True, warn_only=False):
 
     """
     if distro_info()[1] >= 7:
-        command = 'systemctl {} {}'.format(action, daemon)
+        command = 'systemctl {0} {1}'.format(action, daemon)
     else:
         if action in ('enable', 'disable'):
-            command = 'chkconfig {} {}'.format(
+            command = 'chkconfig {0} {1}'.format(
                 daemon,
                 'on' if action == 'enable' else 'off'
             )
         else:
-            command = 'service {} {}'.format(daemon, action)
+            command = 'service {0} {1}'.format(daemon, action)
     return run(command, pty=pty, warn_only=warn_only)
 
 
