@@ -855,6 +855,9 @@ def product_install(distribution, create_vm=False, certificate_url=None,
     If ``certificate_url`` parameter or ``FAKE_MANIFEST_CERT_URL`` env var is
     defined the setup_fake_manifest_certificate task will run.
 
+    Every call to a task after the definition ``host = env.get('vm_ip',
+    env['host'])`` must be run by using ``execute`` and passing ``host=host``.
+
     :param str distribution: product distribution wanted to install
     :param bool create_vm: creates a virtual machine and then install the
         product on it. Default: False.
@@ -920,7 +923,7 @@ def product_install(distribution, create_vm=False, certificate_url=None,
     )
 
     # Update the machine
-    update_packages(warn_only=True)
+    execute(update_packages, host=host, warn_only=True)
 
     if distribution in ('satellite6-downstream', 'satellite6-iso'):
         execute(java_workaround, host=host)
