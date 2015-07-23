@@ -918,7 +918,9 @@ def product_install(distribution, create_vm=False, certificate_url=None,
         beta=distribution.endswith('beta'),
         host=host
     )
-    execute(update_packages, warn_only=True)
+
+    # Update the machine
+    update_packages(warn_only=True)
 
     if distribution in ('satellite6-downstream', 'satellite6-iso'):
         execute(java_workaround, host=host)
