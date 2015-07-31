@@ -192,10 +192,8 @@ def setup_default_docker():
     else:
         run('yum install -y docker-io', warn_only=True)
 
-    # Docker should run as the ``apache`` user
-    for group in ('docker', 'dockerroot'):
-        if run('id -g {0}'.format(group), quiet=True).succeeded:
-            run('usermod -aG {0} apache'.format(group))
+    run('groupadd docker', warn_only=True)
+    run('usermod -aG docker foreman')
 
     # SElinux workaround let us use ``http://localhost:2375`` for a
     # ``Docker`` Compute Resurce.
@@ -205,6 +203,7 @@ def setup_default_docker():
             '--selinux-enabled=true',
             '--host tcp://0.0.0.0:2375',
             '--host unix:///var/run/docker.sock',
+            '-G docker',
         ])
     ))
 
@@ -217,13 +216,6 @@ def setup_default_docker():
     # https://github.com/fabric/fabric/issues/395#issuecomment-32219270
     # https://github.com/docker/docker/issues/2758
     manage_daemon('restart', 'docker', pty=(os_version >= 7))
-
-    # Check that things look good
-    run('docker ps')
-
-    # Pull down a very simple/light Docker container to 'seed' the
-    # system with something that can be used right away.
-    run('docker pull busybox')
 
 
 def setup_default_capsule(interface=None, run_katello_installer=True):
