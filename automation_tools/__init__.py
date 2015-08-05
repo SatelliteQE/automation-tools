@@ -538,6 +538,12 @@ def setup_vm_provisioning(interface=None):
         print('A network interface is required')
         sys.exit(1)
 
+    # Check for virtualization support
+    result = run('grep -E "^flags.*(vmx|svm)" /proc/cpuinfo', quiet=True)
+    if result.failed:
+        print('Virtualization is not supported on this machine')
+        sys.exit(1)
+
     # Check for Nested virtualization support
     result = run(
         'grep -E "^Y" /sys/module/kvm_intel/parameters/nested', quiet=True)
@@ -549,12 +555,6 @@ def setup_vm_provisioning(interface=None):
             '/etc/modprobe.d/kvm-intel.conf'
         )
         print('Please reboot this machine to enable Nested Virtualization')
-        sys.exit(1)
-
-    # Check for virtualization support
-    result = run('grep -E "^flags.*(vmx|svm)" /proc/cpuinfo', quiet=True)
-    if result.failed:
-        print('Virtualization is not supported on this machine')
         sys.exit(1)
 
     # Install virtualization packages
