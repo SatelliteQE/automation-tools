@@ -10,6 +10,7 @@ from automation_tools import (  # flake8: noqa
     downstream_install,
     errata_upgrade,
     fix_hostname,
+    fix_qdrouterd_listen_to_ipv6,
     foreman_debug,
     get_hostname_from_ip,
     install_errata,

@@ -964,6 +964,19 @@ def product_install(distribution, create_vm=False, certificate_url=None,
             host=host
         )
 
+    execute(fix_qdrouterd_listen_to_ipv6, host=host)
+
+
+def fix_qdrouterd_listen_to_ipv6():
+    """Configure qdrouterd to listen to IPv6 instead of IPv4.
+
+    Workaround for BZ #1219902.
+
+    """
+    run('sed -i -e "0,/addr: 0.0.0.0/s/addr: 0.0.0.0/addr: ::/" '
+        '/etc/qpid-dispatch/qdrouterd.conf')
+    manage_daemon('restart', 'qdrouterd')
+
 
 def partition_disk():
     """Re-partitions disk to increase the size of /root to handle
