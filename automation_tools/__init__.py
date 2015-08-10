@@ -1532,7 +1532,7 @@ def katello_service(action, exclude=None):
         exclude = ''
     else:
         exclude = '--exclude {}'.format(','.join(exclude))
-    return run('katello-service {} {}'.format(exclude, action))
+    run('katello-service {} {}'.format(exclude, action))
 
 
 def manage_daemon(action, daemon, pty=True, warn_only=False):
