@@ -954,7 +954,7 @@ def product_install(distribution, create_vm=False, certificate_url=None,
 
     if distribution.startswith('satellite6'):
         execute(setup_default_docker, host=host)
-        execute(katello_service('restart'), host=host)
+        execute(katello_service, 'restart', host=host)
         execute(setup_scap_client, host=host)
 
     certificate_url = certificate_url or os.environ.get(
@@ -1532,7 +1532,7 @@ def katello_service(action, exclude=None):
         exclude = ''
     else:
         exclude = '--exclude {}'.format(','.join(exclude))
-    run('katello-service {} {}'.format(exclude, action))
+    return run('katello-service {} {}'.format(exclude, action))
 
 
 def manage_daemon(action, daemon, pty=True, warn_only=False):
