@@ -938,7 +938,6 @@ def product_install(distribution, create_vm=False, certificate_url=None,
     execute(setup_firewall, host=host)
 
     if distribution.startswith('satellite6'):
-        execute(setup_default_docker, host=host)
         if os.environ.get('PROXY_INFO'):
             # execute returns a dictionary mapping host strings to the given
             # task's return value
@@ -953,7 +952,10 @@ def product_install(distribution, create_vm=False, certificate_url=None,
         **installer_options
     )
 
-    execute(setup_scap_client, host=host)
+    if distribution.startswith('satellite6'):
+        execute(setup_default_docker, host=host)
+        execute(katello_service('restart'), host=host)
+        execute(setup_scap_client, host=host)
 
     certificate_url = certificate_url or os.environ.get(
         'FAKE_MANIFEST_CERT_URL')
@@ -1517,6 +1519,20 @@ def katello_installer(debug=True, sam=False, verbose=True, **kwargs):
         ]),
         ' '.join(extra_options)
     ))
+
+
+def katello_service(action, exclude=None):
+    """Run katello-service
+
+    :param str action: One of stop, start, restart, status.
+    :param list exclude: A list of services to skip
+
+    """
+    if exclude is None:
+        exclude = ''
+    else:
+        exclude = '--exclude {}'.format(','.join(exclude))
+    return run('katello-service {} {}'.format(exclude, action))
 
 
 def manage_daemon(action, daemon, pty=True, warn_only=False):

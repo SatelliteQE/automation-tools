@@ -18,6 +18,7 @@ from automation_tools import (  # flake8: noqa
     install_prerequisites,
     iso_download,
     iso_install,
+    katello_service,
     partition_disk,
     performance_tuning,
     product_install,
