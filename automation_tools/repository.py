@@ -155,7 +155,7 @@ def enable_satellite_repos(cdn=False, beta=False, disable_enabled=True):
     if beta is True:
         repos.append('rhel-server-{0}-satellite-6-beta-rpms')
     elif cdn is True:
-        repos.append('rhel-{0}-server-satellite-6.0-rpms')
+        repos.append('rhel-{0}-server-satellite-6.1-rpms')
 
     enable_repos(*[repo.format(distro_info()[1]) for repo in repos])
     run('yum repolist')
