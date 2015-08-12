@@ -1669,6 +1669,7 @@ def create_openstack_instance(instance_name, image_name, flavor_name, ssh_key):
         openstack_client.floating_ip_pools.list()[0].name
     )
     # Create instance from the given parameters
+    print('Creating new Openstack instance {0}'.format(instance_name))
     instance = openstack_client.servers.create(
         name=instance_name,
         image=image.id,
@@ -1715,6 +1716,9 @@ def delete_openstack_instance(instance_name):
         ))
         return
     instance.delete()
+    print('The instance {0} has been deleted from Openstack.'.format(
+        instance_name
+    ))
 
 
 def satellite6_upgrade(admin_password=None):
@@ -1726,13 +1730,10 @@ def satellite6_upgrade(admin_password=None):
     ADMIN_PASSWORD
         Optional, defaults to 'changeme'. Foreman admin password.
     BASE_URL
+        Optional, defaults to available satellite version in CDN.
         URL for the compose repository.
 
     """
-    base_url = os.environ.get('BASE_URL')
-    if base_url is None:
-        print('The BASE_URL environment variable should be defined')
-        sys.exit(1)
     if admin_password is None:
         admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme')
     # Removing rhel-released and rhel-optional repo
@@ -1741,7 +1742,9 @@ def satellite6_upgrade(admin_password=None):
     update_packages(quiet=True)
     # Setting Satellite61 Repos
     major_ver = distro_info()[1]
-    enable_repos('rhel-{0}-server-satellite-6.1-rpms'.format(major_ver))
+    base_url = os.environ.get('BASE_URL')
+    if base_url is None:
+        enable_repos('rhel-{0}-server-satellite-6.1-rpms'.format(major_ver))
     disable_repos('rhel-{0}-server-satellite-6.0-rpms'.format(major_ver))
     # Add Sat6 repo from latest compose
     satellite_repo = StringIO()
@@ -1755,6 +1758,8 @@ def satellite6_upgrade(admin_password=None):
     # Stop katello services, except mongod
     run('katello-service stop')
     run('service-wait mongod start')
+    if major_ver == 7:
+        run('service tomcat stop')
     # yum cleaning all
     run('yum clean all', warn_only=True)
     # Updating the packages again after setting sat6 repo
@@ -1763,6 +1768,8 @@ def satellite6_upgrade(admin_password=None):
     run('katello-installer --upgrade')
     # Test the Upgrade is successful
     run('hammer -u admin -p {0} ping'.format(admin_password))
+    # Test The status of all katello services
+    run('katello-service status')
 
 
 def product_upgrade(product, instance_name, image_name, flavor_name, ssh_key):
@@ -1782,6 +1789,13 @@ def product_upgrade(product, instance_name, image_name, flavor_name, ssh_key):
 
     The following environment variables affect this command:
 
+    RHN_USERNAME
+        Red Hat Network username to register the system.
+    RHN_PASSWORD
+        Red Hat Network password to register the system.
+    RHN_POOLID
+        Optional. Red Hat Network pool ID. Determines what software will be
+        available from RHN.
     ADMIN_PASSWORD
         Optional, defaults to 'changeme'. Foreman admin password.
     BASE_URL
@@ -1816,4 +1830,10 @@ def product_upgrade(product, instance_name, image_name, flavor_name, ssh_key):
     )
     # Getting the host name on to which upgrade will run
     host = env.get('instance_host')
+    # Subscribe the instance to CDN
+    execute(subscribe, host=host)
+    # Restarting Katello-services
+    if product == 'satellite':
+        execute(lambda: run('katello-service restart'), host=host)
+    # Run product upgrade
     execute(upgrade_tasks[product], host=host)
