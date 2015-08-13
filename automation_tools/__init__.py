@@ -424,6 +424,11 @@ def setup_scap_client():
     run('yum -y install puppet-foreman_scap_client', warn_only=True)
 
 
+def install_discovery_image():
+    """Task to install foreman discovery image."""
+    run('yum -y install foreman-discovery-image', warn_only=True)
+
+
 def vm_create():
     """Task to create a VM using snap-guest based on a ``SOURCE_IMAGE`` base
     image.
@@ -956,6 +961,7 @@ def product_install(distribution, create_vm=False, certificate_url=None,
         execute(setup_default_docker, host=host)
         execute(katello_service, 'restart', host=host)
         execute(setup_scap_client, host=host)
+        execute(install_discovery_image, host=host)
 
     certificate_url = certificate_url or os.environ.get(
         'FAKE_MANIFEST_CERT_URL')
