@@ -838,7 +838,8 @@ def sam_upstream_install(admin_password=None):
 
 
 def product_install(distribution, create_vm=False, certificate_url=None,
-                    selinux_mode=None, sat_cdn_version=None):
+                    selinux_mode=None, sat_cdn_version=None,
+                    test_in_stage=False):
     """Task which install every product distribution.
 
     Product distributions are sam-upstream, satellite6-cdn,
@@ -864,6 +865,8 @@ def product_install(distribution, create_vm=False, certificate_url=None,
     # Command-line arguments are passed in as strings.
     if isinstance(create_vm, str):
         create_vm = (create_vm.lower() == 'true')
+    if isinstance(test_in_stage, str):
+        test_in_stage = (test_in_stage.lower() == 'true')
 
     install_tasks = {
         'sam-upstream': sam_upstream_install,
@@ -911,6 +914,8 @@ def product_install(distribution, create_vm=False, certificate_url=None,
     host = env.get('vm_ip', env['host'])
 
     # Register and subscribe machine to Red Hat
+    if test_in_stage:
+        execute(update_rhsm_stage, host=host)
     execute(subscribe, host=host)
 
     execute(install_prerequisites, host=host)
@@ -1123,6 +1128,30 @@ def add_repo(repo_name=None, repo_url=None):
 
 # Client registration
 # ==================================================
+
+def update_rhsm_stage():
+    """Updates the host to point to stage
+
+    The following environment variables affect this command:
+
+    RHN_STAGE_SERVER
+        Stage content server
+    CDN_STAGE_URL
+        Stage content baseurl
+
+    """
+    rhn_stage_server = os.environ.get('RHN_STAGE_SERVER')
+    cdn_stage_url = os.environ.get('CDN_STAGE_URL')
+    if rhn_stage_server is None or cdn_stage_url is None:
+        print('RHN_STAGE and CDN_STAGE_URL are required to continue')
+        sys.exit(1)
+    run("sed -i -e 's/^hostname.*/hostname={0}/' "
+        "/etc/rhsm/rhsm.conf".format(rhn_stage_server))
+    run("sed -i -e 's|^baseurl.*|baseurl={0}|' "
+        "/etc/rhsm/rhsm.conf".format(cdn_stage_url))
+    manage_daemon('restart', 'rhsmcertd')
+
+
 def clean_rhsm():
     """Removes pre-existing Candlepin certs and resets RHSM."""
     print('Erasing existing Candlepin certs, if any.')
