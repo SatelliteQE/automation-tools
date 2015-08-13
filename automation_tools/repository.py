@@ -125,7 +125,8 @@ def create_custom_repos(**kwargs):
         repo_file.close()
 
 
-def enable_satellite_repos(cdn=False, beta=False, disable_enabled=True):
+def enable_satellite_repos(cdn=False, beta=False, disable_enabled=True,
+                           cdn_version='6.1'):
     """Enable repositories required to install Satellite 6
 
     :param cdn: Indicates if the CDN Satellite 6 repo should be enabled or not
@@ -135,6 +136,8 @@ def enable_satellite_repos(cdn=False, beta=False, disable_enabled=True):
         stable one.
     :param disable_enabled: If True, disable all repositories (including beaker
         repositories) before enabling repositories.
+    :param version: Indicates which satellite version should be installed,
+        default set to 6.1.
 
     """
     if isinstance(cdn, str):
@@ -154,8 +157,13 @@ def enable_satellite_repos(cdn=False, beta=False, disable_enabled=True):
     ]
     if beta is True:
         repos.append('rhel-server-{0}-satellite-6-beta-rpms')
-    elif cdn is True:
-        repos.append('rhel-{0}-server-satellite-6.1-rpms')
+    if cdn is True:
+        if cdn_version == '6.0':
+            repos.append('rhel-{0}-server-satellite-6.0-rpms')
+        elif cdn_version == '6.1':
+            repos.append('rhel-{0}-server-satellite-6.1-rpms')
+        else:
+            raise ValueError('CDN Version should be either 6.0 or 6.1')
 
     enable_repos(*[repo.format(distro_info()[1]) for repo in repos])
     run('yum repolist')

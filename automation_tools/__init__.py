@@ -833,7 +833,7 @@ def sam_upstream_install(admin_password=None):
 
 
 def product_install(distribution, create_vm=False, certificate_url=None,
-                    selinux_mode=None):
+                    selinux_mode=None, sat_cdn_version=None):
     """Task which install every product distribution.
 
     Product distributions are sam-upstream, satellite6-cdn,
@@ -877,6 +877,9 @@ def product_install(distribution, create_vm=False, certificate_url=None,
             distribution, ', '.join(distributions)))
         sys.exit(1)
 
+    if sat_cdn_version not in ('6.0', '6.1'):
+        raise ValueError("Satellite version should be either 6.0 or 6.1")
+
     if selinux_mode is None:
         selinux_mode = os.environ.get('SELINUX_MODE', 'enforcing')
 
@@ -911,6 +914,7 @@ def product_install(distribution, create_vm=False, certificate_url=None,
         enable_satellite_repos,
         cdn=distribution.endswith('cdn'),
         beta=distribution.endswith('beta'),
+        version=sat_cdn_version,
         host=host
     )
 
