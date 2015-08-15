@@ -885,7 +885,8 @@ def product_install(distribution, create_vm=False, certificate_url=None,
             distribution, ', '.join(distributions)))
         sys.exit(1)
 
-    if sat_cdn_version not in ('6.0', '6.1'):
+    if (distribution == 'satellite6-cdn' and
+            sat_cdn_version not in ('6.0', '6.1')):
         raise ValueError("Satellite version should be either 6.0 or 6.1")
 
     if selinux_mode is None:
@@ -914,7 +915,7 @@ def product_install(distribution, create_vm=False, certificate_url=None,
     host = env.get('vm_ip', env['host'])
 
     # Register and subscribe machine to Red Hat
-    if test_in_stage:
+    if distribution == 'satellite6-cdn' and test_in_stage:
         execute(update_rhsm_stage, host=host)
     execute(subscribe, host=host)
 
@@ -924,7 +925,7 @@ def product_install(distribution, create_vm=False, certificate_url=None,
         enable_satellite_repos,
         cdn=distribution.endswith('cdn'),
         beta=distribution.endswith('beta'),
-        version=sat_cdn_version,
+        cdn_version=sat_cdn_version,
         host=host
     )
 
