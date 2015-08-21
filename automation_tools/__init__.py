@@ -11,6 +11,7 @@ import socket
 import sys
 import time
 import novaclient
+import subprocess
 from re import search
 from urlparse import urlsplit
 
@@ -1622,6 +1623,29 @@ def setenforce(mode):
     run('setenforce {0}'.format(mode))
 
 
+def host_pings(host, attempts=200):
+    """This ensures the given IP/hostname pings succesfully.
+
+    :param host: A string. The IP or hostname of host.
+    :param attempts: An integer.
+        The maximum number of attempts to ping the host.
+
+    """
+    for attempt in range(attempts):
+        command = subprocess.Popen(
+            'ping -c1 {0}; echo $?'.format(host),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            shell=True
+        )
+        output = command.communicate()[0]
+        # Checking the return code of ping is 0
+        if int(output.split()[-1]) == 0:
+            break
+        else:
+            time.sleep(5)
+
+
 def get_hostname_from_ip(ip):
     """Retrives the hostname by logging into remote machine by IP.
     Specially for the systems who doesnt support reverse DNS.
@@ -1673,7 +1697,7 @@ def get_openstack_client():
 
 def create_openstack_instance(instance_name, image_name, flavor_name, ssh_key):
     """Creates openstack Instance from Image and Assigns a floating IP
-    to instance.
+    to instance. Also It ensures that instance is ready for testing.
 
     :param instance_name: A string. Openstack Instance name to create.
     :param image_name: A string. Openstack image name from which instance
@@ -1725,9 +1749,16 @@ def create_openstack_instance(instance_name, image_name, flavor_name, ssh_key):
         except novaclient.exceptions.BadRequest:
             time.sleep(5)
     # Wait till DNS resolves the IP
-    time.sleep(600)
-    # Getting Hostname from IP
-    env['instance_host'] = get_hostname_from_ip(str(floating_ip.ip))
+    print('Pinging the Host by IP:{0} ..........'.format(str(floating_ip.ip)))
+    host_pings(str(floating_ip.ip))
+    print('SUCCESS !! The given IP has been pinged!!\n')
+    print('Now, Getting the hostname from IP......\n')
+    hostname = get_hostname_from_ip(str(floating_ip.ip))
+    env['instance_host'] = hostname
+    print('Pinging the Hostname:{0} ..........'.format(hostname))
+    host_pings(hostname)
+    print('SUCCESS !! The obtained hostname from IP is pinged !!')
+    print('The Instance is ready for further Testing .....!!')
 
 
 def delete_openstack_instance(instance_name):
@@ -1779,6 +1810,7 @@ def satellite6_upgrade(admin_password=None):
     # Removing rhel-released and rhel-optional repo
     run('rm -rf /etc/yum.repos.d/rhel-{optional,released}.repo')
     # Update the packages
+    print('Wait till Packages update ... ')
     update_packages(quiet=True)
     # Setting Satellite61 Repos
     major_ver = distro_info()[1]
@@ -1803,6 +1835,7 @@ def satellite6_upgrade(admin_password=None):
     # yum cleaning all
     run('yum clean all', warn_only=True)
     # Updating the packages again after setting sat6 repo
+    print('Wait till packages update ... ')
     update_packages(quiet=True)
     # Upgrading Katello installer
     run('katello-installer --upgrade')
