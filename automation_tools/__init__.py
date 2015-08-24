@@ -445,9 +445,19 @@ def install_puppet_scap_client():
     run('yum -y install puppet-foreman_scap_client', warn_only=True)
 
 
-def install_discovery_image():
-    """Task to install foreman discovery image."""
+def setup_foreman_discovery():
+    """Task to setup foreman discovery."""
+    admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme')
+    template_url = os.environ['PXE_DEFAULT_TEMPLATE_URL']
+    template_file = run('mktemp')
     run('yum -y install foreman-discovery-image', warn_only=True)
+    run('wget -O {0} {1}'.format(template_file, template_url))
+    run('sed -i -e "s/SatelliteCapsule_HOST/{0}/" {1}'
+        .format(env['host'], template_file))
+    run('hammer -u admin -p {0} template update --name '
+        '"PXELinux global default" --file {1}'
+        .format(admin_password, template_file))
+    run('rm -rf {0}'.format(template_file))
 
 
 def vm_create():
@@ -993,7 +1003,7 @@ def product_install(distribution, create_vm=False, certificate_url=None,
         execute(setup_oscap, host=host)
         execute(katello_service, 'restart', host=host)
         execute(install_puppet_scap_client, host=host)
-        execute(install_discovery_image, host=host)
+        execute(setup_foreman_discovery, host=host)
 
     certificate_url = certificate_url or os.environ.get(
         'FAKE_MANIFEST_CERT_URL')
