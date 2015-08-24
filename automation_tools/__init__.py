@@ -1910,3 +1910,5 @@ def product_upgrade(product, instance_name, image_name, flavor_name, ssh_key):
         execute(lambda: run('katello-service restart'), host=host)
     # Run product upgrade
     execute(upgrade_tasks[product], host=host)
+    # Generate foreman debug
+    execute(foreman_debug, product, host=host)
