@@ -420,7 +420,27 @@ def setup_abrt():
     run('abrt-auto-reporting enabled')
 
 
-def setup_scap_client():
+def setup_oscap():
+    """Task to setup oscap on foreman."""
+    # Check if ruby193-rubygem-foreman_openscap package is available
+    result = run('yum list ruby193-rubygem-foreman_openscap', quiet=True)
+    if result.failed:
+        print('WARNING: OSCAP was not set up')
+        return
+
+    # Install required packages for the installation
+    packages = [
+        'rubygem-smart_proxy_openscap',
+        'ruby193-rubygem-foreman_openscap'
+    ]
+    for package in packages:
+        run('yum install -y {0}'.format(package))
+
+    for daemon in ('foreman', 'httpd', 'foreman-proxy'):
+        manage_daemon('restart', daemon)
+
+
+def install_puppet_scap_client():
     """Task to setup puppet-foreman_scap_client."""
     run('yum -y install puppet-foreman_scap_client', warn_only=True)
 
@@ -970,8 +990,9 @@ def product_install(distribution, create_vm=False, certificate_url=None,
 
     if distribution.startswith('satellite6'):
         execute(setup_default_docker, host=host)
+        execute(setup_oscap, host=host)
         execute(katello_service, 'restart', host=host)
-        execute(setup_scap_client, host=host)
+        execute(install_puppet_scap_client, host=host)
         execute(install_discovery_image, host=host)
 
     certificate_url = certificate_url or os.environ.get(
