@@ -1000,10 +1000,11 @@ def product_install(distribution, create_vm=False, certificate_url=None,
 
     if distribution.startswith('satellite6'):
         execute(setup_default_docker, host=host)
-        execute(setup_oscap, host=host)
         execute(katello_service, 'restart', host=host)
         execute(install_puppet_scap_client, host=host)
         execute(setup_foreman_discovery, host=host)
+        if not distribution.endswith('upstream'):
+            execute(setup_oscap, host=host)
 
     certificate_url = certificate_url or os.environ.get(
         'FAKE_MANIFEST_CERT_URL')
