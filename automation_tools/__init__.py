@@ -1644,15 +1644,16 @@ def setenforce(mode):
     run('setenforce {0}'.format(mode))
 
 
-def host_pings(host, attempts=200):
+def host_pings(host, timeout=15):
     """This ensures the given IP/hostname pings succesfully.
 
     :param host: A string. The IP or hostname of host.
-    :param attempts: An integer.
-        The maximum number of attempts to ping the host.
+    :param timeout: An integer.
+        The timeout in minutes to ping the host.
 
     """
-    for attempt in range(attempts):
+    timeup = time.time() + int(timeout) * 60
+    while True:
         command = subprocess.Popen(
             'ping -c1 {0}; echo $?'.format(host),
             stdout=subprocess.PIPE,
@@ -1662,7 +1663,14 @@ def host_pings(host, attempts=200):
         output = command.communicate()[0]
         # Checking the return code of ping is 0
         if int(output.split()[-1]) == 0:
+            print(
+                'SUCCESS !! The given host {0} has been pinged!!'.format(host))
             break
+        elif time.time() > timeup:
+            print(
+                'The timout for pinging the host {0} has reached!'.format(host)
+            )
+            sys.exit(1)
         else:
             time.sleep(5)
 
@@ -1716,7 +1724,8 @@ def get_openstack_client():
         return openstack_client
 
 
-def create_openstack_instance(instance_name, image_name, flavor_name, ssh_key):
+def create_openstack_instance(
+        instance_name, image_name, flavor_name, ssh_key, timeout=5):
     """Creates openstack Instance from Image and Assigns a floating IP
     to instance. Also It ensures that instance is ready for testing.
 
@@ -1727,6 +1736,8 @@ def create_openstack_instance(instance_name, image_name, flavor_name, ssh_key):
         e.g m1.small.
     :param ssh_key: A string. ssh_key 'name' that required to add
         into this instance.
+    :param timeout: An integer. A timeout in minutes to assign
+        the floating IP to instance.
 
     ssh_key should be added to openstack project before running automation.
     Else the automation will fail.
@@ -1763,22 +1774,27 @@ def create_openstack_instance(instance_name, image_name, flavor_name, ssh_key):
         network=network.id
     )
     # Assigning floating ip to instance
+    ip_string = str(floating_ip.ip)
+    timeup = time.time() + int(timeout) * 60
     while True:
+        if time.time() > timeup:
+            print('The timeout for assigning the floating IP has reached!')
+            sys.exit(1)
         try:
             instance.add_floating_ip(floating_ip)
+            print('SUCCESS!! The floating IP {0} has been assigned '
+                  'to instance!'.format(ip_string))
             break
         except novaclient.exceptions.BadRequest:
             time.sleep(5)
     # Wait till DNS resolves the IP
-    print('Pinging the Host by IP:{0} ..........'.format(str(floating_ip.ip)))
+    print('Pinging the Host by IP:{0} ..........'.format(ip_string))
     host_pings(str(floating_ip.ip))
-    print('SUCCESS !! The given IP has been pinged!!\n')
     print('Now, Getting the hostname from IP......\n')
-    hostname = get_hostname_from_ip(str(floating_ip.ip))
+    hostname = get_hostname_from_ip(ip_string)
     env['instance_host'] = hostname
     print('Pinging the Hostname:{0} ..........'.format(hostname))
     host_pings(hostname)
-    print('SUCCESS !! The obtained hostname from IP is pinged !!')
     print('The Instance is ready for further Testing .....!!')
 
 
