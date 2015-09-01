@@ -1,0 +1,26 @@
+{
+    "organization-label": "Default-Organization",
+    "environment": "dev",
+    "content-view": "mycv",
+    "activation-key": "capsule-ak",
+    "admin-user": "admin",
+    "admin-password": "changeme",
+    "defaults": {
+        "user": "root",
+        "password": "rootpass",
+        "key-filename": "path/to/ssh.key"
+    },
+    "server": {
+        "hostname": "sat.example.com",
+        "user": "root",
+        "password": "rootpass",
+        "key-filename": "path/to/ssh.key"
+    },
+    "capsules": [
+        {
+            "hostname": "capsule1.example.com",
+            "password": "rootpass",
+            "key-filename": "path/to/ssh.key"
+        }
+    ]
+}
