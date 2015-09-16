@@ -450,10 +450,11 @@ def setup_foreman_discovery():
     admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme')
     template_url = os.environ['PXE_DEFAULT_TEMPLATE_URL']
     template_file = run('mktemp')
+    hostname = run('hostname -f', quiet=True).strip()
     run('yum -y install foreman-discovery-image', warn_only=True)
     run('wget -O {0} {1}'.format(template_file, template_url))
     run('sed -i -e "s/SatelliteCapsule_HOST/{0}/" {1}'
-        .format(env['host'], template_file))
+        .format(hostname, template_file))
     run('hammer -u admin -p {0} template update --name '
         '"PXELinux global default" --file {1}'
         .format(admin_password, template_file))
