@@ -1,9 +1,12 @@
 """Module which publish all automation-tools tasks"""
 from automation_tools import (  # flake8: noqa
     add_repo,
+    capsule6_upgrade,
+    capsule_certs_generate,
     cdn_install,
     clean_rhsm,
     client_registration_test,
+    copy_ssh_key,
     create_openstack_instance,
     create_personal_git_repo,
     delete_openstack_instance,
@@ -13,6 +16,7 @@ from automation_tools import (  # flake8: noqa
     fix_qdrouterd_listen_to_ipv6,
     foreman_debug,
     get_hostname_from_ip,
+    host_pings,
     install_errata,
     install_katello_agent,
     install_prerequisites,
@@ -36,6 +40,7 @@ from automation_tools import (  # flake8: noqa
     setup_proxy,
     setup_vm_provisioning,
     subscribe,
+    sync_capsule_tools_repos_to_upgrade,
     unsubscribe,
     update_basic_packages,
     update_rhsm_stage,

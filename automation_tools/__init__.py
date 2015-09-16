@@ -10,11 +10,13 @@ import random
 import socket
 import sys
 import time
+import tempfile
 import novaclient
 import subprocess
 from re import search
 from urlparse import urlsplit
 
+from automation_tools.satellite6.capsule import generate_capsule_certs
 from automation_tools.repository import (
     enable_satellite_repos, enable_repos, disable_repos)
 from automation_tools.utils import distro_info, update_packages
@@ -1722,16 +1724,154 @@ def setenforce(mode):
     run('setenforce {0}'.format(mode))
 
 
-def host_pings(host, timeout=15):
+# =============================================================================
+# Satellite and Capsule Upgrade
+# =============================================================================
+def copy_ssh_key(from_host, to_host):
+    """This will generate(if not already) ssh-key on from_host
+    and copy that ssh-key to to_host.
+
+    Beware that both hosts should have authorized key added
+    for test-running host.
+
+    :param from_host: A string. Hostname on which the key to be generated and
+        to be copied from.
+    :param to_host: A string. Hostname on to which the ssh-key will be copied.
+
+    """
+    execute(lambda: run('[ ! -f ~/.ssh/id_rsa.pub ] && ssh-keygen '
+                        '-f ~/.ssh/id_rsa -t rsa -N \'\''), host=from_host)
+    if execute(lambda: run('[ -f ~/.ssh/id_rsa.pub ]; '
+                           'echo $?'), host=from_host)[from_host] == 0:
+        tmp_path = tempfile.mkstemp()[1]
+        local('scp root@{0}:~/.ssh/id_rsa.pub {1}'.format(from_host, tmp_path))
+        execute(lambda: run('[ ! -f ~/.ssh/authorized_keys ] && '
+                            'touch ~/.ssh/authorized_keys'), host=to_host)
+        local("cat {0} | ssh -o 'StrictHostKeyChecking no' root@{1} "
+              "'cat >> .ssh/authorized_keys'".format(tmp_path, to_host))
+        os.remove(tmp_path)
+
+
+def sync_capsule_tools_repos_to_upgrade(admin_password=None):
+    """This syncs capsule and sat-tools repos in Satellite server.
+
+    Useful for upgrading Capsule and Client in feature.
+
+    :param admin_password: A string. Defaults to 'changeme'.
+        Foreman admin password for hammer commands.
+
+    Following environment variable affects this function:
+
+    CAPSULE_URL
+        The url for capsule repo from latest satellite compose.
+    TOOLS_URL
+        The url for sat-tools repo from latest satellite compose.
+
+    """
+    capsule_repo = os.environ.get('CAPSULE_URL')
+    tools_repo = os.environ.get('TOOLS_URL')
+    version = distro_info()[1]
+    if capsule_repo is None:
+        print('The Capsule repo URL is not provided '
+              'to perform Capsule Upgrade in feature!')
+        sys.exit(1)
+    if tools_repo is None:
+        print('The Satellite Tools repo URL is not provided '
+              'to perform Client Upgrade in feature!')
+        sys.exit(1)
+    if admin_password is None:
+        admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme')
+    initials = 'hammer -u admin -p {0} '.format(admin_password)
+    # First initiate the connection with capsule by syncing it
+    capsule_id = str(
+        run(initials + 'capsule list | grep {0}'.format(
+            env.get('capsule_host')))).split('|')[0].strip()
+    run(initials+'capsule content synchronize --id {0}'.format(capsule_id))
+    # Create product capsule
+    run(initials + 'product create --name capsule6_latest '
+        '--organization Default_Organization')
+    time.sleep(2)
+    capsule_sub_id = str(
+        run(initials + 'subscription list --organization '
+            'Default_Organization | grep capsule6_latest')
+    ).split('|')[7].strip()
+    # create repo
+    run(initials + 'repository create --content-type yum '
+        '--name capsule6_latest_repo --label capsule6_latest_repo '
+        '--product capsule6_latest --publish-via-http true --url {0} '
+        '--organization Default_Organization'.format(capsule_repo))
+    # Create product sattools
+    run(initials + 'product create --name satTools6_latest '
+        '--organization Default_Organization')
+    time.sleep(2)
+    tools_sub_id = str(
+        run(initials + 'subscription list '
+            '--organization Default_Organization | grep satTools6_latest')
+    ).split('|')[7].strip()
+    # Create repo satools
+    run(initials + 'repository create --content-type yum '
+        '--name satTools6_latest_repo --label satTools6_latest_repo '
+        '--product satTools6_latest --publish-via-http true --url {0} '
+        '--organization Default_Organization'.format(tools_repo))
+    # Sync repos
+    run(initials + 'repository synchronize --name capsule6_latest_repo '
+        '--product capsule6_latest --organization Default_Organization')
+    run(initials + 'repository synchronize --name satTools6_latest_repo '
+        '--product satTools6_latest --organization Default_Organization')
+    run(initials + 'content-view list --organization Default_Organization | '
+        'grep rhel')
+    capsule_repo_id = str(
+        run(initials + 'repository list --organization Default_Organization | '
+            'grep capsule6_latest_repo')).split('|')[0].strip()
+    tools_repo_id = str(
+        run(initials + 'repository list --organization Default_Organization | '
+            'grep satTools6_latest_repo')).split('|')[0].strip()
+    # Add repos to CV
+    run(initials + 'content-view add-repository --name rhel{0}_cv '
+        '--repository-id {1} --organization Default_Organization'.format(
+            version, capsule_repo_id))
+    run(initials + 'content-view add-repository --name rhel{0}_cv '
+        '--repository-id {1} --organization Default_Organization'.format(
+            version, tools_repo_id))
+    # publish cv
+    run(initials + 'content-view publish --name rhel{0}_cv '
+        '--organization Default_Organization'.format(version))
+    # promote cv
+    lc_env_id = str(
+        run(initials + 'lifecycle-environment list '
+            '--organization Default_Organization | grep DEV')).split(
+                '|')[0].strip()
+    cv_ver_id = str(
+        run(initials + 'content-view version list --content-view rhel{0}_cv '
+            '--organization Default_Organization | grep rhel'.format(
+                version))).split('|')[0].strip()
+    run(initials + 'content-view version promote --content-view rhel{0}_cv '
+        '--id {1} --lifecycle-environment-id {2} --organization '
+        'Default_Organization'.format(version, cv_ver_id, lc_env_id))
+    ak_id = str(
+        run(initials + 'activation-key list --organization '
+            'Default_Organization | grep rhel')).split('|')[0].strip()
+    # Add new product subscriptions to AK
+    run(initials + 'activation-key add-subscription --id {0} --quantity 1 '
+        '--subscription-id {1}'.format(ak_id, capsule_sub_id))
+    run(initials + 'activation-key add-subscription --id {0} --quantity 1 '
+        '--subscription-id {1}'.format(ak_id, tools_sub_id))
+    # Update subscription on capsule
+    execute(
+        lambda: run('subscription-manager attach --pool={0}'.format(
+            capsule_sub_id)),
+        host=env.get('capsule_host'))
+
+
+def host_pings(host, attempts=200):
     """This ensures the given IP/hostname pings succesfully.
 
     :param host: A string. The IP or hostname of host.
-    :param timeout: An integer.
-        The timeout in minutes to ping the host.
+    :param attempts: An integer.
+        The maximum number of attempts to ping the host.
 
     """
-    timeup = time.time() + int(timeout) * 60
-    while True:
+    for attempt in range(attempts):
         command = subprocess.Popen(
             'ping -c1 {0}; echo $?'.format(host),
             stdout=subprocess.PIPE,
@@ -1741,14 +1881,7 @@ def host_pings(host, timeout=15):
         output = command.communicate()[0]
         # Checking the return code of ping is 0
         if int(output.split()[-1]) == 0:
-            print(
-                'SUCCESS !! The given host {0} has been pinged!!'.format(host))
             break
-        elif time.time() > timeup:
-            print(
-                'The timout for pinging the host {0} has reached!'.format(host)
-            )
-            sys.exit(1)
         else:
             time.sleep(5)
 
@@ -1803,10 +1936,11 @@ def get_openstack_client():
 
 
 def create_openstack_instance(
-        instance_name, image_name, flavor_name, ssh_key, timeout=5):
+        product, instance_name, image_name, flavor_name, ssh_key):
     """Creates openstack Instance from Image and Assigns a floating IP
     to instance. Also It ensures that instance is ready for testing.
 
+    :param product: A string. A product name of which, instance to create.
     :param instance_name: A string. Openstack Instance name to create.
     :param image_name: A string. Openstack image name from which instance
         to be created.
@@ -1814,8 +1948,6 @@ def create_openstack_instance(
         e.g m1.small.
     :param ssh_key: A string. ssh_key 'name' that required to add
         into this instance.
-    :param timeout: An integer. A timeout in minutes to assign
-        the floating IP to instance.
 
     ssh_key should be added to openstack project before running automation.
     Else the automation will fail.
@@ -1852,27 +1984,25 @@ def create_openstack_instance(
         network=network.id
     )
     # Assigning floating ip to instance
-    ip_string = str(floating_ip.ip)
-    timeup = time.time() + int(timeout) * 60
     while True:
-        if time.time() > timeup:
-            print('The timeout for assigning the floating IP has reached!')
-            sys.exit(1)
         try:
             instance.add_floating_ip(floating_ip)
-            print('SUCCESS!! The floating IP {0} has been assigned '
-                  'to instance!'.format(ip_string))
             break
         except novaclient.exceptions.BadRequest:
             time.sleep(5)
     # Wait till DNS resolves the IP
-    print('Pinging the Host by IP:{0} ..........'.format(ip_string))
+    print('Pinging the Host by IP:{0} ..........'.format(floating_ip.ip))
     host_pings(str(floating_ip.ip))
+    print('SUCCESS !! The given IP has been pinged!!\n')
     print('Now, Getting the hostname from IP......\n')
-    hostname = get_hostname_from_ip(ip_string)
-    env['instance_host'] = hostname
+    hostname = get_hostname_from_ip(str(floating_ip.ip))
+    env['{0}_host'.format(product)] = hostname
     print('Pinging the Hostname:{0} ..........'.format(hostname))
     host_pings(hostname)
+    print('SUCCESS !! The obtained hostname from IP is pinged !!')
+    # Update the /etc/hosts file
+    execute(lambda: run("echo {0} {1} >> /etc/hosts".format(
+        floating_ip.ip, hostname)), host=hostname)
     print('The Instance is ready for further Testing .....!!')
 
 
@@ -1911,6 +2041,9 @@ def satellite6_upgrade(admin_password=None):
     """Upgrades satellite from already created Openstack image
     of old Satellite version to latest Satellite version compose.
 
+    :param admin_password: A string. Defaults to 'changeme'.
+        Foreman admin password for hammer commands.
+
     The following environment variables affect this command:
 
     ADMIN_PASSWORD
@@ -1920,11 +2053,11 @@ def satellite6_upgrade(admin_password=None):
         URL for the compose repository.
 
     """
+    # Sync capsule and tools repo
     if admin_password is None:
         admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme')
     # Removing rhel-released and rhel-optional repo
     run('rm -rf /etc/yum.repos.d/rhel-{optional,released}.repo')
-    # Update the packages
     print('Wait till Packages update ... ')
     update_packages(quiet=True)
     # Setting Satellite61 Repos
@@ -1947,12 +2080,10 @@ def satellite6_upgrade(admin_password=None):
     run('service-wait mongod start')
     if major_ver == 7:
         run('service tomcat stop')
-    # yum cleaning all
     run('yum clean all', warn_only=True)
     # Updating the packages again after setting sat6 repo
     print('Wait till packages update ... ')
     update_packages(quiet=True)
-    # Upgrading Katello installer
     run('katello-installer --upgrade')
     # Test the Upgrade is successful
     run('hammer -u admin -p {0} ping'.format(admin_password))
@@ -1960,20 +2091,86 @@ def satellite6_upgrade(admin_password=None):
     run('katello-service status')
 
 
-def product_upgrade(product, instance_name, image_name, flavor_name, ssh_key):
+def satellite6_capsule_upgrade(admin_password=None):
+    """Upgrades capsule from already created Openstack image
+    of old capsule version to latest capsule CDN/compose version.
+
+    :param admin_password: A string. Defaults to 'changeme'.
+        Foreman admin password for hammer commands.
+
+    The following environment variables affect this command:
+
+    ADMIN_PASSWORD
+        Optional, defaults to 'changeme'. Foreman admin password.
+    CAPSULE_URL
+        Optional, defaults to available capsule version in CDN.
+        URL for capsule of latest compose to upgrade.
+
+    """
+    sat_host = env.get('satellite_host')
+    cap_host = env.get('capsule_host')
+    if admin_password is None:
+        admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme')
+    # Update the packages
+    print('Wait till Packages update ... ')
+    update_packages(quiet=True)
+    # Setting Capsule61 Repos
+    major_ver = distro_info()[1]
+    if os.environ.get('CAPSULE_URL') is None:
+        enable_repos('rhel-{0}-server-satellite-capsule-6.1-rpms'.format(
+            major_ver))
+    disable_repos('rhel-{0}-server-satellite-capsule-6.0-rpms'.format(
+        major_ver))
+    # Stop katello services, except mongod
+    run('for i in qpidd pulp_workers pulp_celerybeat '
+        'pulp_resource_manager httpd; do service $i stop; done')
+    run('yum clean all', warn_only=True)
+    print('Wait till packages update ... ')
+    update_packages(quiet=True)
+    run('yum install -y capsule-installer', warn_only=True)
+    # Copy answer file from katello to capule installer
+    run('cp /etc/katello-installer/answers.capsule-installer.yaml.rpmsave '
+        '/etc/capsule-installer/answers.capsule-installer.yaml',
+        warn_only=True)
+    # Generates Capsule Certs file on satelltie and copies in capsule
+    execute(
+        generate_capsule_certs,
+        cap_host,
+        host=sat_host
+    )
+    # Copying the capsule cert to capsule
+    execute(
+        lambda: run('scp {0}-certs.tar root@{0}:/home/'.format(cap_host)),
+        host=sat_host)
+    # Upgrading Katello installer
+    run('capsule-installer --upgrade --certs-tar '
+        '/home/{0}-certs.tar'.format(env.get('capsule_host')))
+    # Test The status of all katello services
+    run('katello-service status')
+
+
+def product_upgrade(
+        product, ssh_key, sat_instance, sat_image, sat_flavor,
+        cap_instance=None, cap_image=None, cap_flavor=None):
     """Task which upgrades the product.
 
-    Product is satellite.
+    Product is satellite or capsule.
 
-    :param product: A string. product name wanted to upgrade
-    :param instance_name: A string. Openstack Instance name
-        onto which upgrade will run.
-    :param image_name: A string. Openstack image name
-        from which instance to create.
-    :param flavor_name: A string. Openstack flavor_name for instance to create.
-        e.g m1.small.
+    :param product: A string. product name wanted to upgrade.
     :param ssh_key: A string. ssh_key 'name' that is required
         to add into this instance.
+    :param sat_instance: A string. Openstack Satellite Instance name
+        onto which upgrade will run.
+    :param sat_image: A string. Openstack Satellite image name
+        from which instance to create.
+    :param sat_flavor: A string. Openstack Satelltie flavor_name
+        for instance to create. e.g m1.small.
+    :param cap_instance: A string. Openstack Capsule Instance name
+        onto which upgrade will run.
+    :param cap_image: A string. Openstack Capsule image name
+        from which instance to create.
+    :param cap_flavor: A string. Openstack Capsule flavor_name
+        for instance to create. e.g m1.small.
 
     The following environment variables affect this command:
 
@@ -1996,34 +2193,64 @@ def product_upgrade(product, instance_name, image_name, flavor_name, ssh_key):
         The authentication url of the project.
     PROJECT_ID
         Project ID of an openstack project.
+    CAPSULE_URL
+        The url for capsule repo from latest satellite compose.
+        Optional, defaults to latest available capsule version in CDN.
+    TOOLS_URL
+        The url for sat-tools repo from latest satellite compose.
+        Optional, defaults to latest available sat tools version in CDN.
 
     Note: ssh_key should be added to openstack project before
     running automation, else the automation will fail.
 
     """
-    upgrade_tasks = {'satellite': satellite6_upgrade}
-    product = product.lower()
-    products = upgrade_tasks.keys()
+    products = ['satellite', 'capsule']
 
     if product not in products:
         print ('Product name should be one of {0}'.format(', '.join(products)))
         sys.exit(1)
-    execute(delete_openstack_instance, instance_name)
+    # Deleting Satellite instance if any
+    execute(delete_openstack_instance, sat_instance)
+    print('Turning on Satellite Instance ....')
     execute(
         create_openstack_instance,
-        instance_name,
-        image_name,
-        flavor_name,
+        'satellite',
+        sat_instance,
+        sat_image,
+        sat_flavor,
         ssh_key
     )
-    # Getting the host name on to which upgrade will run
-    host = env.get('instance_host')
-    # Subscribe the instance to CDN
-    execute(subscribe, host=host)
-    # Restarting Katello-services
-    if product == 'satellite':
-        execute(lambda: run('katello-service restart'), host=host)
-    # Run product upgrade
-    execute(upgrade_tasks[product], host=host)
-    # Generate foreman debug
-    execute(foreman_debug, product, host=host)
+    # Getting the host name
+    sat_host = env.get('satellite_host')
+    # Subscribe the instances to CDN
+    execute(subscribe, host=sat_host)
+    # For Capsule Upgrade
+    if product == 'capsule':
+        # Deleting Capsule instance if any
+        execute(delete_openstack_instance, cap_instance)
+        print('Turning on Capsule Instance ....')
+        execute(
+            create_openstack_instance,
+            'capsule',
+            cap_instance,
+            cap_image,
+            cap_flavor,
+            ssh_key
+        )
+        # Getting the host name
+        cap_host = env.get('capsule_host')
+        # Copy ssh key from satellie to capsule
+        copy_ssh_key(sat_host, cap_host)
+        if os.environ.get('CAPSULE_URL') is not None:
+            execute(sync_capsule_tools_repos_to_upgrade, host=sat_host)
+    execute(lambda: run('katello-service restart'), host=sat_host)
+    # Run satellite upgrade
+    execute(satellite6_upgrade, host=sat_host)
+    # Generate foreman debug on satellite
+    execute(foreman_debug, 'satellite', host=sat_host)
+    if product == 'capsule':
+        print('\nRunning Capsule Upgrade ..........')
+        # Run capsule upgrade
+        execute(satellite6_capsule_upgrade, host=cap_host)
+        # Generate foreman debug on capsule
+        execute(foreman_debug, 'capsule', host=cap_host)
