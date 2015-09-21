@@ -257,8 +257,12 @@ def setup_default_capsule(interface=None, run_katello_installer=True):
             run('mv -f tempfile manifests/libvirt.pp')
         run('puppet apply -v -e "include katellovirt" --modulepath /tmp')
 
-        interface = run('ifconfig | grep virbr | awk \'{print $1}\'')
-        # Aways select the first interface
+        # Ignore errors related to infiniband if any and just fetch
+        # virtual bridge information.
+        interface = run(
+            'ifconfig 2> /dev/null | grep virbr | awk \'{print $1}\''
+        )
+        # Always select the first interface
         interface = interface.split('\n', 1)[0].strip()
         # Remove any additional visual character like `:` on RHEL7
         interface = search(r'(virbr\d+)', interface).group(1)
