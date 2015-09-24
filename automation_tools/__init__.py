@@ -452,7 +452,11 @@ def install_puppet_scap_client():
 def setup_foreman_discovery():
     """Task to setup foreman discovery."""
     admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme')
-    template_url = os.environ['PXE_DEFAULT_TEMPLATE_URL']
+    template_url = os.environ.get('PXE_DEFAULT_TEMPLATE_URL')
+    if template_url is None:
+        print('You must specify the PXE default template URL')
+        sys.exit(1)
+
     template_file = run('mktemp')
     hostname = run('hostname -f', quiet=True).strip()
     run('yum -y install foreman-discovery-image', warn_only=True)
@@ -1007,7 +1011,8 @@ def product_install(distribution, create_vm=False, certificate_url=None,
         execute(setup_default_docker, host=host)
         execute(katello_service, 'restart', host=host)
         if not distribution.endswith('upstream'):
-            execute(setup_foreman_discovery, host=host)
+            if os.environ.get('PXE_DEFAULT_TEMPLATE_URL') is not None:
+                execute(setup_foreman_discovery, host=host)
             execute(install_puppet_scap_client, host=host)
             execute(setup_oscap, host=host)
 
