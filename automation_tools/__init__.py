@@ -489,9 +489,28 @@ def vm_create():
         path where the generated image will be stored
     CPU_FEATURE
         copies cpu features of base-metal to vm, thus enabling nested_virt
+    BRIDGE
+        Now Sat6 VM can use isolated VLAN Bridge with static Ip address if
+        available, otherwise uses the bridge br0 which provides a dhcp IP
+        address from corporate network.
+    IPADDR
+        The static IP address from the VLAN which needs to be provided when
+        using VLAN Bridge.
+    NETMASK
+        The static netmask of the VLAN when using VLAN Bridge
+    GATEWAY
+        The static gateway of the VLAN when using VLAN Bridge
 
-    The VM will have the TARGET_IMAGE.VM_DOMAIN hostname, but make sure to have
-    setup DDNS entry correctly.
+    If the Bridge being used is br0 then a DHCP IP is used and the VM will have
+    the TARGET_IMAGE.VM_DOMAIN hostname, but make sure to have setup DDNS entry
+    correctly.
+
+    Alternately if a VLAN Bridge is being used the VM will be assigned static
+    IP address and the VM will have a fixed domain name and no need to
+    configure DDNS.
+
+    Why does Satellite6 VM require a static IP address?
+    Because to provision vms on existing rhevm and external Libvirt instances.
 
     This task will add to the ``env`` the vm_ip and vm_domain
 
@@ -504,6 +523,10 @@ def vm_create():
         'target_image': os.environ.get('TARGET_IMAGE'),
         'image_dir': os.environ.get('IMAGE_DIR'),
         'cpu_feature': os.environ.get('CPU_FEATURE'),
+        'bridge': os.environ.get('BRIDGE'),
+        'ip_addr': os.environ.get('IPADDR'),
+        'netmask': os.environ.get('NETMASK'),
+        'gateway': os.environ.get('GATEWAY'),
     }
 
     command_args = [
@@ -512,8 +535,7 @@ def vm_create():
         '-t {target_image}',
         '-m {vm_ram}',
         '-c {vm_cpu}',
-        '-d {vm_domain}',
-        '-n bridge=br0 -f',
+        '-d {vm_domain} -f',
     ]
 
     if options['image_dir'] is not None:
@@ -522,17 +544,34 @@ def vm_create():
     if options['cpu_feature'] is not None:
         command_args.append('--cpu-feature {cpu_feature}')
 
-    command = ' '.join(command_args).format(**options)
+    if options['bridge'] is not None:
+        command_args.append('-n bridge={bridge}')
+    else:
+        command_args.append('-n bridge=br0')
 
+    if options['ip_addr'] is not None:
+        command_args.append('--static-ipaddr {ip_addr}')
+
+    if options['netmask'] is not None:
+        command_args.append('--static-netmask {netmask}')
+
+    if options['gateway'] is not None:
+        command_args.append('--static-gateway {gateway}')
+
+    command = ' '.join(command_args).format(**options)
     run(command)
 
     # Give some time to machine boot
     time.sleep(60)
 
-    result = run('ping -c 1 {0}.local'.format(
-        options['target_image']))
-
-    env['vm_ip'] = result.split('(')[1].split(')')[0]
+    # Fetch Ip information via ping only when not using VLAN Bridges as we
+    # know the VM's Ip address beforehand.
+    if options['bridge'] is None:
+        result = run('ping -c 1 {0}.local'.format(
+            options['target_image']))
+        env['vm_ip'] = result.split('(')[1].split(')')[0]
+    else:
+        env['vm_ip'] = '{ip_addr}'.format(**options)
     env['vm_domain'] = '{target_image}.{vm_domain}'.format(**options)
 
 
@@ -887,8 +926,9 @@ def product_install(distribution, create_vm=False, certificate_url=None,
 
     If ``create_vm`` is True then ``vm_destroy`` and ``vm_create`` tasks will
     be run. Make sure to set the required environment variables for those
-    tasks. Also, if one of the ``setup_ddns`` required environment variables
-    is set then that task will run.
+    tasks.
+    Also, if one of the ``setup_ddns`` required environment variables
+    is set then that task will only run if the VM does not use any VLAN Bridges
 
     If ``certificate_url`` parameter or ``FAKE_MANIFEST_CERT_URL`` env var is
     defined the setup_fake_manifest_certificate task will run.
@@ -947,9 +987,15 @@ def product_install(distribution, create_vm=False, certificate_url=None,
         execute(vm_destroy, target_image, delete_image=True)
         execute(vm_create)
 
-        if 'DDNS_HASH' in os.environ or 'DDNS_PACKAGE_URL' in os.environ:
-            execute(
-                setup_ddns, env['vm_domain'], env['vm_ip'], host=env['vm_ip'])
+        # Execute setup_ddns only if not using VLAN Bridges.
+        if os.environ.get('BRIDGE') is None:
+            if 'DDNS_HASH' in os.environ or 'DDNS_PACKAGE_URL' in os.environ:
+                execute(
+                    setup_ddns,
+                    env['vm_domain'],
+                    env['vm_ip'],
+                    host=env['vm_ip']
+                )
 
     # When creating a vm the vm_ip will be set, otherwise use the fabric host
     host = env.get('vm_ip', env['host'])
