@@ -1028,11 +1028,22 @@ def product_install(distribution, create_vm=False, certificate_url=None,
 
     if distribution in (
             'satellite6-cdn', 'satellite6-downstream', 'satellite6-iso'):
-        # execute returns a dictionary mapping host strings to the given task's
-        # return value
-        installer_options.update(execute(
-            setup_default_capsule, host=host, run_katello_installer=False
-        )[host])
+        # Execute with 'interface=eth0' only if using VLAN Bridges.
+        if os.environ.get('BRIDGE') is None:
+            # execute returns a dictionary mapping host strings to the given
+            # task's return value.
+            installer_options.update(execute(
+                setup_default_capsule, host=host, run_katello_installer=False
+            )[host])
+        else:
+            # execute returns a dictionary mapping host strings to the given
+            # task's return value
+            installer_options.update(execute(
+                setup_default_capsule,
+                host=host,
+                interface='eth0',
+                run_katello_installer=False
+            )[host])
 
     # Firewall should be setup after setup_default_capsule clean the puppet
     # module it installs clean already created rules
