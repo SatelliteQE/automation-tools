@@ -2,7 +2,6 @@
 from automation_tools import (  # flake8: noqa
     add_repo,
     satellite6_capsule_upgrade,
-    capsule_certs_generate,
     cdn_install,
     clean_rhsm,
     client_registration_test,
