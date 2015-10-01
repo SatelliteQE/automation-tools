@@ -577,7 +577,12 @@ def vm_create():
     # fix_hostname only if using VLAN Bridge.
     if os.environ.get('BRIDGE'):
         # We need to fix the /etc/hosts file for snap-guest changes.
-        fix_hostname(env['vm_domain'], env['vm_ip'])
+        execute(
+            fix_hostname,
+            entry_domain=env['vm_domain'],
+            host_ip=env['vm_ip'],
+            host=env['vm_ip'],
+        )
 
 
 def vm_destroy(target_image=None, image_dir=None, delete_image=False):
