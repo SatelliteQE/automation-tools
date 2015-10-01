@@ -122,9 +122,7 @@ def setup_ddns(entry_domain, host_ip):
     run('yum localinstall -y {0}'.format(ddns_package_url))
     run('echo "{0} {1} {2}" >> /etc/redhat-ddns/hosts'.format(
         target, domain, ddns_hash))
-    run('echo "127.0.0.1 {0} localhost" > /etc/hosts'.format(entry_domain))
-    run('echo "{0} {1}" >> /etc/hosts'.format(
-        host_ip, entry_domain))
+    fix_hostname(entry_domain, host_ip)
     run('redhat-ddns-client enable')
     run('redhat-ddns-client')
 
@@ -575,6 +573,11 @@ def vm_create():
     else:
         env['vm_ip'] = '{ip_addr}'.format(**options)
     env['vm_domain'] = '{target_image}.{vm_domain}'.format(**options)
+
+    # fix_hostname only if using VLAN Bridge.
+    if os.environ.get('BRIDGE'):
+        # We need to fix the /etc/hosts file for snap-guest changes.
+        fix_hostname(env['vm_domain'], env['vm_ip'])
 
 
 def vm_destroy(target_image=None, image_dir=None, delete_image=False):
@@ -1111,11 +1114,17 @@ def partition_disk():
         'else xfs_growfs / && mount / -o inode64,remount; fi')
 
 
-def fix_hostname():
+def fix_hostname(entry_domain=None, host_ip=None):
     """Updates `/etc/hosts` with FQDN and IP."""
-    ip_addr = run("ping -c 1 $(hostname) | grep 'icmp_seq' "
-                  "| awk -F '(' '{print $2}' | awk -F ')' '{print $1}'")
-    run('echo "{0} $(hostname)" >> /etc/hosts'.format(ip_addr))
+    if host_ip and entry_domain:
+        # Required when running product-automation.
+        run('echo "127.0.0.1 {0} localhost" > /etc/hosts'.format(entry_domain))
+        run('echo "{0} {1}" >> /etc/hosts'.format(host_ip, entry_domain))
+    else:
+        # Required for fixing the hostname when using satellite-installer
+        ip_addr = run("ping -c 1 $(hostname) | grep 'icmp_seq' "
+                      "| awk -F '(' '{print $2}' | awk -F ')' '{print $1}'")
+        run('echo "{0} $(hostname)" >> /etc/hosts'.format(ip_addr))
 
 
 def iso_download(iso_url=None):
