@@ -1757,12 +1757,13 @@ def copy_ssh_key(from_host, to_host):
     """
     execute(lambda: run('[ ! -f ~/.ssh/id_rsa.pub ] && ssh-keygen '
                         '-f ~/.ssh/id_rsa -t rsa -N \'\''), host=from_host)
-    if execute(lambda: run('[ -f ~/.ssh/id_rsa.pub ]; '
-                           'echo $?'), host=from_host)[from_host] == 0:
+    if int(execute(lambda: run('[ -f ~/.ssh/id_rsa.pub ]; '
+                               'echo $?'), host=from_host)[from_host]) == 0:
         tmp_path = tempfile.mkstemp()[1]
         local('scp root@{0}:~/.ssh/id_rsa.pub {1}'.format(from_host, tmp_path))
         execute(lambda: run('[ ! -f ~/.ssh/authorized_keys ] && '
-                            'touch ~/.ssh/authorized_keys'), host=to_host)
+                            'touch ~/.ssh/authorized_keys',
+                            warn_only=True), host=to_host)
         local("cat {0} | ssh -o 'StrictHostKeyChecking no' root@{1} "
               "'cat >> .ssh/authorized_keys'".format(tmp_path, to_host))
         os.remove(tmp_path)
