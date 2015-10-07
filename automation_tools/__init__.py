@@ -18,7 +18,7 @@ from urlparse import urlsplit
 
 from automation_tools.satellite6.capsule import generate_capsule_certs
 from automation_tools.repository import (
-    enable_satellite_repos, enable_repos, disable_repos)
+    delete_custom_repos, enable_satellite_repos, enable_repos, disable_repos)
 from automation_tools.utils import distro_info, update_packages
 from fabric.api import cd, env, execute, get, local, put, run
 from novaclient.v2 import client
@@ -192,6 +192,8 @@ def setup_default_docker():
         run('yum install -y docker', warn_only=True)
     else:
         run('yum install -y docker-io', warn_only=True)
+        # Delete EPEL repo files
+        delete_custom_repos('epel*')
 
     run('groupadd docker', warn_only=True)
     run('usermod -aG docker foreman')
@@ -1652,7 +1654,7 @@ def java_workaround():
         run('yum install -y java-1.7.0-openjdk')
 
 
-def katello_installer(debug=True, sam=False, verbose=True, **kwargs):
+def katello_installer(debug=False, sam=False, verbose=True, **kwargs):
     """Runs the installer with ``kwargs`` as command options. If ``sam`` is
     True
 
