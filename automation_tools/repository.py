@@ -51,7 +51,7 @@ def disable_repos(*args, **kwargs):
         .format(' '.join(['--disable "{0}"'.format(repo) for repo in args])))
 
 
-def delete_custom_repos(**args):
+def delete_custom_repos(*args):
     """Delete repos files on ``/etc/yum.repos.d``.
 
     All files that match ``<filename>.repo`` will be deleted. Be aware that
