@@ -197,8 +197,8 @@ def get_oauth_info():
 
 
 @task
-def generate_capsule_certs(capsule_hostname):
-    """Generate certificates for a capusule.
+def generate_capsule_certs(capsule_hostname, force=False):
+    """Generate certificates for a capsule.
 
     Run ``capsule-certs-generate --capsule-fqdn <capsule_hostname> --certs-tar
     "<capsule_hostname>-certs.tar"`` in order to generate them.
@@ -208,11 +208,13 @@ def generate_capsule_certs(capsule_hostname):
 
     :param str capsule_hostname: The fully qualified domain name for the
         capsule.
+    :param bool force: Force creation of the capsule cert even if it is
+        already created.
 
     """
     cert_path = '{}-certs.tar'.format(capsule_hostname)
     result = run('[ -f {} ]'.format(cert_path), quiet=True)
-    if result.failed:
+    if result.failed or force:
         run('capsule-certs-generate -v --capsule-fqdn {} '
             '--certs-tar {}'.format(capsule_hostname, cert_path))
     return cert_path
