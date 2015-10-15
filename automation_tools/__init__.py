@@ -2155,6 +2155,7 @@ def satellite6_capsule_upgrade(admin_password=None):
     execute(
         generate_capsule_certs,
         cap_host,
+        True,
         host=sat_host
     )
     # Copying the capsule cert to capsule
