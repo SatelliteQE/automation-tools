@@ -1762,7 +1762,8 @@ def copy_ssh_key(from_host, to_host):
     if int(execute(lambda: run('[ -f ~/.ssh/id_rsa.pub ]; '
                                'echo $?'), host=from_host)[from_host]) == 0:
         tmp_path = tempfile.mkstemp()[1]
-        local('scp root@{0}:~/.ssh/id_rsa.pub {1}'.format(from_host, tmp_path))
+        local("scp -o 'StrictHostKeyChecking no' "
+              "root@{0}:~/.ssh/id_rsa.pub {1}".format(from_host, tmp_path))
         execute(lambda: run('[ ! -f ~/.ssh/authorized_keys ] && '
                             'touch ~/.ssh/authorized_keys',
                             warn_only=True), host=to_host)
