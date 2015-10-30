@@ -285,6 +285,15 @@ def setup_default_capsule(interface=None, run_katello_installer=True):
         'capsule-puppetca': 'true',
         'capsule-register-in-foreman': 'true',
     }
+
+    if 'GATEWAY' in os.environ:
+        gateway = os.environ.get('GATEWAY')
+        installer_options['capsule-dhcp-gateway'] = gateway
+        zone = gateway.rpartition('.')[0]
+        reversed_zone = '.'.join(reversed(zone.split('.')))
+        dns_reverse_zone = '{0}.in-addr.arpa'.format(reversed_zone)
+        installer_options['capsule-dns-reverse'] = dns_reverse_zone
+
     if run_katello_installer:
         katello_installer(**installer_options)
     else:
