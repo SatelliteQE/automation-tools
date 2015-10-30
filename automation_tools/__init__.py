@@ -10,7 +10,6 @@ import random
 import socket
 import sys
 import time
-import tempfile
 import novaclient
 import subprocess
 from re import search
@@ -1761,15 +1760,14 @@ def copy_ssh_key(from_host, to_host):
                         '-f ~/.ssh/id_rsa -t rsa -N \'\''), host=from_host)
     if int(execute(lambda: run('[ -f ~/.ssh/id_rsa.pub ]; '
                                'echo $?'), host=from_host)[from_host]) == 0:
-        tmp_path = tempfile.mkstemp()[1]
-        local("scp -o 'StrictHostKeyChecking no' "
-              "root@{0}:~/.ssh/id_rsa.pub {1}".format(from_host, tmp_path))
+        pub_key = execute(lambda: run(
+            'cat ~/.ssh/id_rsa.pub'), host=from_host)[from_host]
         execute(lambda: run('[ ! -f ~/.ssh/authorized_keys ] && '
                             'touch ~/.ssh/authorized_keys',
                             warn_only=True), host=to_host)
-        local("cat {0} | ssh -o 'StrictHostKeyChecking no' root@{1} "
-              "'cat >> .ssh/authorized_keys'".format(tmp_path, to_host))
-        os.remove(tmp_path)
+        execute(lambda: run(
+            'echo "{0}" >> ~/.ssh/authorized_key'.format(pub_key)),
+            host=to_host)
 
 
 def sync_capsule_tools_repos_to_upgrade(admin_password=None):
@@ -2160,9 +2158,8 @@ def satellite6_capsule_upgrade(admin_password=None):
         host=sat_host
     )
     # Copying the capsule cert to capsule
-    execute(
-        lambda: run('scp {0}-certs.tar root@{0}:/home/'.format(cap_host)),
-        host=sat_host)
+    execute(lambda: run("scp -o 'StrictHostKeyChecking no' {0}-certs.tar "
+                        "root@{0}:/home/".format(cap_host)), host=sat_host)
     # Upgrading Katello installer
     run('capsule-installer --upgrade --certs-tar '
         '/home/{0}-certs.tar'.format(env.get('capsule_host')))
