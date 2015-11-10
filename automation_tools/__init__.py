@@ -1765,8 +1765,10 @@ def copy_ssh_key(from_host, to_host):
     :param to_host: A string. Hostname on to which the ssh-key will be copied.
 
     """
-    execute(lambda: run('[ ! -f ~/.ssh/id_rsa.pub ] && ssh-keygen '
-                        '-f ~/.ssh/id_rsa -t rsa -N \'\''), host=from_host)
+    execute(lambda: run(
+        '[ ! -f ~/.ssh/id_rsa.pub ] && '
+        'ssh-keygen -f ~/.ssh/id_rsa -t rsa -N \'\'', warn_only=True),
+        host=from_host)
     if int(execute(lambda: run('[ -f ~/.ssh/id_rsa.pub ]; '
                                'echo $?'), host=from_host)[from_host]) == 0:
         pub_key = execute(lambda: run(
@@ -1775,7 +1777,7 @@ def copy_ssh_key(from_host, to_host):
                             'touch ~/.ssh/authorized_keys',
                             warn_only=True), host=to_host)
         execute(lambda: run(
-            'echo "{0}" >> ~/.ssh/authorized_key'.format(pub_key)),
+            'echo "{0}" >> ~/.ssh/authorized_keys'.format(pub_key)),
             host=to_host)
 
 
