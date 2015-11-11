@@ -7,11 +7,13 @@ all environment variables are required.
 from __future__ import print_function
 import os
 import random
+import requests
 import socket
 import sys
 import time
 import novaclient
 import subprocess
+from lxml import html
 from re import search
 from urlparse import urlsplit
 
@@ -2283,3 +2285,134 @@ def product_upgrade(
         execute(satellite6_capsule_upgrade, host=cap_host)
         # Generate foreman debug on capsule
         execute(foreman_debug, 'capsule', host=cap_host)
+
+
+def idp_authenticate(idp=None):
+    """Authenticates on a customer portal and returns a session object.
+
+    The following environment variables affect this command:
+
+    IDP_URL
+        Identity Provider URL
+    RHN_USERNAME
+        Red Hat Network username
+    RHN_PASSWORD
+        Red Hat Network password
+    :param idp: id provider url (typically https://idp.redhat.com/idp/)
+    :returns: A requests.Session instance containing IDP session cookies
+    """
+    if idp is None:
+        idp = os.environ.get('IDP_URL')
+    user = os.environ.get('RHN_USERNAME')
+    password = os.environ.get('RHN_PASSWORD')
+
+    session = requests.session()
+    session.get(idp)
+    idp_request = session.post(
+        '{}/j_security_check'.format(idp),
+        data={
+            u'j_username': user,
+            u'j_password': password,
+        }
+    )
+    idp_tree = html.fromstring(idp_request.text)
+    try:
+        ugc_url = idp_tree.xpath(
+            '//div[@class="loginBox"]/table/center/a'
+        )[0].get('href')
+    except IndexError:
+        print('Unable to find UGC link in the returned HTML.'
+              'Check IDP url and credentials')
+        sys.exit(1)
+
+    ugc_request = session.get(
+        ugc_url
+    )
+    ugc_tree = html.fromstring(ugc_request.text)
+    try:
+        action_url = ugc_tree.xpath('//form[@method="POST"]')[0].get('action')
+        saml_hash = ugc_tree.xpath(
+            '//input[@name="SAMLRequest"]'
+        )[0].get('value')
+        relay_hash = ugc_tree.xpath(
+            '//input[@name="RelayState"]'
+        )[0].get('value')
+    except:
+        print('Error during parsing the values from the returned HTML.'
+              'The authentication procedure might have changed')
+        sys.exit(1)
+    ugc2_request = session.post(
+        action_url,
+        data={
+            u'SAMLRequest': saml_hash,
+            u'RelayState': relay_hash,
+        }
+    )
+    ugc2_tree = html.fromstring(ugc2_request.text)
+    try:
+        action_url_2 = ugc2_tree.xpath(
+            '//form[@method="POST"]'
+        )[0].get('action')
+        saml2_hash = ugc2_tree.xpath(
+            '//input[@name="SAMLResponse"]'
+        )[0].get('value')
+        relay2_hash = ugc2_tree.xpath(
+            '//input[@name="RelayState"]'
+        )[0].get('value')
+    except:
+        print('Error during parsing the values from the returned HTML.'
+              'The authentication procedure might have changed')
+        sys.exit(1)
+    auth_request = session.post(
+        action_url_2,
+        data={
+            u'SAMLResponse': saml2_hash,
+            u'RelayState': relay2_hash,
+        }
+    )
+    if auth_request.ok is True:
+        return session
+    else:
+        auth_request.raise_for_status()
+
+
+def download_manifest(url=None, session=None, distributor=None):
+    """Task for downloading the manifest file from customer portal.
+
+    The following environment variables affect this command:
+
+    CUSTOMER_PORTAL_URL
+        Customer Portal URL (typically 'https://access.redhat.com')
+    DISTRIBUTOR
+        A distributor hash to be used for getting the manifest
+
+    :param url: Customer Portal URL (typically 'https://access.redhat.com')
+    :param session: A requests.session object with a valid customer portal
+        session
+    :param distributor: A distributor hash to be used for getting the manifest
+    :returns: a path string to a downloaded manifest file
+    """
+    if url is None:
+        url = os.environ.get('CUSTOMER_PORTAL_URL')
+    if session is None:
+        session = idp_authenticate()
+    if distributor is None:
+            distributor = os.environ.get('DISTRIBUTOR')
+    manifest_file = run('mktemp --suffix=.zip')
+    headers = ''
+    for cookie in session.cookies:
+        headers += '{0}={1}; '.format(cookie.name, cookie.value)
+    response = run(
+        'curl -sIb \'{0}\' {1}/management/distributors/{2}/certificate/'
+        'manifestdownload'
+        .format(headers, url, distributor, manifest_file))
+    if ('Content-Disposition: attachment' in response and
+            distributor in response):
+        run('curl -sb \'{0}\' -o {3} {1}/management/distributors/{2}/'
+            'certificate/manifestdownload'
+            .format(headers, url, distributor, manifest_file)
+            )
+        return manifest_file
+    else:
+        raise ValueError('Request has returned no attachment. Check the'
+                         ' session and distributor hash')
