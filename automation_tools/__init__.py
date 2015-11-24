@@ -479,6 +479,16 @@ def setup_foreman_discovery():
     run('rm -rf {0}'.format(template_file))
 
 
+def setup_libvirt_key():
+    """Task to setup key pairs for secure comminication between Satellite server
+    and libvirt hypervisor."""
+    key_url = os.environ.get('LIBVIRT_KEY_URL')
+    if key_url is None:
+        print('You must specify the Libvirt key URL')
+        sys.exit(1)
+    run('wget -O {0} {1}'.format("/root/.ssh/id_rsa", key_url))
+
+
 def vm_create():
     """Task to create a VM using snap-guest based on a ``SOURCE_IMAGE`` base
     image.
@@ -1090,6 +1100,8 @@ def product_install(distribution, create_vm=False, certificate_url=None,
         if not distribution.endswith('upstream'):
             if os.environ.get('PXE_DEFAULT_TEMPLATE_URL') is not None:
                 execute(setup_foreman_discovery, host=host)
+            if os.environ.get('LIBVIRT_KEY_URL') is not None:
+                execute(setup_libvirt_key, host=host)
             execute(install_puppet_scap_client, host=host)
             execute(setup_oscap, host=host)
 
