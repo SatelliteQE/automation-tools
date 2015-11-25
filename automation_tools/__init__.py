@@ -483,10 +483,12 @@ def setup_libvirt_key():
     """Task to setup key pairs for secure comminication between Satellite server
     and libvirt hypervisor."""
     key_url = os.environ.get('LIBVIRT_KEY_URL')
+    key_file = '/root/.ssh/id_rsa'
     if key_url is None:
         print('You must specify the Libvirt key URL')
         sys.exit(1)
-    run('wget -O {0} {1}'.format("/root/.ssh/id_rsa", key_url))
+    run('wget -O {0} {1}'.format(key_file, key_url))
+    run('chmod 600 {0}'.format(key_file))
 
 
 def vm_create():
