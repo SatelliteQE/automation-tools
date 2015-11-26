@@ -20,7 +20,7 @@ from automation_tools.repository import (
     delete_custom_repos, enable_satellite_repos, enable_repos, disable_repos)
 from automation_tools.utils import distro_info, update_packages
 from fabric.api import cd, env, execute, get, local, put, run
-from novaclient.v2 import client
+from novaclient.client import Client
 
 if sys.version_info[0] is 2:
     from urlparse import urljoin  # (import-error) pylint:disable=F0401
@@ -1906,15 +1906,15 @@ def sync_capsule_tools_repos_to_upgrade(admin_password=None):
         host=env.get('capsule_host'))
 
 
-def host_pings(host, attempts=200):
+def host_pings(host, timeout=15):
     """This ensures the given IP/hostname pings succesfully.
 
     :param host: A string. The IP or hostname of host.
-    :param attempts: An integer.
-        The maximum number of attempts to ping the host.
+    :param int timeout: The polling timeout in minutes.
 
     """
-    for attempt in range(attempts):
+    timeup = time.time() + int(timeout) * 60
+    while True:
         command = subprocess.Popen(
             'ping -c1 {0}; echo $?'.format(host),
             stdout=subprocess.PIPE,
@@ -1924,20 +1924,39 @@ def host_pings(host, attempts=200):
         output = command.communicate()[0]
         # Checking the return code of ping is 0
         if int(output.split()[-1]) == 0:
+            print(
+                'SUCCESS !! The given host {0} has been pinged!!'.format(host))
             break
+        elif time.time() > timeup:
+            print(
+                'The timout for pinging the host {0} has reached!'.format(host)
+            )
+            sys.exit(1)
         else:
             time.sleep(5)
 
 
-def get_hostname_from_ip(ip):
+def get_hostname_from_ip(ip, timeout=3):
     """Retrives the hostname by logging into remote machine by IP.
     Specially for the systems who doesnt support reverse DNS.
     e.g usersys machines.
 
     :param ip: A string. The IP address of the remote host.
+    :param int timeout: The polling timeout in minutes.
 
     """
-    return execute(lambda: run('hostname'), host=ip)[ip]
+    timeup = time.time() + int(timeout) * 60
+    while True:
+        if time.time() > timeup:
+            print('The timeout for getting the Hostname from IP has reached!')
+            sys.exit(1)
+        try:
+            output = execute(lambda: run('hostname'), host=ip)
+            print('The hostname is: {0}'.format(output[ip]))
+            break
+        except:
+            time.sleep(5)
+    return output[ip]
 
 
 def get_openstack_client():
@@ -1968,7 +1987,8 @@ def get_openstack_client():
     project_id = os.environ.get('PROJECT_ID')
     if project_id is None:
         print('The PROJECT_ID environment variable should be defined.')
-    with client.Client(
+    with Client(
+        version=2,
         username=username,
         api_key=password,
         auth_url=auth_url,
@@ -1979,7 +1999,7 @@ def get_openstack_client():
 
 
 def create_openstack_instance(
-        product, instance_name, image_name, flavor_name, ssh_key):
+        product, instance_name, image_name, flavor_name, ssh_key, timeout=5):
     """Creates openstack Instance from Image and Assigns a floating IP
     to instance. Also It ensures that instance is ready for testing.
 
@@ -1991,6 +2011,7 @@ def create_openstack_instance(
         e.g m1.small.
     :param ssh_key: A string. ssh_key 'name' that required to add
         into this instance.
+    :param int timeout: The polling timeout in minutes to assign IP.
 
     ssh_key should be added to openstack project before running automation.
     Else the automation will fail.
@@ -2027,9 +2048,15 @@ def create_openstack_instance(
         network=network.id
     )
     # Assigning floating ip to instance
+    timeup = time.time() + int(timeout) * 60
     while True:
+        if time.time() > timeup:
+            print('The timeout for assigning the floating IP has reached!')
+            sys.exit(1)
         try:
             instance.add_floating_ip(floating_ip)
+            print('SUCCESS!! The floating IP {0} has been assigned '
+                  'to instance!'.format(floating_ip.ip))
             break
         except novaclient.exceptions.BadRequest:
             time.sleep(5)
