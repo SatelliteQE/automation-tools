@@ -1767,6 +1767,22 @@ def setenforce(mode):
 # =============================================================================
 # Satellite and Capsule Upgrade
 # =============================================================================
+
+def reboot(halt_time=300):
+    """Reboots the host.
+
+    Also halts the execution until reboots according to given time.
+
+    :param int halt_time: Halt execution in seconds.
+    """
+    print('Rebooting the host, please wait .... ')
+    try:
+        run('reboot', warn_only=True)
+    except:
+        pass
+    time.sleep(halt_time)
+
+
 def copy_ssh_key(from_host, to_host):
     """This will generate(if not already) ssh-key on from_host
     and copy that ssh-key to to_host.
@@ -1809,8 +1825,18 @@ def sync_capsule_tools_repos_to_upgrade(admin_password=None):
         The url for capsule repo from latest satellite compose.
     TOOLS_URL
         The url for sat-tools repo from latest satellite compose.
+    FROM_VERSION:
+        Current Satellite version - to differentiate default organization.
+        e.g. '6.1', '6.0'
 
     """
+    if os.environ.get('FROM_VERSION') == '6.1':
+        org = '\'Default Organization\''
+    elif os.environ.get('FROM_VERSION') == '6.0':
+        org = 'Default_Organization'
+    else:
+        print('Wrong FROM_VERSION Provided. Provide one of 6.1 or 6.0...')
+        sys.exit(1)
     capsule_repo = os.environ.get('CAPSULE_URL')
     tools_repo = os.environ.get('TOOLS_URL')
     version = distro_info()[1]
@@ -1832,68 +1858,68 @@ def sync_capsule_tools_repos_to_upgrade(admin_password=None):
     run(initials+'capsule content synchronize --id {0}'.format(capsule_id))
     # Create product capsule
     run(initials + 'product create --name capsule6_latest '
-        '--organization Default_Organization')
+        '--organization {0}'.format(org))
     time.sleep(2)
     capsule_sub_id = str(
         run(initials + 'subscription list --organization '
-            'Default_Organization | grep capsule6_latest')
+            '{0} | grep capsule6_latest'.format(org))
     ).split('|')[7].strip()
     # create repo
     run(initials + 'repository create --content-type yum '
         '--name capsule6_latest_repo --label capsule6_latest_repo '
         '--product capsule6_latest --publish-via-http true --url {0} '
-        '--organization Default_Organization'.format(capsule_repo))
+        '--organization {1}'.format(capsule_repo, org))
     # Create product sattools
     run(initials + 'product create --name satTools6_latest '
-        '--organization Default_Organization')
+        '--organization {0}'.format(org))
     time.sleep(2)
     tools_sub_id = str(
         run(initials + 'subscription list '
-            '--organization Default_Organization | grep satTools6_latest')
+            '--organization {0} | grep satTools6_latest'.format(org))
     ).split('|')[7].strip()
     # Create repo satools
     run(initials + 'repository create --content-type yum '
         '--name satTools6_latest_repo --label satTools6_latest_repo '
         '--product satTools6_latest --publish-via-http true --url {0} '
-        '--organization Default_Organization'.format(tools_repo))
+        '--organization {1}'.format(tools_repo, org))
     # Sync repos
     run(initials + 'repository synchronize --name capsule6_latest_repo '
-        '--product capsule6_latest --organization Default_Organization')
+        '--product capsule6_latest --organization {0}'.format(org))
     run(initials + 'repository synchronize --name satTools6_latest_repo '
-        '--product satTools6_latest --organization Default_Organization')
-    run(initials + 'content-view list --organization Default_Organization | '
-        'grep rhel')
+        '--product satTools6_latest --organization {0}'.format(org))
+    run(initials + 'content-view list --organization {0} | '
+        'grep rhel'.format(org))
     capsule_repo_id = str(
-        run(initials + 'repository list --organization Default_Organization | '
-            'grep capsule6_latest_repo')).split('|')[0].strip()
+        run(initials + 'repository list --organization {0} | '
+            'grep capsule6_latest_repo'.format(org))).split('|')[0].strip()
     tools_repo_id = str(
-        run(initials + 'repository list --organization Default_Organization | '
-            'grep satTools6_latest_repo')).split('|')[0].strip()
+        run(initials + 'repository list --organization {0} | '
+            'grep satTools6_latest_repo'.format(org))).split('|')[0].strip()
     # Add repos to CV
     run(initials + 'content-view add-repository --name rhel{0}_cv '
-        '--repository-id {1} --organization Default_Organization'.format(
-            version, capsule_repo_id))
+        '--repository-id {1} --organization {2}'.format(
+            version, capsule_repo_id, org))
     run(initials + 'content-view add-repository --name rhel{0}_cv '
-        '--repository-id {1} --organization Default_Organization'.format(
-            version, tools_repo_id))
+        '--repository-id {1} --organization {2}'.format(
+            version, tools_repo_id, org))
     # publish cv
     run(initials + 'content-view publish --name rhel{0}_cv '
-        '--organization Default_Organization'.format(version))
+        '--organization {1}'.format(version, org))
     # promote cv
     lc_env_id = str(
         run(initials + 'lifecycle-environment list '
-            '--organization Default_Organization | grep DEV')).split(
+            '--organization {0} | grep DEV'.format(org))).split(
                 '|')[0].strip()
     cv_ver_id = str(
         run(initials + 'content-view version list --content-view rhel{0}_cv '
-            '--organization Default_Organization | grep rhel'.format(
-                version))).split('|')[0].strip()
+            '--organization {1} | grep rhel'.format(
+                version, org))).split('|')[0].strip()
     run(initials + 'content-view version promote --content-view rhel{0}_cv '
         '--id {1} --lifecycle-environment-id {2} --organization '
-        'Default_Organization'.format(version, cv_ver_id, lc_env_id))
+        '{3}'.format(version, cv_ver_id, lc_env_id, org))
     ak_id = str(
         run(initials + 'activation-key list --organization '
-            'Default_Organization | grep rhel')).split('|')[0].strip()
+            '{0} | grep rhel'.format(org))).split('|')[0].strip()
     # Add new product subscriptions to AK
     run(initials + 'activation-key add-subscription --id {0} --quantity 1 '
         '--subscription-id {1}'.format(ak_id, capsule_sub_id))
@@ -2121,8 +2147,14 @@ def satellite6_upgrade(admin_password=None):
     BASE_URL
         Optional, defaults to available satellite version in CDN.
         URL for the compose repository.
-
+    FROM_VERSION
+        Satellite current version, to disable repos while upgrading.
+        e.g '6.1','6.0'
     """
+    from_version = os.environ.get('FROM_VERSION')
+    if from_version not in ['6.1', '6.0']:
+        print('Wrong Satellite Version Provoded. Provide one of 6.1,6.0.')
+        sys.exit(1)
     # Sync capsule and tools repo
     if admin_password is None:
         admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme')
@@ -2130,12 +2162,15 @@ def satellite6_upgrade(admin_password=None):
     run('rm -rf /etc/yum.repos.d/rhel-{optional,released}.repo')
     print('Wait till Packages update ... ')
     update_packages(quiet=True)
+    # Rebooting the system to see possible errors
+    execute(reboot, 120, host=env.get('satellite_host'))
     # Setting Satellite61 Repos
     major_ver = distro_info()[1]
     base_url = os.environ.get('BASE_URL')
     if base_url is None:
         enable_repos('rhel-{0}-server-satellite-6.1-rpms'.format(major_ver))
-    disable_repos('rhel-{0}-server-satellite-6.0-rpms'.format(major_ver))
+    disable_repos('rhel-{0}-server-satellite-{1}-rpms'.format(
+        major_ver, from_version))
     # Add Sat6 repo from latest compose
     satellite_repo = StringIO()
     satellite_repo.write('[sat6]\n')
@@ -2153,12 +2188,24 @@ def satellite6_upgrade(admin_password=None):
     run('yum clean all', warn_only=True)
     # Updating the packages again after setting sat6 repo
     print('Wait till packages update ... ')
+    print('YUM UPDATE started at: {0}'.format(time.ctime()))
     update_packages(quiet=True)
+    print('YUM UPDATE finished at: {0}'.format(time.ctime()))
+    # Rebooting the system again for possible errors
+    execute(reboot, 120, host=env.get('satellite_host'))
+    # Stop the service again which started in restart
+    run('katello-service stop')
+    run('service-wait mongod start')
+    if major_ver == 7:
+        run('service tomcat stop')
+    # Running Upgrade
+    print('SATELLITE UPGRADE started at: {0}'.format(time.ctime()))
     run('katello-installer --upgrade')
+    print('SATELLITE UPGRADE finished at: {0}'.format(time.ctime()))
     # Test the Upgrade is successful
-    run('hammer -u admin -p {0} ping'.format(admin_password))
+    run('hammer -u admin -p {0} ping'.format(admin_password), warn_only=True)
     # Test The status of all katello services
-    run('katello-service status')
+    run('katello-service status', warn_only=True)
 
 
 def satellite6_capsule_upgrade(admin_password=None):
@@ -2175,33 +2222,45 @@ def satellite6_capsule_upgrade(admin_password=None):
     CAPSULE_URL
         Optional, defaults to available capsule version in CDN.
         URL for capsule of latest compose to upgrade.
+    FROM_VERSION
+        Capsule current version, to disable repos while upgrading.
+        e.g '6.1','6.0'
 
     """
     sat_host = env.get('satellite_host')
     cap_host = env.get('capsule_host')
+    from_version = os.environ.get('FROM_VERSION')
+    if from_version not in ['6.1', '6.0']:
+        print('Wrong Capsule Version Provoded. Provide one of 6.1,6.0.')
+        sys.exit(1)
     if admin_password is None:
         admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme')
     # Update the packages
     print('Wait till Packages update ... ')
     update_packages(quiet=True)
+    # Rebooting the system to see possible errors
+    execute(reboot, 120, host=env.get('satellite_host'))
     # Setting Capsule61 Repos
     major_ver = distro_info()[1]
     if os.environ.get('CAPSULE_URL') is None:
         enable_repos('rhel-{0}-server-satellite-capsule-6.1-rpms'.format(
             major_ver))
-    disable_repos('rhel-{0}-server-satellite-capsule-6.0-rpms'.format(
-        major_ver))
+    disable_repos('rhel-{0}-server-satellite-capsule-{1}-rpms'.format(
+        major_ver, from_version))
     # Stop katello services, except mongod
     run('for i in qpidd pulp_workers pulp_celerybeat '
         'pulp_resource_manager httpd; do service $i stop; done')
     run('yum clean all', warn_only=True)
     print('Wait till packages update ... ')
+    print('YUM UPDATE started at: {0}'.format(time.ctime()))
     update_packages(quiet=True)
-    run('yum install -y capsule-installer', warn_only=True)
-    # Copy answer file from katello to capule installer
-    run('cp /etc/katello-installer/answers.capsule-installer.yaml.rpmsave '
-        '/etc/capsule-installer/answers.capsule-installer.yaml',
-        warn_only=True)
+    print('YUM UPDATE finished at: {0}'.format(time.ctime()))
+    if from_version == '6.0':
+        run('yum install -y capsule-installer', warn_only=True)
+        # Copy answer file from katello to capule installer
+        run('cp /etc/katello-installer/answers.capsule-installer.yaml.rpmsave '
+            '/etc/capsule-installer/answers.capsule-installer.yaml',
+            warn_only=True)
     # Generates Capsule Certs file on satelltie and copies in capsule
     execute(
         generate_capsule_certs,
@@ -2212,11 +2271,18 @@ def satellite6_capsule_upgrade(admin_password=None):
     # Copying the capsule cert to capsule
     execute(lambda: run("scp -o 'StrictHostKeyChecking no' {0}-certs.tar "
                         "root@{0}:/home/".format(cap_host)), host=sat_host)
+    # Rebooting the system again to see possible errors
+    execute(reboot, 120, host=env.get('satellite_host'))
+    # Stopping the services again which started in reboot
+    run('for i in qpidd pulp_workers pulp_celerybeat '
+        'pulp_resource_manager httpd; do service $i stop; done')
     # Upgrading Katello installer
+    print('CAPSULE UPGRADE started at: {0}'.format(time.ctime()))
     run('capsule-installer --upgrade --certs-tar '
-        '/home/{0}-certs.tar'.format(env.get('capsule_host')))
+        '/home/{0}-certs.tar'.format(cap_host))
+    print('CAPSULE UPGRADE finished at: {0}'.format(time.ctime()))
     # Test The status of all katello services
-    run('katello-service status')
+    run('katello-service status', warn_only=True)
 
 
 def product_upgrade(
@@ -2269,13 +2335,15 @@ def product_upgrade(
     TOOLS_URL
         The url for sat-tools repo from latest satellite compose.
         Optional, defaults to latest available sat tools version in CDN.
+    FROM_VERSION
+        The satellite/capsule current version to upgrade to latest.
+        e.g '6.1','6.0'
 
     Note: ssh_key should be added to openstack project before
     running automation, else the automation will fail.
 
     """
     products = ['satellite', 'capsule']
-
     if product not in products:
         print ('Product name should be one of {0}'.format(', '.join(products)))
         sys.exit(1)
@@ -2294,6 +2362,8 @@ def product_upgrade(
     sat_host = env.get('satellite_host')
     # Subscribe the instances to CDN
     execute(subscribe, host=sat_host)
+    # Rebooting the services
+    execute(lambda: run('katello-service restart'), host=sat_host)
     # For Capsule Upgrade
     if product == 'capsule':
         # Deleting Capsule instance if any
@@ -2313,7 +2383,6 @@ def product_upgrade(
         copy_ssh_key(sat_host, cap_host)
         if os.environ.get('CAPSULE_URL') is not None:
             execute(sync_capsule_tools_repos_to_upgrade, host=sat_host)
-    execute(lambda: run('katello-service restart'), host=sat_host)
     # Run satellite upgrade
     execute(satellite6_upgrade, host=sat_host)
     # Generate foreman debug on satellite
