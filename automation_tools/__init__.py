@@ -250,6 +250,11 @@ def setup_default_capsule(interface=None, run_katello_installer=True):
         print('Was not possible to fetch domain information')
         sys.exit(1)
 
+    dhcp_range = os.environ.get('DHCP_RANGE')
+    if dhcp_range is None:
+        print('Could not fetch the dhcp range information')
+        sys.exit(1)
+
     if interface is None:
         run('yum install -y libvirt')
         manage_daemon('enable', 'libvirtd')
@@ -281,6 +286,7 @@ def setup_default_capsule(interface=None, run_katello_installer=True):
         'capsule-dns-zone': domain,
         'capsule-dhcp': 'true',
         'capsule-dhcp-interface': interface,
+        'capsule-dhcp-range': dhcp_range,
         'capsule-tftp': 'true',
         'capsule-tftp-servername': hostname,
         'capsule-puppet': 'true',
