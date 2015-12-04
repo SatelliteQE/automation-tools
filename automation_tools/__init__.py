@@ -226,7 +226,6 @@ def setup_default_capsule(interface=None, run_katello_installer=True):
     """Task to setup a the default capsule for Satellite
 
     :param str interface: Network interface name to be used
-
     """
     if isinstance(run_katello_installer, str):
         run_katello_installer = (run_katello_installer.lower() == 'true')
@@ -248,11 +247,6 @@ def setup_default_capsule(interface=None, run_katello_installer=True):
     domain = hostname.split('.', 1)[1]
     if len(domain) == 0:
         print('Was not possible to fetch domain information')
-        sys.exit(1)
-
-    dhcp_range = os.environ.get('DHCP_RANGE')
-    if dhcp_range is None:
-        print('Could not fetch the dhcp range information')
         sys.exit(1)
 
     if interface is None:
@@ -286,13 +280,15 @@ def setup_default_capsule(interface=None, run_katello_installer=True):
         'capsule-dns-zone': domain,
         'capsule-dhcp': 'true',
         'capsule-dhcp-interface': interface,
-        'capsule-dhcp-range': dhcp_range,
         'capsule-tftp': 'true',
         'capsule-tftp-servername': hostname,
         'capsule-puppet': 'true',
         'capsule-puppetca': 'true',
         'capsule-register-in-foreman': 'true',
     }
+
+    if 'DHCP_RANGE' in os.environ:
+        installer_options['capsule-dhcp-range'] = os.environ.get('DHCP_RANGE')
 
     if 'GATEWAY' in os.environ:
         gateway = os.environ.get('GATEWAY')
