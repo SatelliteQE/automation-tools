@@ -2243,7 +2243,7 @@ def satellite6_capsule_upgrade(admin_password=None):
     print('Wait till Packages update ... ')
     update_packages(quiet=True)
     # Rebooting the system to see possible errors
-    execute(reboot, 120, host=env.get('satellite_host'))
+    execute(reboot, 120, host=cap_host)
     # Setting Capsule61 Repos
     major_ver = distro_info()[1]
     if os.environ.get('CAPSULE_URL') is None:
@@ -2276,7 +2276,7 @@ def satellite6_capsule_upgrade(admin_password=None):
     execute(lambda: run("scp -o 'StrictHostKeyChecking no' {0}-certs.tar "
                         "root@{0}:/home/".format(cap_host)), host=sat_host)
     # Rebooting the system again to see possible errors
-    execute(reboot, 120, host=env.get('satellite_host'))
+    execute(reboot, 120, host=cap_host)
     # Stopping the services again which started in reboot
     run('for i in qpidd pulp_workers pulp_celerybeat '
         'pulp_resource_manager httpd; do service $i stop; done')
