@@ -2171,19 +2171,23 @@ def satellite6_upgrade(admin_password=None):
     # Setting Satellite61 Repos
     major_ver = distro_info()[1]
     base_url = os.environ.get('BASE_URL')
+    # Following disbales the old satellite repo and extra repos enabled
+    # during subscribe e.g Load balancer
+    disable_repos('*', silent=True)
+    enable_repos('rhel-{0}-server-rpms'.format(major_ver))
     if base_url is None:
         enable_repos('rhel-{0}-server-satellite-6.1-rpms'.format(major_ver))
-    disable_repos('rhel-{0}-server-satellite-{1}-rpms'.format(
-        major_ver, from_version))
-    # Add Sat6 repo from latest compose
-    satellite_repo = StringIO()
-    satellite_repo.write('[sat6]\n')
-    satellite_repo.write('name=satellite 6\n')
-    satellite_repo.write('baseurl={0}\n'.format(base_url))
-    satellite_repo.write('enabled=1\n')
-    satellite_repo.write('gpgcheck=0\n')
-    put(local_path=satellite_repo, remote_path='/etc/yum.repos.d/sat6.repo')
-    satellite_repo.close()
+    else:
+        # Add Sat6 repo from latest compose
+        satellite_repo = StringIO()
+        satellite_repo.write('[sat6]\n')
+        satellite_repo.write('name=satellite 6\n')
+        satellite_repo.write('baseurl={0}\n'.format(base_url))
+        satellite_repo.write('enabled=1\n')
+        satellite_repo.write('gpgcheck=0\n')
+        put(local_path=satellite_repo,
+            remote_path='/etc/yum.repos.d/sat6.repo')
+        satellite_repo.close()
     # Stop katello services, except mongod
     run('katello-service stop')
     run('service-wait mongod start')
