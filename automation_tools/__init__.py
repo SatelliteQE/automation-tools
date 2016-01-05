@@ -21,7 +21,7 @@ from automation_tools.satellite6.capsule import generate_capsule_certs
 from automation_tools.repository import (
     delete_custom_repos, enable_satellite_repos, enable_repos, disable_repos)
 from automation_tools.utils import distro_info, update_packages
-from fabric.api import cd, env, execute, get, local, put, run
+from fabric.api import cd, env, execute, get, local, put, run, settings, sudo
 from novaclient.client import Client
 
 if sys.version_info[0] is 2:
@@ -484,15 +484,38 @@ def setup_foreman_discovery():
 
 
 def setup_libvirt_key():
-    """Task to setup key pairs for secure comminication between Satellite server
-    and libvirt hypervisor."""
+    """Task to setup key pairs and verify host for secure communication between
+    Satellite server and libvirt hypervisor (qemu+ssh).
+
+    Expects the following environment variables:
+
+    LIBVIRT_HOSTNAME
+        hostname of libvirt hypervisor machine
+    LIBVIRT_KEY_URL
+        URL of relevant SSH key used for authentication to libvirt machine
+    """
+    root_key_file = '/root/.ssh/id_rsa'
+    foreman_key_file = '~foreman/.ssh/id_rsa'
     key_url = os.environ.get('LIBVIRT_KEY_URL')
-    key_file = '/root/.ssh/id_rsa'
-    if key_url is None:
-        print('You must specify the Libvirt key URL')
+    libvirt_host = os.environ.get('LIBVIRT_HOSTNAME')
+
+    if key_url is None or libvirt_host is None:
+        print('You must specify the Libvirt key URL and the Libvirt hostname')
         sys.exit(1)
-    run('wget -O {0} {1}'.format(key_file, key_url))
-    run('chmod 600 {0}'.format(key_file))
+    # Deploy priv ssh key under root and foreman account
+    run('wget -O {0} {1}'.format(root_key_file, key_url))
+    run('chmod 600 {0}'.format(root_key_file))
+    sudo('wget -O {0} {1}'.format(foreman_key_file, key_url), user='foreman')
+    sudo('chmod 600 {0}'.format(foreman_key_file), user='foreman')
+    # Add libvirt host into known hosts
+    with settings(prompts={
+        'Are you sure you want to continue connecting (yes/no)? ': 'yes'}
+    ):
+        run('ssh {0} date'.format(libvirt_host), warn_only=True)
+        sudo(
+            'ssh root@{0} date'.format(libvirt_host), user='foreman',
+            warn_only=True
+        )
 
 
 def vm_create():
