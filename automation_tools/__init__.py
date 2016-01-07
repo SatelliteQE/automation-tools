@@ -1064,21 +1064,26 @@ def product_install(distribution, create_vm=False, certificate_url=None,
 
     if distribution in (
             'satellite6-cdn', 'satellite6-downstream', 'satellite6-iso'):
-        # Execute with 'interface=eth0' only if using VLAN Bridges.
-        if os.environ.get('BRIDGE') is None:
-            # execute returns a dictionary mapping host strings to the given
-            # task's return value.
-            installer_options.update(execute(
-                setup_default_capsule, host=host, run_katello_installer=False
-            )[host])
-        else:
+        # When using VLAN Bridges os.environ.get('BRIDGE') is 'true' and
+        # executes with 'interface=eth0' for Satellite6-automation.
+        # When using Satellite6-installer one can specify custom interface.
+        if os.environ.get('BRIDGE') or os.environ.get('INTERFACE'):
             # execute returns a dictionary mapping host strings to the given
             # task's return value
             installer_options.update(execute(
                 setup_default_capsule,
                 host=host,
-                interface='eth0',
+                # If an INTERFACE is specified it will be used otherwise would
+                # default to eth0 interface. Helpful for configuring DHCP and
+                # DNS capsule services.
+                interface=os.environ.get('INTERFACE') or 'eth0',
                 run_katello_installer=False
+            )[host])
+        else:
+            # execute returns a dictionary mapping host strings to the given
+            # task's return value.
+            installer_options.update(execute(
+                setup_default_capsule, host=host, run_katello_installer=False
             )[host])
 
     # Firewall should be setup after setup_default_capsule clean the puppet
