@@ -29,6 +29,7 @@ from automation_tools import (  # flake8: noqa
     product_install,
     product_upgrade,
     remove_katello_agent,
+    relink_manifest,
     run_errata,
     satellite6_upgrade,
     setup_abrt,

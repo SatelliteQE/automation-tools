@@ -2532,3 +2532,21 @@ def download_manifest(url=None, session=None, distributor=None):
     else:
         raise ValueError('Request has returned no attachment. Check the'
                          ' session and distributor hash')
+
+
+def relink_manifest(manifest_file=None):
+    """Links the latest downloaded manifest file to the manifest_latest.zip
+    softlink.
+
+    :param manifest_file: Specify the manifest file path.
+    """
+    if manifest_file is None:
+        manifest_file = download_manifest()
+    run('mv {0} /opt/manifests/'.format(manifest_file))
+    filename = os.path.basename(manifest_file)
+    new_manifest_file = os.path.join('/opt/manifests', filename)
+    run('chmod 644 {0}'.format(new_manifest_file))
+    run('restorecon -v {0}'.format(new_manifest_file))
+    run('unlink /opt/manifests/manifest-latest.zip')
+    run('ln -s {0} /opt/manifests/manifest-latest.zip'
+        .format(new_manifest_file))
