@@ -2542,6 +2542,9 @@ def relink_manifest(manifest_file=None):
     """
     if manifest_file is None:
         manifest_file = download_manifest()
+    if not manifest_file:
+        print('manifest_file is not populated.')
+        sys.exit(1)
     run('mv {0} /opt/manifests/'.format(manifest_file))
     filename = os.path.basename(manifest_file)
     new_manifest_file = os.path.join('/opt/manifests', filename)
