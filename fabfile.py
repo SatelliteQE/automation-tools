@@ -39,6 +39,7 @@ from automation_tools import (  # flake8: noqa
     setup_email_notification,
     setup_fake_manifest_certificate,
     setup_firewall,
+    setup_libvirt_key,
     setup_proxy,
     setup_vm_provisioning,
     subscribe,
