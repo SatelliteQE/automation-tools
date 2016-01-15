@@ -13,6 +13,7 @@ import sys
 import time
 import novaclient
 import subprocess
+from datetime import date
 from lxml import html
 from re import search
 from urlparse import urlsplit
@@ -2573,9 +2574,9 @@ def relink_manifest(manifest_file=None):
     if not manifest_file:
         print('manifest_file is not populated.')
         sys.exit(1)
-    run('mv {0} /opt/manifests/'.format(manifest_file))
-    filename = os.path.basename(manifest_file)
-    new_manifest_file = os.path.join('/opt/manifests', filename)
+    date_str = date.today().strftime("%Y%m%d")
+    new_manifest_file = '/opt/manifests/manifest-{0}.zip'.format(date_str)
+    run('mv {0} {1}'.format(manifest_file, new_manifest_file))
     run('chmod 644 {0}'.format(new_manifest_file))
     run('restorecon -v {0}'.format(new_manifest_file))
     run('unlink /opt/manifests/manifest-latest.zip')
