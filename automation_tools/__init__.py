@@ -1725,6 +1725,8 @@ def katello_installer(debug=False, sam=False, verbose=True, **kwargs):
             extra_options.append(
                 '--capsule-dns-forwarders="{0}"'.format(forwarder))
 
+    debug = (debug or os.environ.get('DEBUG', '') == 'true')
+
     run('{0}-installer {1} {2} {3} {4}'.format(
         'sam' if sam else 'katello',
         '-d' if debug else '',
