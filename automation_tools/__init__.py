@@ -2582,3 +2582,9 @@ def relink_manifest(manifest_file=None):
     run('unlink /opt/manifests/manifest-latest.zip')
     run('ln -s {0} /opt/manifests/manifest-latest.zip'
         .format(new_manifest_file))
+
+
+def enable_gateway_ports_connections():
+    """Required by remote connections to SSH tunnels"""
+    run('sed "s/^[#]*GatewayPorts.*/GatewayPorts yes/" /etc/ssh/sshd_config')
+    manage_daemon('restart', 'sshd')
