@@ -2226,7 +2226,7 @@ def satellite6_upgrade(admin_password=None):
     # Updating the packages again after setting sat6 repo
     print('Wait till packages update ... ')
     print('YUM UPDATE started at: {0}'.format(time.ctime()))
-    update_packages(quiet=True)
+    update_packages(quiet=False)
     print('YUM UPDATE finished at: {0}'.format(time.ctime()))
     # Rebooting the system again for possible errors
     execute(reboot, 120, host=env.get('satellite_host'))
@@ -2290,7 +2290,7 @@ def satellite6_capsule_upgrade(admin_password=None):
     run('yum clean all', warn_only=True)
     print('Wait till packages update ... ')
     print('YUM UPDATE started at: {0}'.format(time.ctime()))
-    update_packages(quiet=True)
+    update_packages(quiet=False)
     print('YUM UPDATE finished at: {0}'.format(time.ctime()))
     if from_version == '6.0':
         run('yum install -y capsule-installer', warn_only=True)
