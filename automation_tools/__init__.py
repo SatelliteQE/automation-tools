@@ -496,7 +496,7 @@ def setup_libvirt_key():
         URL of relevant SSH key used for authentication to libvirt machine
     """
     root_key_file = '/root/.ssh/id_rsa'
-    foreman_key_file = '~/foreman/.ssh/id_rsa'
+    foreman_key_file = '~/.ssh/id_rsa'
     key_url = os.environ.get('LIBVIRT_KEY_URL')
     libvirt_host = os.environ.get('LIBVIRT_HOSTNAME')
 
