@@ -1122,6 +1122,13 @@ def product_install(distribution, create_vm=False, certificate_url=None,
                 setup_proxy, host=host, run_katello_installer=False
             )[host])
 
+    if os.environ.get('INSTALLER_OPTIONS'):
+        # INSTALLER_OPTIONS are comma separated katello-installer options.
+        # It will be of the form "key1=val1,key2=val2".
+        ins_opt = os.environ.get('INSTALLER_OPTIONS')
+        ins_opt_dict = dict(i.split('=') for i in ins_opt.split(','))
+        installer_options.update(ins_opt_dict)
+
     execute(
         katello_installer,
         host=host,
