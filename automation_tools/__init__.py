@@ -496,7 +496,7 @@ def setup_libvirt_key():
         URL of relevant SSH key used for authentication to libvirt machine
     """
     root_key_file = '/root/.ssh/id_rsa'
-    foreman_key_file = '~/foreman/.ssh/id_rsa'
+    foreman_key_file = '~/.ssh/id_rsa'
     key_url = os.environ.get('LIBVIRT_KEY_URL')
     libvirt_host = os.environ.get('LIBVIRT_HOSTNAME')
 
@@ -1121,6 +1121,13 @@ def product_install(distribution, create_vm=False, certificate_url=None,
             installer_options.update(execute(
                 setup_proxy, host=host, run_katello_installer=False
             )[host])
+
+    if os.environ.get('INSTALLER_OPTIONS'):
+        # INSTALLER_OPTIONS are comma separated katello-installer options.
+        # It will be of the form "key1=val1,key2=val2".
+        ins_opt = os.environ.get('INSTALLER_OPTIONS')
+        ins_opt_dict = dict(i.split('=') for i in ins_opt.split(','))
+        installer_options.update(ins_opt_dict)
 
     execute(
         katello_installer,
@@ -2226,7 +2233,7 @@ def satellite6_upgrade(admin_password=None):
     # Updating the packages again after setting sat6 repo
     print('Wait till packages update ... ')
     print('YUM UPDATE started at: {0}'.format(time.ctime()))
-    update_packages(quiet=True)
+    update_packages(quiet=False)
     print('YUM UPDATE finished at: {0}'.format(time.ctime()))
     # Rebooting the system again for possible errors
     execute(reboot, 120, host=env.get('satellite_host'))
@@ -2290,7 +2297,7 @@ def satellite6_capsule_upgrade(admin_password=None):
     run('yum clean all', warn_only=True)
     print('Wait till packages update ... ')
     print('YUM UPDATE started at: {0}'.format(time.ctime()))
-    update_packages(quiet=True)
+    update_packages(quiet=False)
     print('YUM UPDATE finished at: {0}'.format(time.ctime()))
     if from_version == '6.0':
         run('yum install -y capsule-installer', warn_only=True)
@@ -2586,5 +2593,5 @@ def relink_manifest(manifest_file=None):
 
 def enable_gateway_ports_connections():
     """Required by remote connections to SSH tunnels"""
-    run('sed "s/^[#]*GatewayPorts.*/GatewayPorts yes/" /etc/ssh/sshd_config')
+    run('sed -i "s/^[#]*GatewayPorts.*/GatewayPorts yes/" /etc/ssh/sshd_config')
     manage_daemon('restart', 'sshd')
