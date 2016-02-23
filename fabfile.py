@@ -11,6 +11,7 @@ from automation_tools import (  # flake8: noqa
     delete_openstack_instance,
     download_manifest,
     downstream_install,
+    enable_gateway_ports_connections,
     errata_upgrade,
     fix_hostname,
     fix_qdrouterd_listen_to_ipv6,
