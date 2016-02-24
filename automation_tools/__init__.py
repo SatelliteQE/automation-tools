@@ -244,6 +244,9 @@ def setup_default_capsule(interface=None, run_katello_installer=True):
     if len(hostname) == 0:
         print('Was not possible to fetch hostname information')
         sys.exit(1)
+    if '.' not in hostname:
+        print('Please make sure the hostname is configured with a FQDN')
+        sys.exit(1)
 
     domain = hostname.split('.', 1)[1]
     if len(domain) == 0:
