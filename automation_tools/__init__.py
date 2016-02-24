@@ -1144,8 +1144,9 @@ def product_install(distribution, create_vm=False, certificate_url=None,
                 execute(setup_foreman_discovery, host=host)
             if os.environ.get('LIBVIRT_KEY_URL') is not None:
                 execute(setup_libvirt_key, host=host)
-            execute(install_puppet_scap_client, host=host)
-            execute(setup_oscap, host=host)
+            if os.environ.get('SATELLITE_VERSION') != '6.0':
+                execute(install_puppet_scap_client, host=host)
+                execute(setup_oscap, host=host)
 
     certificate_url = certificate_url or os.environ.get(
         'FAKE_MANIFEST_CERT_URL')
