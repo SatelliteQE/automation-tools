@@ -1852,9 +1852,9 @@ def copy_ssh_key(from_host, to_host):
 
 
 def sync_capsule_tools_repos_to_upgrade(admin_password=None):
-    """This syncs capsule and sat-tools repos in Satellite server.
+    """This syncs capsule repos in Satellite server.
 
-    Useful for upgrading Capsule and Client in feature.
+    Useful for upgrading Capsule in feature.
 
     :param admin_password: A string. Defaults to 'changeme'.
         Foreman admin password for hammer commands.
@@ -1863,11 +1863,13 @@ def sync_capsule_tools_repos_to_upgrade(admin_password=None):
 
     CAPSULE_URL
         The url for capsule repo from latest satellite compose.
-    TOOLS_URL
-        The url for sat-tools repo from latest satellite compose.
     FROM_VERSION:
         Current Satellite version - to differentiate default organization.
         e.g. '6.1', '6.0'
+    CAP_SUB_DETAILS:
+        List of cv_name, environment, ak_name attached to subscription of
+        capsule in defined sequence.
+        Optional, for upgrade on specific satellite and capsule.
 
     """
     if os.environ.get('FROM_VERSION') == '6.1':
@@ -1878,16 +1880,18 @@ def sync_capsule_tools_repos_to_upgrade(admin_password=None):
         print('Wrong FROM_VERSION Provided. Provide one of 6.1 or 6.0...')
         sys.exit(1)
     capsule_repo = os.environ.get('CAPSULE_URL')
-    tools_repo = os.environ.get('TOOLS_URL')
-    version = distro_info()[1]
     if capsule_repo is None:
         print('The Capsule repo URL is not provided '
               'to perform Capsule Upgrade in feature!')
         sys.exit(1)
-    if tools_repo is None:
-        print('The Satellite Tools repo URL is not provided '
-              'to perform Client Upgrade in feature!')
-        sys.exit(1)
+    version = distro_info()[1]
+    details = os.environ.get('CAP_SUB_DETAILS')
+    if details is not None:
+        cv_name, env, ak_name = [item.strip() for item in details.split(',')]
+    else:
+        cv_name = 'rhel{0}_cv'.format(version)
+        env = 'DEV'
+        ak_name = 'rhel'
     if admin_password is None:
         admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme')
     initials = 'hammer -u admin -p {0} '.format(admin_password)
@@ -1895,7 +1899,9 @@ def sync_capsule_tools_repos_to_upgrade(admin_password=None):
     capsule_id = str(
         run(initials + 'capsule list | grep {0}'.format(
             env.get('capsule_host')))).split('|')[0].strip()
-    run(initials+'capsule content synchronize --id {0}'.format(capsule_id))
+    if not os.environ.get('CAP_SUB_DETAILS'):
+        run(initials + 'capsule content synchronize --id {0}'.format(
+            capsule_id))
     # Create product capsule
     run(initials + 'product create --name capsule6_latest '
         '--organization {0}'.format(org))
@@ -1909,62 +1915,39 @@ def sync_capsule_tools_repos_to_upgrade(admin_password=None):
         '--name capsule6_latest_repo --label capsule6_latest_repo '
         '--product capsule6_latest --publish-via-http true --url {0} '
         '--organization {1}'.format(capsule_repo, org))
-    # Create product sattools
-    run(initials + 'product create --name satTools6_latest '
-        '--organization {0}'.format(org))
-    time.sleep(2)
-    tools_sub_id = str(
-        run(initials + 'subscription list '
-            '--organization {0} | grep satTools6_latest'.format(org))
-    ).split('|')[7].strip()
-    # Create repo satools
-    run(initials + 'repository create --content-type yum '
-        '--name satTools6_latest_repo --label satTools6_latest_repo '
-        '--product satTools6_latest --publish-via-http true --url {0} '
-        '--organization {1}'.format(tools_repo, org))
     # Sync repos
     run(initials + 'repository synchronize --name capsule6_latest_repo '
         '--product capsule6_latest --organization {0}'.format(org))
-    run(initials + 'repository synchronize --name satTools6_latest_repo '
-        '--product satTools6_latest --organization {0}'.format(org))
     run(initials + 'content-view list --organization {0} | '
-        'grep rhel'.format(org))
+        'grep {1}'.format(org, cv_name))
     capsule_repo_id = str(
         run(initials + 'repository list --organization {0} | '
             'grep capsule6_latest_repo'.format(org))).split('|')[0].strip()
-    tools_repo_id = str(
-        run(initials + 'repository list --organization {0} | '
-            'grep satTools6_latest_repo'.format(org))).split('|')[0].strip()
     # Add repos to CV
-    run(initials + 'content-view add-repository --name rhel{0}_cv '
+    run(initials + 'content-view add-repository --name {0} '
         '--repository-id {1} --organization {2}'.format(
-            version, capsule_repo_id, org))
-    run(initials + 'content-view add-repository --name rhel{0}_cv '
-        '--repository-id {1} --organization {2}'.format(
-            version, tools_repo_id, org))
+            cv_name, capsule_repo_id, org))
     # publish cv
-    run(initials + 'content-view publish --name rhel{0}_cv '
-        '--organization {1}'.format(version, org))
+    run(initials + 'content-view publish --name {0} '
+        '--organization {1}'.format(cv_name, org))
     # promote cv
     lc_env_id = str(
         run(initials + 'lifecycle-environment list '
-            '--organization {0} | grep DEV'.format(org))).split(
+            '--organization {0} | grep {1}'.format(org, env))).split(
                 '|')[0].strip()
     cv_ver_id = str(
-        run(initials + 'content-view version list --content-view rhel{0}_cv '
-            '--organization {1} | grep rhel'.format(
-                version, org))).split('|')[0].strip()
-    run(initials + 'content-view version promote --content-view rhel{0}_cv '
+        run(initials + 'content-view version list --content-view {0} '
+            '--organization {1} | grep {0}'.format(
+                cv_name, org))).split('|')[0].strip()
+    run(initials + 'content-view version promote --content-view {0} '
         '--id {1} --lifecycle-environment-id {2} --organization '
-        '{3}'.format(version, cv_ver_id, lc_env_id, org))
+        '{3}'.format(cv_name, cv_ver_id, lc_env_id, org))
     ak_id = str(
         run(initials + 'activation-key list --organization '
-            '{0} | grep rhel'.format(org))).split('|')[0].strip()
+            '{0} | grep {1}'.format(org, ak_name))).split('|')[0].strip()
     # Add new product subscriptions to AK
     run(initials + 'activation-key add-subscription --id {0} --quantity 1 '
         '--subscription-id {1}'.format(ak_id, capsule_sub_id))
-    run(initials + 'activation-key add-subscription --id {0} --quantity 1 '
-        '--subscription-id {1}'.format(ak_id, tools_sub_id))
     # Update subscription on capsule
     execute(
         lambda: run('subscription-manager attach --pool={0}'.format(
@@ -2382,6 +2365,16 @@ def product_upgrade(
     FROM_VERSION
         The satellite/capsule current version to upgrade to latest.
         e.g '6.1','6.0'
+    SATELLITE
+        The Satellite hostname to run upgrade on.
+        Optional, If want to run upgrade on specific satellite.
+    CAPSULE
+        The Satellite hostname to run upgrade on.
+        Optional, If want to run upgrade on specific capsule.
+    CAP_SUB_DETAILS:
+        List of cv_name, environment, ak_name attached to subscription of
+        capsule in defined sequence.
+        Optional, for upgrade on specific satellite and capsule.
 
     Note: ssh_key should be added to openstack project before
     running automation, else the automation will fail.
@@ -2391,38 +2384,46 @@ def product_upgrade(
     if product not in products:
         print ('Product name should be one of {0}'.format(', '.join(products)))
         sys.exit(1)
-    # Deleting Satellite instance if any
-    execute(delete_openstack_instance, sat_instance)
-    print('Turning on Satellite Instance ....')
-    execute(
-        create_openstack_instance,
-        'satellite',
-        sat_instance,
-        sat_image,
-        sat_flavor,
-        ssh_key
-    )
-    # Getting the host name
-    sat_host = env.get('satellite_host')
-    # Subscribe the instances to CDN
-    execute(subscribe, host=sat_host)
+    if not os.environ.get('SATELLITE'):
+        # Deleting Satellite instance if any
+        execute(delete_openstack_instance, sat_instance)
+        print('Turning on Satellite Instance ....')
+        execute(
+            create_openstack_instance,
+            'satellite',
+            sat_instance,
+            sat_image,
+            sat_flavor,
+            ssh_key
+        )
+        # Getting the host name
+        sat_host = env.get('satellite_host')
+        # Subscribe the instances to CDN
+        execute(subscribe, host=sat_host)
+    else:
+        sat_host = os.environ.get('SATELLITE')
+        env['satellite_host'] = sat_host
     # Rebooting the services
     execute(lambda: run('katello-service restart'), host=sat_host)
     # For Capsule Upgrade
     if product == 'capsule':
-        # Deleting Capsule instance if any
-        execute(delete_openstack_instance, cap_instance)
-        print('Turning on Capsule Instance ....')
-        execute(
-            create_openstack_instance,
-            'capsule',
-            cap_instance,
-            cap_image,
-            cap_flavor,
-            ssh_key
-        )
-        # Getting the host name
-        cap_host = env.get('capsule_host')
+        if not os.environ.get('CAPSULE'):
+            # Deleting Capsule instance if any
+            execute(delete_openstack_instance, cap_instance)
+            print('Turning on Capsule Instance ....')
+            execute(
+                create_openstack_instance,
+                'capsule',
+                cap_instance,
+                cap_image,
+                cap_flavor,
+                ssh_key
+            )
+            # Getting the host name
+            cap_host = env.get('capsule_host')
+        else:
+            cap_host = os.environ.get('CAPSULE')
+            env['capsule_host'] = cap_host
         # Copy ssh key from satellie to capsule
         copy_ssh_key(sat_host, cap_host)
         if os.environ.get('CAPSULE_URL') is not None:
