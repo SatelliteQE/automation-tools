@@ -2599,3 +2599,8 @@ def enable_gateway_ports_connections():
     """Required by remote connections to SSH tunnels"""
     run('sed -i "s/^[#]*GatewayPorts.*/GatewayPorts yes/" /etc/ssh/sshd_config')
     manage_daemon('restart', 'sshd')
+
+
+def set_yum_debug_level(level=1):
+    """Set default debug level for yum output"""
+    run('sed -i "s/^[#]*debuglevel=.*/debuglevel={}/" /etc/yum.conf'.format(level))

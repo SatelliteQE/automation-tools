@@ -33,6 +33,7 @@ from automation_tools import (  # flake8: noqa
     relink_manifest,
     run_errata,
     satellite6_upgrade,
+    set_yum_debug_level,
     setup_abrt,
     setup_ddns,
     setup_default_capsule,
