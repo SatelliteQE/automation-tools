@@ -274,36 +274,30 @@ def setup_default_capsule(interface=None, run_katello_installer=True):
             print('Was not possible to fetch interface information')
             sys.exit(1)
 
-    proxy = 'capsule'
-    if os.environ.get('SATELLITE_VERSION') == '6.2':
-        proxy = 'foreman-proxy'
-
     installer_options = {
-        '{0}-dns'.format(proxy): 'true',
-        '{0}-dns-forwarders'.format(proxy): forwarders,
-        '{0}-dns-interface'.format(proxy): interface,
-        '{0}-dns-zone.format(proxy)': domain,
-        '{0}-dhcp'.format(proxy): 'true',
-        '{0}-dhcp-interface'.format(proxy): interface,
-        '{0}-tftp'.format(proxy): 'true',
-        '{0}-tftp-servername'.format(proxy): hostname,
+        'capsule-dns': 'true',
+        'capsule-dns-forwarders': forwarders,
+        'capsule-dns-interface': interface,
+        'capsule-dns-zone': domain,
+        'capsule-dhcp': 'true',
+        'capsule-dhcp-interface': interface,
+        'capsule-tftp': 'true',
+        'capsule-tftp-servername': hostname,
         'capsule-puppet': 'true',
-        '{0}-puppetca'.format(proxy): 'true',
-        '{0}-register-in-foreman'.format(proxy): 'true',
+        'capsule-puppetca': 'true',
+        'capsule-register-in-foreman': 'true',
     }
 
     if 'DHCP_RANGE' in os.environ:
-        installer_options[
-            '{0}-dhcp-range'.format(proxy)
-        ] = os.environ.get('DHCP_RANGE')
+        installer_options['capsule-dhcp-range'] = os.environ.get('DHCP_RANGE')
 
     if 'GATEWAY' in os.environ:
         gateway = os.environ.get('GATEWAY')
-        installer_options['{0}-dhcp-gateway'.format(proxy)] = gateway
+        installer_options['capsule-dhcp-gateway'] = gateway
         zone = gateway.rpartition('.')[0]
         reversed_zone = '.'.join(reversed(zone.split('.')))
         dns_reverse_zone = '{0}.in-addr.arpa'.format(reversed_zone)
-        installer_options['{0}-dns-reverse'.format(proxy)] = dns_reverse_zone
+        installer_options['capsule-dns-reverse'] = dns_reverse_zone
 
     if run_katello_installer:
         katello_installer(**installer_options)
@@ -870,10 +864,7 @@ def downstream_install(admin_password=None, run_katello_installer=True):
     satellite_repo.close()
 
     # Install required packages for the installation
-    if os.environ.get('SATELLITE_VERSION') == '6.2':
-        run('yum install -y satellite')
-    else:
-        run('yum install -y katello')
+    run('yum install -y katello')
 
     installer_options = {
         'foreman-admin-password': admin_password,
@@ -1066,9 +1057,6 @@ def product_install(distribution, create_vm=False, certificate_url=None,
                     host=env['vm_ip']
                 )
 
-    # Fetch the Satellite Version information.
-    satellite_version = os.environ.get('SATELLITE_VERSION')
-
     # When creating a vm the vm_ip will be set, otherwise use the fabric host
     host = env.get('vm_ip', env['host'])
 
@@ -1145,7 +1133,6 @@ def product_install(distribution, create_vm=False, certificate_url=None,
         katello_installer,
         host=host,
         sam=distribution.startswith('sam'),
-        sat_version=satellite_version,
         **installer_options
     )
 
@@ -1730,33 +1717,24 @@ def java_workaround():
         run('yum install -y java-1.7.0-openjdk')
 
 
-def katello_installer(debug=False, sam=False, verbose=True, sat_version='6.2',
-                      **kwargs):
+def katello_installer(debug=False, sam=False, verbose=True, **kwargs):
     """Runs the installer with ``kwargs`` as command options. If ``sam`` is
     True
 
     """
-    # capsule-dns-forwarders should be repeated if setting more than one
-    # value check if a list is being received and repeat the option with
-    # different values
-    proxy = 'capsule'
-    installer = 'katello'
-    if sam:
-        sat_version = ''
-    if sat_version == '6.2':
-        proxy = 'foreman-proxy'
-        installer = 'foreman'
+    # capsule-dns-forwarders should be repeated if setting more than one value
+    # check if a list is being received and repeat the option with different
+    # values
     extra_options = []
-    if ('{0}-dns-forwarders'.format(proxy) in kwargs and
-            isinstance(kwargs['{0}-dns-forwarders'.format(proxy)], list)):
-        forwarders = kwargs.pop('{0}-dns-forwarders'.format(proxy))
+    if ('capsule-dns-forwarders' in kwargs and
+            isinstance(kwargs['capsule-dns-forwarders'], list)):
+        forwarders = kwargs.pop('capsule-dns-forwarders')
         for forwarder in forwarders:
             extra_options.append(
-                '--{0}-dns-forwarders="{1}"'.format(proxy, forwarder))
+                '--capsule-dns-forwarders="{0}"'.format(forwarder))
 
-    run('{0}-installer {1} {2} {3} {4} {5}'.format(
-        'sam' if sam else installer,
-        '--scenario katello' if installer == 'foreman' else '',
+    run('{0}-installer {1} {2} {3} {4}'.format(
+        'sam' if sam else 'katello',
         '-d' if debug else '',
         '-v' if verbose else '',
         ' '.join([
@@ -2622,7 +2600,4 @@ def enable_gateway_ports_connections():
 
 def set_yum_debug_level(level=1):
     """Set default debug level for yum output"""
-    run(
-        'sed -i "s/^[#]*debuglevel=.*/debuglevel={}/" /etc/yum.conf'
-        .format(level)
-    )
+    run('sed -i "s/^[#]*debuglevel=.*/debuglevel={}/" /etc/yum.conf'.format(level))
