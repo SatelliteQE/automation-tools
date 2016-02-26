@@ -282,7 +282,7 @@ def setup_default_capsule(interface=None, run_katello_installer=True):
         '{0}-dns'.format(proxy): 'true',
         '{0}-dns-forwarders'.format(proxy): forwarders,
         '{0}-dns-interface'.format(proxy): interface,
-        '{0}-dns-zone.format(proxy)': domain,
+        '{0}-dns-zone'.format(proxy): domain,
         '{0}-dhcp'.format(proxy): 'true',
         '{0}-dhcp-interface'.format(proxy): interface,
         '{0}-tftp'.format(proxy): 'true',
