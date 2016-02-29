@@ -20,7 +20,9 @@ from urlparse import urlsplit
 
 from automation_tools.satellite6.capsule import generate_capsule_certs
 from automation_tools.repository import (
-    delete_custom_repos, enable_satellite_repos, enable_repos, disable_repos)
+    create_custom_repos, delete_custom_repos, enable_satellite_repos,
+    enable_repos, disable_repos
+)
 from automation_tools.utils import distro_info, update_packages
 from fabric.api import cd, env, execute, get, local, put, run, settings, sudo
 from novaclient.client import Client
@@ -1002,6 +1004,9 @@ def product_install(distribution, create_vm=False, certificate_url=None,
     If ``certificate_url`` parameter or ``FAKE_MANIFEST_CERT_URL`` env var is
     defined the setup_fake_manifest_certificate task will run.
 
+    ``OS_UPGRADE_REPO`` env var can be defined to setup a custom repository
+    before OS upgrade, it can be OS candidate repo when tesing OS compatibility
+
     Every call to a task after the definition ``host = env.get('vm_ip',
     env['host'])`` must be run by using ``execute`` and passing ``host=host``.
 
@@ -1086,7 +1091,10 @@ def product_install(distribution, create_vm=False, certificate_url=None,
         cdn_version=sat_cdn_version,
         host=host
     )
-
+    # Create custom OS beaker repo
+    if os.environ.get('OS_UPGRADE_REPO'):
+        os_upgrade_repo = os.environ.get('OS_UPGRADE_REPO')
+        execute(create_custom_repos, rhel_candidate=os_upgrade_repo, host=host)
     # Update the machine
     execute(update_packages, host=host, warn_only=True)
 
