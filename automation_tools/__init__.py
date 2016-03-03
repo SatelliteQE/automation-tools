@@ -353,7 +353,7 @@ def setup_fake_manifest_certificate(certificate_url=None):
 
 def setup_firewall():
     """Setup firewall rules that Satellite 6 needs to work properly"""
-    ports = (
+    tcp_ports = (
         # Port 443 for HTTPS (secure WWW) must be open for incoming
         # connections.
         443,
@@ -376,20 +376,33 @@ def setup_firewall():
         5647,
         # Port 8000 for foreman-proxy service
         8000,
-        # Port 8443 for Katello access the Islated Capsule
+        # Port 8443 for Katello access the Isolated Capsule
         8443,
     )
 
-    for port in ports:
-        rule_exists = run(
-            r'iptables -nL INPUT | grep -E "^ACCEPT\s+tcp.*{0}"'.format(port),
-            quiet=True,
-        ).succeeded
-        if not rule_exists:
-            run(
-                'iptables -I INPUT -m state --state NEW -p tcp --dport {0} '
-                '-j ACCEPT'.format(port)
-            )
+    udp_ports = (
+        # Port 53 must be open for DNS Capsule Feature.
+        53,
+        # Port 69 must be open for TFTP Capsule Feature.
+        69,
+    )
+
+    definitions = {
+        'tcp': tcp_ports,
+        'udp': udp_ports,
+    }
+
+    for protocol, ports in definitions:
+        for port in ports:
+            rule_exists = run(
+                r'iptables -nL INPUT | grep -E "^ACCEPT\s+{0}.*{1}"'.format(protocol, port),
+                quiet=True,
+            ).succeeded
+            if not rule_exists:
+                run(
+                    'iptables -I INPUT -m state --state NEW -p {0} --dport {1} '
+                    '-j ACCEPT'.format(protocol, port)
+                )
 
     # To make the changes persistent across reboots when using the command line
     # use this command:
