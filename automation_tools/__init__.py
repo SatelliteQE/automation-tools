@@ -392,8 +392,8 @@ def setup_firewall():
         'udp': udp_ports,
     }
 
-    for protocol, ports in definitions:
-        for port in ports:
+    for protocol in definitions:
+        for port in definitions[protocol]:
             rule_exists = run(
                 r'iptables -nL INPUT | grep -E "^ACCEPT\s+{0}.*{1}"'.format(protocol, port),
                 quiet=True,
