@@ -1931,10 +1931,11 @@ def sync_capsule_tools_repos_to_upgrade(admin_password=None):
     version = distro_info()[1]
     details = os.environ.get('CAP_SUB_DETAILS')
     if details is not None:
-        cv_name, env, ak_name = [item.strip() for item in details.split(',')]
+        cv_name, env_name, ak_name = [
+            item.strip() for item in details.split(',')]
     else:
         cv_name = 'rhel{0}_cv'.format(version)
-        env = 'DEV'
+        env_name = 'DEV'
         ak_name = 'rhel'
     if admin_password is None:
         admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme')
@@ -1977,7 +1978,7 @@ def sync_capsule_tools_repos_to_upgrade(admin_password=None):
     # promote cv
     lc_env_id = str(
         run(initials + 'lifecycle-environment list '
-            '--organization {0} | grep {1}'.format(org, env))).split(
+            '--organization {0} | grep {1}'.format(org, env_name))).split(
                 '|')[0].strip()
     cv_ver_id = str(
         run(initials + 'content-view version list --content-view {0} '
