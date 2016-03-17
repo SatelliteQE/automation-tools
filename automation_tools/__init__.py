@@ -2358,8 +2358,8 @@ def satellite6_capsule_upgrade(admin_password=None):
 
 
 def product_upgrade(
-        product, ssh_key, sat_instance, sat_image, sat_flavor,
-        cap_instance=None, cap_image=None, cap_flavor=None):
+        product, ssh_key=None, sat_instance=None, sat_image=None,
+        sat_flavor=None, cap_instance=None, cap_image=None, cap_flavor=None):
     """Task which upgrades the product.
 
     Product is satellite or capsule.
