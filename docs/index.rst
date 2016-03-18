@@ -9,13 +9,22 @@ automation-tools documentation
 A set of tools to help automating virtual machines to install Foreman and test
 it using `Robottelo <https://github.com/SatelliteQE/robottelo>`_.
 
-Usage examples
-==============
+Installation
+============
 
-The python packages listed in `requirements.txt` must be installed before
+Install the following packages on your Operating System::
+
+    sudo yum -y install libxml-devel libxslt-devel
+
+
+Also python packages listed in `requirements.txt` must be installed before
 automation-tools can be used::
 
     pip install -r requirements.txt
+
+
+Usage examples
+==============
 
 Virtual Machine Management
 --------------------------
