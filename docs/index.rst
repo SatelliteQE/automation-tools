@@ -12,16 +12,9 @@ it using `Robottelo <https://github.com/SatelliteQE/robottelo>`_.
 Installation
 ============
 
-Install the following packages on your Operating System.
+Install the following packages on your Operating System::
 
-- libxml
-- libxml-devel
-- libxslt
-- libxslt-devel
-- libxslt-python
-
-    Note that those package names can vary according to operating system.
-    e.g: In Fedora23 `libxml2-2.9.3-2.fc23.x86_64` is valid name while the same package is called only `libxml` in other systems
+    sudo yum -y install libxml-devel libxslt-devel
 
 
 Also python packages listed in `requirements.txt` must be installed before
