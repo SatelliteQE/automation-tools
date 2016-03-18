@@ -194,6 +194,8 @@ def setup_default_docker():
     # Install ``Docker`` package.
     if os_version >= 7:
         run('yum install -y docker', warn_only=True)
+        # Disable 'extras' repo after installing Docker
+        disable_repos('rhel-{0}-server-extras-rpms'.format(os_version))
     else:
         run('yum install -y docker-io', warn_only=True)
         # Delete EPEL repo files
