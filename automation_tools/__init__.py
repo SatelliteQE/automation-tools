@@ -2,7 +2,6 @@
 
 Many commands are affected by environment variables. Unless stated otherwise,
 all environment variables are required.
-
 """
 from __future__ import print_function
 import os
@@ -353,63 +352,124 @@ def setup_fake_manifest_certificate(certificate_url=None):
     manage_daemon('restart', 'tomcat6' if distro_info()[1] <= 6 else 'tomcat')
 
 
-def setup_firewall():
-    """Setup firewall rules that Satellite 6 needs to work properly"""
-    tcp_ports = (
-        # Port 443 for HTTPS (secure WWW) must be open for incoming
-        # connections.
-        443,
-        # Port 5671 must be open for SSL communication with managed systems.
-        5671,
-        # Port 80 for HTTP (WWW) must be open to download the bootstrap files.
-        80,
-        # Port 8140 must be open for incoming Puppet connections with the
-        # managed systems.
-        8140,
-        # Port 9090 must be open for Foreman Smart Proxy connections with the
-        # managed systems.
-        9090,
-        # Port 22 must be open for connections via ssh
-        22,
-        # Port 5000 must be open for Docker registry communication.
-        5000,
-        # Ports 5646 and 5647 for qpidd
-        5646,
-        5647,
-        # Port 8000 for foreman-proxy service
-        8000,
-        # Port 8443 for Katello access the Isolated Capsule
-        8443,
-    )
+def setup_firewall(definitions=None):
+    """Setup firewall rules based on the ``definitions``.
 
-    udp_ports = (
-        # Port 53 must be open for DNS Capsule Feature.
-        53,
-        # Port 69 must be open for TFTP Capsule Feature.
-        69,
-    )
+    :param definitions: A dict containing the definitions for the
+        firewall rules, for example::
 
-    definitions = {
-        'tcp': tcp_ports,
-        'udp': udp_ports,
-    }
+            definitions = {
+                'tcp': (
+                    42,
+                    9090,
+                ),
+                'udp': (
+                    4242,
+                    4422,
+                ),
+            }
+    """
+    if definitions is None:
+        return
+
+    if distro_info()[1] < 7:
+        exists_command = r'iptables -nL INPUT | grep -E "^ACCEPT\s+{0}.*{1}"'
+        command = (
+            'iptables -I INPUT -m state --state NEW -p {0} --dport {1} '
+            '-j ACCEPT'
+        )
+    else:
+        exists_command = 'firewall-cmd --query-port="{1}/{0}"'
+        command = 'firewall-cmd --permanent --add-port="{1}/{0}"'
 
     for protocol in definitions:
         for port in definitions[protocol]:
             rule_exists = run(
-                r'iptables -nL INPUT | grep -E "^ACCEPT\s+{0}.*{1}"'.format(protocol, port),
+                exists_command.format(protocol, port),
                 quiet=True,
             ).succeeded
             if not rule_exists:
-                run(
-                    'iptables -I INPUT -m state --state NEW -p {0} --dport {1} '
-                    '-j ACCEPT'.format(protocol, port)
-                )
+                run(command.format(protocol, port))
 
-    # To make the changes persistent across reboots when using the command line
-    # use this command:
-    run('iptables-save > /etc/sysconfig/iptables')
+    if distro_info()[1] < 7:
+        # To make the changes persistent across reboots when using the
+        # command line use this command:
+        run('iptables-save > /etc/sysconfig/iptables')
 
+
+def setup_satellite_firewall():
+    """Setup firewall rules that Satellite 6 needs to work properly."""
+    setup_firewall({
+        'tcp': (
+            # Port 443 for HTTPS (secure WWW) must be open for incoming
+            # connections.
+            443,
+            # Port 5671 must be open for SSL communication with managed systems.
+            5671,
+            # Port 80 for HTTP (WWW) must be open to download the bootstrap files.
+            80,
+            # Port 8140 must be open for incoming Puppet connections with the
+            # managed systems.
+            8140,
+            # Port 9090 must be open for Foreman Smart Proxy connections with the
+            # managed systems.
+            9090,
+            # Port 22 must be open for connections via ssh
+            22,
+            # Port 5000 must be open for Docker registry communication.
+            5000,
+            # Ports 5646 and 5647 for qpidd
+            5646,
+            5647,
+            # Port 8000 for foreman-proxy service
+            8000,
+            # Port 8443 for Katello access the Isolated Capsule
+            8443,
+        ),
+        'udp': (
+            # Port 53 must be open for DNS Capsule Feature.
+            53,
+            # Port 69 must be open for TFTP Capsule Feature.
+            69,
+        ),
+    })
+
+
+def setup_capsule_firewall():
+    """Setup firewall rules that a Satellite 6 Capsule needs to work
+    properly.
+    """
+    setup_firewall({
+        'tcp': (
+            # Connections to the proxy in the Capsule and sending
+            # generated SCAP reports to the proxy in the Capsule for
+            # spooling
+            9090,
+            # Queries to the DNS service
+            53,
+            # Anaconda, yum, and for obtaining Katello certificate updates
+            80,
+            # Anaconda, yum, Telemetry Services, and Puppet
+            443,
+            # The Katello agent to communicate with the Capsule's Qpid dispatch router
+            5647,
+            # Anaconda to download kickstart templates to hosts, and for downloading iPXE firmware
+            8000,
+            # Puppet agent to Puppet master connections
+            8140,
+            # Subscription Management Services connection to the reverse proxy for the certificate-based API
+            8443,
+        ),
+        'udp': (
+            # Queries to the DNS service
+            53,
+            # For Client provisioning from the Capsule
+            67,
+            68,
+            # Downloading PXE boot image files
+            69,
+        ),
+    })
 
 def setup_abrt():
     """Task to setup abrt on foreman
@@ -1147,7 +1207,7 @@ def product_install(distribution, create_vm=False, certificate_url=None,
 
     # Firewall should be setup after setup_default_capsule clean the puppet
     # module it installs clean already created rules
-    execute(setup_firewall, host=host)
+    execute(setup_satellite_firewall, host=host)
 
     if distribution.startswith('satellite6'):
         if os.environ.get('PROXY_INFO'):

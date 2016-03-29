@@ -15,7 +15,6 @@ class ImproperlyConfigured(Exception):
     configured
     - for example, if the configuration is not loaded or some required
     configuration is missing.
-
     """
 
 
@@ -26,7 +25,6 @@ class Credentials(object):
 
         cred1 = Credentials('admin', 'password')
         cred2 = Credentials(key_filename='/path/to/ssh.key')
-
     """
     def __init__(self, user=None, password=None, key_filename=None):
         self.user = user
@@ -42,7 +40,6 @@ class HostConfig(Credentials):
         cred1 = HostConfig('host1.example.com', 'admin', 'password')
         cred2 = HostConfig(
             'host2.example.com', key_filename='/path/to/ssh.key')
-
     """
     def __init__(self, hostname=None, port=22, *args, **kwargs):
         super(HostConfig, self).__init__(*args, **kwargs)
@@ -58,7 +55,6 @@ class HostConfig(Credentials):
 class Config(object):
     """Configuration information provide easy access to configuration and some
     helper methods to identify if some configuration is present or not.
-
     """
     def __init__(self, path):
         self.path = path
@@ -122,7 +118,6 @@ class Config(object):
     def key_filenames(self):
         """Return a list of collect key filenames or None if the list is
         empty.
-
         """
         if self._key_filenames:
             return list(self._key_filenames)
@@ -133,7 +128,6 @@ class Config(object):
     def passwords(self):
         """Return a dict in the format suited for Fabric usage in order to
         define passwords for hosts.
-
         """
         passwords = {}
         if self.server.password and not self.server.key_filename:
@@ -147,7 +141,6 @@ class Config(object):
 def _get_config():
     """Get the capsule configuration if available in the fabric environment
     else raise ``ImproperlyConfigured``.
-
     """
     config = env.get('capsule_config')
     if config is None:
@@ -173,27 +166,27 @@ def load_capsule_config(path):
 
 @task
 def get_oauth_info():
-    """Get foreman_oauth_key, foreman_oauth_secret and pulp_oauth_secret
+    """Get oauth_consumer_key, oauth_consumer_secret and pulp_oauth_secret
     information.
 
-    :return: Tuple containing (foreman_oauth_key, foreman_oauth_secret,
+    :return: Tuple containing (oauth_consumer_key, oauth_consumer_secret,
         pulp_oauth_secret)
-
     """
     result = run('grep oauth_consumer /etc/foreman/settings.yaml', quiet=True)
     for line in result.splitlines():
         if 'oauth_consumer_key' in line:
-            foreman_oauth_key = line.split(': ')[1].strip()
+            oauth_consumer_key = line.split(': ')[1].strip()
         if 'oauth_consumer_secret' in line:
-            foreman_oauth_secret = line.split(': ')[1].strip()
+            oauth_consumer_secret = line.split(': ')[1].strip()
     result = run('grep "^oauth_secret" /etc/pulp/server.conf', quiet=True)
     pulp_oauth_secret = result.split(': ')[1].strip()
     print(
-        'foreman_oauth_key: {}\nforeman_oauth_secret: {}\n'
+        'oauth_consumer_key: {}\n'
+        'oauth_consumer_secret: {}\n'
         'pulp_oauth_secret: {}'
-        .format(foreman_oauth_key, foreman_oauth_secret, pulp_oauth_secret)
+        .format(oauth_consumer_key, oauth_consumer_secret, pulp_oauth_secret)
     )
-    return (foreman_oauth_key, foreman_oauth_secret, pulp_oauth_secret)
+    return (oauth_consumer_key, oauth_consumer_secret, pulp_oauth_secret)
 
 
 @task
@@ -210,7 +203,6 @@ def generate_capsule_certs(capsule_hostname, force=False):
         capsule.
     :param bool force: Force creation of the capsule cert even if it is
         already created.
-
     """
     cert_path = '{}-certs.tar'.format(capsule_hostname)
     result = run('[ -f {} ]'.format(cert_path), quiet=True)
@@ -225,7 +217,8 @@ def register_capsule():
     """Register the capsule on the Satellite 6 server."""
     config = _get_config()
     run(
-        'rpm -Uvh http://{}/pub/katello-ca-consumer-latest.noarch.rpm'
+        'yum -y localinstall '
+        'http://{}/pub/katello-ca-consumer-latest.noarch.rpm'
         .format(config.server.hostname),
         warn_only=True
     )
@@ -253,20 +246,29 @@ def register_capsule():
 
 @task
 def capsule_installer(
-        foreman_oauth_key, foreman_oauth_secret, pulp_oauth_secret):
+        capsule_fqdn, cert_path, oauth_consumer_key,
+        oauth_consumer_secret, pulp_oauth_secret):
     """Install and run capsule-installer."""
     config = _get_config()
-    run('yum -y install capsule-installer')
+    run('yum -y install satellite-capsule')
     run(
-        'capsule-installer -v --certs-tar *-certs.tar --parent-fqdn {} '
-        '--pulp true --pulp-oauth-secret {} --puppet true --puppetca true '
-        '--foreman-oauth-secret {} --foreman-oauth-key {} '
-        '--register-in-foreman true --qpid-router true --reverse-proxy true'
+        'foreman-installer -v --scenario capsule '
+        '--certs-tar {cert_path}'
+        '--foreman-base-url "https://{parent_fqdn}" '
+        '--oauth-consumer-key "{oauth_consumer_key}" '
+        '--oauth-consumer-secret "{oauth_consumer_secret}" '
+        '--parent-fqdn "{parent_fqdn}" '
+        '--pulp-oauth-secret "{pulp_oauth_secret}" '
+        '--register-in-foreman true '
+        '--trusted-hosts "{capsule_fqdn}" '
+        '--trusted-hosts "{parent_fqdn}"'
         .format(
-            config.server.hostname,
-            pulp_oauth_secret,
-            foreman_oauth_secret,
-            foreman_oauth_key
+            capsule_fqdn=capsule_fqdn,
+            cert_path=cert_path,
+            oauth_consumer_key=oauth_consumer_key,
+            oauth_consumer_secret=oauth_consumer_secret,
+            parent_fqdn=config.server.hostname,
+            pulp_oauth_secret=pulp_oauth_secret,
         )
     )
 
@@ -280,7 +282,6 @@ def hammer(command):
         The returned object will exhibit ``failed`` and ``succeeded`` boolean
         attributes specifying whether the command failed or succeeded, and will
         also include the return code as the ``return_code`` attribute.
-
     """
     config = _get_config()
     command_result = run(
@@ -310,7 +311,6 @@ def hammer_capsule_lcenvs(capsule_id):
         ``[{u'organization': u'Default Organization', u'id': 1,
         u'name': u'Library'}]``.
     :rtype: list
-
     """
     return hammer(
         'capsule content available-lifecycle-environments --id {}'
@@ -324,12 +324,233 @@ def hammer_capsule_add_lcenv(capsule_id, lcenv_id):
 
     :param capsule_id: The capsule ID to add the lifecycle environment.
     :param lcenv_id: The lifecycle environment ID to add to the capsule.
-
     """
     return hammer(
         'capsule content add-lifecycle-environment --environment-id {} --id {}'
         .format(lcenv_id, capsule_id)
     )
+
+
+@task
+def hammer_product_create(name, organization_id):
+    """Create a product
+
+    :param name: name of the product
+    :param organization_id: organization where the product will be created
+    """
+    return hammer(
+        'product create --name "{}" --organization-id "{}"'
+        .format(name, organization_id)
+    )
+
+
+@task
+def hammer_repository_create(name, organization_id, product_name, url):
+    """Create a repository
+
+    :param name: name of the repository
+    :param organization_id: organization where the repository will be created
+    :param product_name: name of the product which the repository belongs
+    :param url: repository source URL
+    """
+    return hammer(
+        'repository create --name "{}" '
+        '--content-type "yum" '
+        '--organization-id "{}" '
+        '--product "{}" '
+        '--url "{}"'
+        .format(name, organization_id, product_name, url)
+    )
+
+
+@task
+def hammer_repository_synchronize(name, organization_id, product_name):
+    """Synchronize a repository
+
+    :param name: name of the repository to synchronize
+    :param organization_id: organization_id where the repository was created
+    :param product_name: product name which the repository belongs
+    """
+    return hammer(
+        'repository synchronize --name "{}" '
+        '--organization-id "{}" '
+        '--product "{}"'
+        .format(name, organization_id, product_name)
+    )
+
+
+@task
+def hammer_content_view_create(name, organization_id):
+    """Create a content view
+
+    :param name: name of the content view
+    :param organization_id: organization where the content view will be created
+    """
+    return hammer(
+        'content-view create --name "{}" --organization-id "{}"'
+        .format(name, organization_id)
+    )
+
+
+@task
+def hammer_content_view_add_repository(
+        name, organization_id, product_name, repository_name):
+    """Add a repository to a content view
+
+    :param name: name of the content view which the repository will be added
+    :param organization_id: organization where the content view, product and
+        repository were created
+    :param product_name: name of the product where the repository was created
+    :param repository_name: repository name which will be added to the content
+        view
+    """
+    return hammer(
+        'content-view add-repository --name "{}" '
+        '--organization-id "{}" '
+        '--product "{}" '
+        '--repository "{}"'
+        .format(name, organization_id, product_name, repository_name)
+    )
+
+
+@task
+def hammer_content_view_publish(name, organization_id):
+    """Publish a content view
+
+    :param name: name of the content view which will be published
+    :param organization_id: organization where the content view was created
+    """
+    return hammer(
+        'content-view publish --name "{}" --organization-id "{}"'
+        .format(name, organization_id)
+    )
+
+
+@task
+def hammer_activation_key_create(
+        name, organization_id, content_view_name,
+        lifecycle_environment_name='Library'):
+    """Create an activation key
+
+    :param name: name of the acktivation key which will be created
+    :param organization_id: organization where the activation key will be
+        created
+    :param content_view_name: content view name which will be linked to the
+        activation key
+    :param lifecycle_environment_name: lifecycle environment name which will be
+        linked to the activation key
+    """
+    return hammer(
+        'activation-key create --name "{}" '
+        '--content-view "{}" '
+        '--lifecycle-environment "{}" '
+        '--organization-id "{}"'
+        .format(
+            name,
+            content_view_name,
+            lifecycle_environment_name,
+            organization_id
+        )
+    )
+
+
+@task
+def hammer_activation_key_add_subscription(
+        name, organization_id, subscription_id):
+    """Add a subscription to an activation key
+
+    :param name: name of the activation key which the subscription will be
+        added
+    :param organization_id: organization where the activation key was created
+    :param subscription_id: subscription which will be added to the activation
+        key
+    """
+    return hammer(
+        'activation-key add-subscription --name "{}" '
+        '--organization-id "{}" '
+        '--subscription-id "{}"'
+        .format(name, organization_id, subscription_id)
+    )
+
+
+@task
+def setup_capsule_content(
+        activation_key_name,
+        content_view_name,
+        organization_id,
+        product_name,
+        rhel_repo_name,
+        rhel_repo_url,
+        satellite_capsule_repo_name,
+        satellite_capsule_repo_url,
+        satellite_tools_repo_name,
+        satellite_tools_repo_url):
+    """Setup the content used to provision a capsule.
+
+
+    :param activation_key_name: name of the activation key which will be
+        created
+    :param content_view_name: name of the content view which will be created
+    :param organization_id: organization where all entities will be created
+    :param product_name: name of the product which will be created
+    :param rhel_repo_name: name of the RHEL repository which will be created
+    :param rhel_repo_url: URL of the RHEL repository which will be created
+    :param satellite_capsule_repo_name: name of the capsule repository which
+        will be created
+    :param satellite_capsule_repo_url: URL of the capsule repository which will
+        be created
+    :param satellite_tools_repo_name: name of the satellite tools repository
+        which will be created
+    :param satellite_tools_repo_url: URL of the satellite tools repository
+        which will be created
+    """
+    hammer_product_create(product_name, organization_id)
+    hammer_repository_create(
+        rhel_repo_name, organization_id, product_name, rhel_repo_url)
+    hammer_repository_create(
+        satellite_capsule_repo_name,
+        organization_id,
+        product_name,
+        satellite_capsule_repo_url
+    )
+    hammer_repository_create(
+        satellite_tools_repo_name,
+        organization_id,
+        product_name,
+        satellite_tools_repo_url
+    )
+    hammer_repository_synchronize(
+        rhel_repo_name, organization_id, product_name)
+    hammer_repository_synchronize(
+        satellite_capsule_repo_name, organization_id, product_name)
+    hammer_repository_synchronize(
+        satellite_tools_repo_name, organization_id, product_name)
+    hammer_content_view_create(
+        content_view_name, organization_id)
+    hammer_content_view_add_repository(
+        content_view_name, organization_id, product_name, rhel_repo_name)
+    hammer_content_view_add_repository(
+        content_view_name,
+        organization_id,
+        product_name,
+        satellite_capsule_repo_name
+    )
+    hammer_content_view_add_repository(
+        content_view_name,
+        organization_id,
+        product_name,
+        satellite_tools_repo_name
+    )
+    hammer_content_view_publish(content_view_name, organization_id)
+    product_id = run(
+        'hammer --csv subscription list --organization-id="{}" '
+        '--search="name=\\"{}\\"" | cut  -d "," -f 8 | grep -vi "ID"',
+        quiet=True
+    )
+    hammer_activation_key_create(
+        activation_key_name, organization_id, content_view_name)
+    hammer_activation_key_add_subscription(
+        activation_key_name, organization_id, product_id)
 
 
 @task
@@ -340,7 +561,6 @@ def hammer_capsule_list():
         ``[{u'url': u'https://capsule1.example.com:9090', u'id': 1,
         u'name': u'capsule1.example.com'}]``.
     :rtype: list
-
     """
     return hammer('capsule list')
 
@@ -352,9 +572,8 @@ def sync_capsule_content(capsule):
 
     :param dict capsule: A capsule dictionary containing its ``id`` and
         ``name``.
-
     """
-    if capsule['id'] != 1:
+    if capsule['id'] == 1:
         print('Skipping default capsule...')
         return
     lcenvs = hammer_capsule_lcenvs(capsule['id'])
@@ -369,7 +588,6 @@ def sync_capsule_content(capsule):
 def setup_capsules(path):
     """Reads the configuration, create capsules and start content sync on
     them.
-
     """
     load_capsule_config(path)
     config = env.capsule_config
@@ -393,9 +611,4 @@ def setup_capsules(path):
         with settings(host_string=capsule.host_string):
             register_capsule()
             put(local_path=cert_path)
-            capsule_installer(*oauth_info)
-
-    # Start content synchronization in all registered capsules
-    with settings(host_string=server):
-        for capsule in hammer_capsule_list():
-            sync_capsule_content(capsule)
+            capsule_installer(capsule.hostname, cert_path, *oauth_info)
