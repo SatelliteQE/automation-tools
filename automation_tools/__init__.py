@@ -379,6 +379,9 @@ def setup_firewall(definitions=None):
             '-j ACCEPT'
         )
     else:
+        if run('systemctl status firewalld', quiet=True).failed:
+            run('systemctl enable firewalld')
+            run('systemctl start firewalld')
         exists_command = 'firewall-cmd --query-port="{1}/{0}"'
         command = 'firewall-cmd --permanent --add-port="{1}/{0}"'
 
