@@ -372,7 +372,7 @@ def setup_firewall(definitions=None):
     if definitions is None:
         return
 
-    if distro_info()[1] < 7:
+    if distro_info()[1] < 8:
         exists_command = r'iptables -nL INPUT | grep -E "^ACCEPT\s+{0}.*{1}"'
         command = (
             'iptables -I INPUT -m state --state NEW -p {0} --dport {1} '
@@ -394,7 +394,7 @@ def setup_firewall(definitions=None):
             if not rule_exists:
                 run(command.format(protocol, port))
 
-    if distro_info()[1] < 7:
+    if distro_info()[1] < 8:
         # To make the changes persistent across reboots when using the
         # command line use this command:
         run('iptables-save > /etc/sysconfig/iptables')
@@ -407,15 +407,17 @@ def setup_satellite_firewall():
             # Port 443 for HTTPS (secure WWW) must be open for incoming
             # connections.
             443,
-            # Port 5671 must be open for SSL communication with managed systems.
+            # Port 5671 must be open for SSL communication with managed
+            # systems.
             5671,
-            # Port 80 for HTTP (WWW) must be open to download the bootstrap files.
+            # Port 80 for HTTP (WWW) must be open to download the bootstrap
+            # files.
             80,
             # Port 8140 must be open for incoming Puppet connections with the
             # managed systems.
             8140,
-            # Port 9090 must be open for Foreman Smart Proxy connections with the
-            # managed systems.
+            # Port 9090 must be open for Foreman Smart Proxy connections with
+            # the managed systems.
             9090,
             # Port 22 must be open for connections via ssh
             22,
@@ -454,13 +456,16 @@ def setup_capsule_firewall():
             80,
             # Anaconda, yum, Telemetry Services, and Puppet
             443,
-            # The Katello agent to communicate with the Capsule's Qpid dispatch router
+            # The Katello agent to communicate with the Capsule's Qpid dispatch
+            # router
             5647,
-            # Anaconda to download kickstart templates to hosts, and for downloading iPXE firmware
+            # Anaconda to download kickstart templates to hosts, and for
+            # downloading iPXE firmware
             8000,
             # Puppet agent to Puppet master connections
             8140,
-            # Subscription Management Services connection to the reverse proxy for the certificate-based API
+            # Subscription Management Services connection to the reverse proxy
+            # for the certificate-based API
             8443,
         ),
         'udp': (
@@ -473,6 +478,7 @@ def setup_capsule_firewall():
             69,
         ),
     })
+
 
 def setup_abrt():
     """Task to setup abrt on foreman
