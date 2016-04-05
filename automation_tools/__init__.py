@@ -1167,7 +1167,7 @@ def product_install(distribution, create_vm=False, certificate_url=None,
     execute(subscribe, host=host)
 
     # Setting yum stdout log level to be less verbose
-    execute(set_yum_debug_level)
+    execute(set_yum_debug_level, host=host)
 
     execute(install_prerequisites, host=host)
     execute(setenforce, selinux_mode, host=host)
@@ -2301,7 +2301,7 @@ def satellite6_upgrade(admin_password=None):
     if admin_password is None:
         admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme')
     # Setting yum stdout log level to be less verbose
-    execute(set_yum_debug_level)
+    set_yum_debug_level()
     # Removing rhel-released and rhel-optional repo
     run('rm -rf /etc/yum.repos.d/rhel-{optional,released}.repo')
     print('Wait till Packages update ... ')
