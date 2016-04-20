@@ -49,7 +49,7 @@ class HostConfig(Credentials):
     @property
     def host_string(self):
         """Return a host_string in the format expected by Fabric"""
-        return '{}@{}:{}'.format(self.user, self.hostname, self.port)
+        return '{0}@{1}:{2}'.format(self.user, self.hostname, self.port)
 
 
 class Config(object):
@@ -181,9 +181,9 @@ def get_oauth_info():
     result = run('grep "^oauth_secret" /etc/pulp/server.conf', quiet=True)
     pulp_oauth_secret = result.split(': ')[1].strip()
     print(
-        'oauth_consumer_key: {}\n'
-        'oauth_consumer_secret: {}\n'
-        'pulp_oauth_secret: {}'
+        'oauth_consumer_key: {0}\n'
+        'oauth_consumer_secret: {1}\n'
+        'pulp_oauth_secret: {2}'
         .format(oauth_consumer_key, oauth_consumer_secret, pulp_oauth_secret)
     )
     return (oauth_consumer_key, oauth_consumer_secret, pulp_oauth_secret)
@@ -204,11 +204,11 @@ def generate_capsule_certs(capsule_hostname, force=False):
     :param bool force: Force creation of the capsule cert even if it is
         already created.
     """
-    cert_path = '{}-certs.tar'.format(capsule_hostname)
-    result = run('[ -f {} ]'.format(cert_path), quiet=True)
+    cert_path = '{0}-certs.tar'.format(capsule_hostname)
+    result = run('[ -f {0} ]'.format(cert_path), quiet=True)
     if result.failed or force:
-        run('capsule-certs-generate -v --capsule-fqdn {} '
-            '--certs-tar {}'.format(capsule_hostname, cert_path))
+        run('capsule-certs-generate -v --capsule-fqdn {0} '
+            '--certs-tar {1}'.format(capsule_hostname, cert_path))
     return cert_path
 
 
@@ -218,19 +218,20 @@ def register_capsule():
     config = _get_config()
     run(
         'yum -y localinstall '
-        'http://{}/pub/katello-ca-consumer-latest.noarch.rpm'
+        'http://{0}/pub/katello-ca-consumer-latest.noarch.rpm'
         .format(config.server.hostname),
         warn_only=True
     )
     if config.activation_key:
         run(
-            'subscription-manager register --org={} --activationkey={} --force'
+            'subscription-manager register '
+            '--org={0} --activationkey={1} --force'
             .format(config.organization_label, config.activation_key)
         )
     elif config.content_view:
         run(
-            'subscription-manager register --username {} --auto-attach '
-            '--force --password {} --org {} --environment {} '
+            'subscription-manager register --username {0} --auto-attach '
+            '--force --password {1} --org {2} --environment {3} '
             .format(
                 config.admin_user,
                 config.admin_password,
@@ -253,7 +254,7 @@ def capsule_installer(
     run('yum -y install satellite-capsule')
     run(
         'foreman-installer -v --scenario capsule '
-        '--certs-tar {cert_path}'
+        '--certs-tar {cert_path} '
         '--foreman-base-url "https://{parent_fqdn}" '
         '--oauth-consumer-key "{oauth_consumer_key}" '
         '--oauth-consumer-secret "{oauth_consumer_secret}" '
@@ -285,7 +286,7 @@ def hammer(command):
     """
     config = _get_config()
     command_result = run(
-        'hammer --username {} --password {} --output json {}'
+        'hammer --username {0} --password {1} --output json {2}'
         .format(config.admin_user, config.admin_password, command),
         quiet=True
     )
@@ -313,7 +314,7 @@ def hammer_capsule_lcenvs(capsule_id):
     :rtype: list
     """
     return hammer(
-        'capsule content available-lifecycle-environments --id {}'
+        'capsule content available-lifecycle-environments --id {0}'
         .format(capsule_id),
     )
 
@@ -326,7 +327,8 @@ def hammer_capsule_add_lcenv(capsule_id, lcenv_id):
     :param lcenv_id: The lifecycle environment ID to add to the capsule.
     """
     return hammer(
-        'capsule content add-lifecycle-environment --environment-id {} --id {}'
+        'capsule content add-lifecycle-environment '
+        '--environment-id {0} --id {1}'
         .format(lcenv_id, capsule_id)
     )
 
@@ -339,7 +341,7 @@ def hammer_product_create(name, organization_id):
     :param organization_id: organization where the product will be created
     """
     return hammer(
-        'product create --name "{}" --organization-id "{}"'
+        'product create --name "{0}" --organization-id "{1}"'
         .format(name, organization_id)
     )
 
@@ -354,11 +356,11 @@ def hammer_repository_create(name, organization_id, product_name, url):
     :param url: repository source URL
     """
     return hammer(
-        'repository create --name "{}" '
+        'repository create --name "{0}" '
         '--content-type "yum" '
-        '--organization-id "{}" '
-        '--product "{}" '
-        '--url "{}"'
+        '--organization-id "{1}" '
+        '--product "{2}" '
+        '--url "{3}"'
         .format(name, organization_id, product_name, url)
     )
 
@@ -372,9 +374,9 @@ def hammer_repository_synchronize(name, organization_id, product_name):
     :param product_name: product name which the repository belongs
     """
     return hammer(
-        'repository synchronize --name "{}" '
-        '--organization-id "{}" '
-        '--product "{}"'
+        'repository synchronize --name "{0}" '
+        '--organization-id "{1}" '
+        '--product "{2}"'
         .format(name, organization_id, product_name)
     )
 
@@ -387,7 +389,7 @@ def hammer_content_view_create(name, organization_id):
     :param organization_id: organization where the content view will be created
     """
     return hammer(
-        'content-view create --name "{}" --organization-id "{}"'
+        'content-view create --name "{0}" --organization-id "{1}"'
         .format(name, organization_id)
     )
 
@@ -405,10 +407,10 @@ def hammer_content_view_add_repository(
         view
     """
     return hammer(
-        'content-view add-repository --name "{}" '
-        '--organization-id "{}" '
-        '--product "{}" '
-        '--repository "{}"'
+        'content-view add-repository --name "{0}" '
+        '--organization-id "{1}" '
+        '--product "{2}" '
+        '--repository "{3}"'
         .format(name, organization_id, product_name, repository_name)
     )
 
@@ -421,7 +423,7 @@ def hammer_content_view_publish(name, organization_id):
     :param organization_id: organization where the content view was created
     """
     return hammer(
-        'content-view publish --name "{}" --organization-id "{}"'
+        'content-view publish --name "{0}" --organization-id "{1}"'
         .format(name, organization_id)
     )
 
@@ -441,10 +443,10 @@ def hammer_activation_key_create(
         linked to the activation key
     """
     return hammer(
-        'activation-key create --name "{}" '
-        '--content-view "{}" '
-        '--lifecycle-environment "{}" '
-        '--organization-id "{}"'
+        'activation-key create --name "{0}" '
+        '--content-view "{1}" '
+        '--lifecycle-environment "{2}" '
+        '--organization-id "{3}"'
         .format(
             name,
             content_view_name,
@@ -466,9 +468,9 @@ def hammer_activation_key_add_subscription(
         key
     """
     return hammer(
-        'activation-key add-subscription --name "{}" '
-        '--organization-id "{}" '
-        '--subscription-id "{}"'
+        'activation-key add-subscription --name "{0}" '
+        '--organization-id "{1}" '
+        '--subscription-id "{2}"'
         .format(name, organization_id, subscription_id)
     )
 
@@ -543,8 +545,9 @@ def setup_capsule_content(
     )
     hammer_content_view_publish(content_view_name, organization_id)
     product_id = run(
-        'hammer --csv subscription list --organization-id="{}" '
-        '--search="name=\\"{}\\"" | cut  -d "," -f 8 | grep -vi "ID"',
+        "hammer --csv subscription list --organization-id='{0}' "
+        "--search='name=\"{1}\"' | awk -F, 'NR>1{{print$8}}'"
+        .format(organization_id, product_name),
         quiet=True
     )
     hammer_activation_key_create(
@@ -580,7 +583,7 @@ def sync_capsule_content(capsule):
     for lcenv in lcenvs:
         hammer_capsule_add_lcenv(capsule['id'], lcenv['id'])
     hammer(
-        'capsule content synchronize --async --id {}'.format(capsule['id'])
+        'capsule content synchronize --async --id {0}'.format(capsule['id'])
     )
 
 
