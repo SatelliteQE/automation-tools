@@ -534,7 +534,8 @@ def setup_abrt():
 def setup_oscap():
     """Task to setup oscap on foreman."""
     # Check if ruby193-rubygem-foreman_openscap package is available
-    if os.environ.get('SATELLITE_VERSION') == '6.2':
+    sat_version = os.environ.get('SATELLITE_VERSION')
+    if sat_version == '6.2':
         result = run('yum list tfm-rubygem-foreman_openscap', quiet=True)
     else:
         result = run('yum list ruby193-rubygem-foreman_openscap', quiet=True)
@@ -542,7 +543,8 @@ def setup_oscap():
         print('WARNING: OSCAP was not set up')
         return
 
-    if os.environ.get('SATELLITE_VERSION') == '6.1':
+    # Workaround for BZ 1329394
+    if sat_version == '6.1' or sat_version == '6.2':
         # Install required packages for the installation
         packages = [
             'rubygem-smart_proxy_openscap',
@@ -556,7 +558,7 @@ def setup_oscap():
     else:
         # Run foreman-installer to enable oscap plugin
         run('foreman-installer --enable-foreman-plugin-openscap '
-           '--enable-foreman-proxy-plugin-openscap')
+            '--enable-foreman-proxy-plugin-openscap')
 
 
 def install_puppet_scap_client():
