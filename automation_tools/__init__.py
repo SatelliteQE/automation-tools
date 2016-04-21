@@ -543,8 +543,7 @@ def setup_oscap():
         print('WARNING: OSCAP was not set up')
         return
 
-    # Workaround for BZ 1329394
-    if sat_version == '6.1' or sat_version == '6.2':
+    if sat_version == '6.1':
         # Install required packages for the installation
         packages = [
             'rubygem-smart_proxy_openscap',
@@ -1275,7 +1274,10 @@ def product_install(distribution, create_vm=False, certificate_url=None,
                 execute(setup_libvirt_key, host=host)
             if os.environ.get('SATELLITE_VERSION') != '6.0':
                 execute(install_puppet_scap_client, host=host)
-                execute(setup_oscap, host=host)
+                # Workaround for bug 1329394 - Install oscap only on rhel 7
+                major_ver = distro_info()[1]
+                if major_ver == 7:
+                    execute(setup_oscap, host=host)
 
     certificate_url = certificate_url or os.environ.get(
         'FAKE_MANIFEST_CERT_URL')
