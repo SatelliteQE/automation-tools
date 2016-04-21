@@ -558,6 +558,18 @@ def install_puppet_scap_client():
 
 def setup_foreman_discovery():
     """Task to setup foreman discovery."""
+    # Install required packages to enable discovery plugin
+    packages = (
+        'tfm-rubygem-foreman_discovery',
+        'rubygem-smart_proxy_discovery',
+        'foreman-discovery-image',
+        'tfm-rubygem-hammer_cli_foreman_discovery',
+    )
+    run('yum install -y {0}'.format(' '.join(packages)))
+
+    for daemon in ('foreman', 'httpd', 'foreman-proxy'):
+        manage_daemon('restart', daemon)
+
     admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme')
     template_url = os.environ.get('PXE_DEFAULT_TEMPLATE_URL')
     if template_url is None:
@@ -566,7 +578,6 @@ def setup_foreman_discovery():
 
     template_file = run('mktemp')
     hostname = run('hostname -f', quiet=True).strip()
-    run('yum -y install foreman-discovery-image', warn_only=True)
     run('wget -O {0} {1}'.format(template_file, template_url))
     run('sed -i -e "s/SatelliteCapsule_HOST/{0}/" {1}'
         .format(hostname, template_file))
