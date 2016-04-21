@@ -534,21 +534,29 @@ def setup_abrt():
 def setup_oscap():
     """Task to setup oscap on foreman."""
     # Check if ruby193-rubygem-foreman_openscap package is available
-    result = run('yum list ruby193-rubygem-foreman_openscap', quiet=True)
+    if os.environ.get('SATELLITE_VERSION') == '6.2':
+        result = run('yum list tfm-rubygem-foreman_openscap', quiet=True)
+    else:
+        result = run('yum list ruby193-rubygem-foreman_openscap', quiet=True)
     if result.failed:
         print('WARNING: OSCAP was not set up')
         return
 
-    # Install required packages for the installation
-    packages = [
-        'rubygem-smart_proxy_openscap',
-        'ruby193-rubygem-foreman_openscap'
-    ]
-    for package in packages:
-        run('yum install -y {0}'.format(package))
+    if os.environ.get('SATELLITE_VERSION') == '6.1':
+        # Install required packages for the installation
+        packages = [
+            'rubygem-smart_proxy_openscap',
+            'ruby193-rubygem-foreman_openscap'
+        ]
+        for package in packages:
+            run('yum install -y {0}'.format(package))
 
-    for daemon in ('foreman', 'httpd', 'foreman-proxy'):
-        manage_daemon('restart', daemon)
+        for daemon in ('foreman', 'httpd', 'foreman-proxy'):
+            manage_daemon('restart', daemon)
+    else:
+        # Run foreman-installer to enable oscap plugin
+        run('foreman-installer --enable-foreman-plugin-openscap '
+           '--enable-foreman-proxy-plugin-openscap')
 
 
 def install_puppet_scap_client():
