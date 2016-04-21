@@ -1871,8 +1871,8 @@ def katello_service(action, exclude=None):
     if exclude is None:
         exclude = ''
     else:
-        exclude = '--exclude {}'.format(','.join(exclude))
-    return run('katello-service {} {}'.format(exclude, action))
+        exclude = '--exclude {0}'.format(','.join(exclude))
+    return run('katello-service {0} {1}'.format(exclude, action))
 
 
 def manage_daemon(action, daemon, pty=True, warn_only=False):
@@ -2583,7 +2583,7 @@ def idp_authenticate(idp=None):
     session = requests.session()
     session.get(idp)
     idp_request = session.post(
-        '{}/j_security_check'.format(idp),
+        '{0}/j_security_check'.format(idp),
         data={
             u'j_username': user,
             u'j_password': password,
@@ -2715,13 +2715,15 @@ def relink_manifest(manifest_file=None):
 
 def enable_gateway_ports_connections():
     """Required by remote connections to SSH tunnels"""
-    run('sed -i "s/^[#]*GatewayPorts.*/GatewayPorts yes/" /etc/ssh/sshd_config')
+    run(
+        'sed -i "s/^[#]*GatewayPorts.*/GatewayPorts yes/" /etc/ssh/sshd_config'
+    )
     manage_daemon('restart', 'sshd')
 
 
 def set_yum_debug_level(level=1):
     """Set default debug level for yum output"""
     run(
-        'sed -i "s/^[#]*debuglevel=.*/debuglevel={}/" /etc/yum.conf'
+        'sed -i "s/^[#]*debuglevel=.*/debuglevel={0}/" /etc/yum.conf'
         .format(level)
     )
