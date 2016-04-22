@@ -1289,6 +1289,7 @@ def product_install(distribution, create_vm=False, certificate_url=None,
         )
 
     execute(fix_qdrouterd_listen_to_ipv6, host=host)
+    execute(enable_gateway_ports_connections, host=host)
 
 
 def fix_qdrouterd_listen_to_ipv6():
