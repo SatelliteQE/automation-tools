@@ -1275,8 +1275,7 @@ def product_install(distribution, create_vm=False, certificate_url=None,
             if os.environ.get('SATELLITE_VERSION') != '6.0':
                 execute(install_puppet_scap_client, host=host)
                 # Workaround for bug 1329394 - Install oscap only on rhel 7
-                major_ver = distro_info()[1]
-                if major_ver == 7:
+                if execute(distro_info, host=host)[host][1] == 7:
                     execute(setup_oscap, host=host)
 
     certificate_url = certificate_url or os.environ.get(
