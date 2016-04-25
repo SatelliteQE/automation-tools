@@ -21,7 +21,7 @@ setup(
     package_data={'': ['LICENSE']},
     package_dir={'automation_tools': 'automation_tools'},
     include_package_data=True,
-    install_requires=['Fabric', 'lxml', 'python-novaclient', 'requests', 'ovirt-engine-sdk-python'],
+    install_requires=['Fabric', 'lxml', 'python-novaclient', 'requests'],
     license='GNU GPL v3.0',
     classifiers=(
         'Development Status :: 5 - Production/Stable',
