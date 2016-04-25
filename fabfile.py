@@ -1,10 +1,14 @@
 """Module which publish all automation-tools tasks"""
 from automation_tools import (  # flake8: noqa
     add_repo,
+    satellite6_capsule_upgrade,
     cdn_install,
     clean_rhsm,
     client_registration_test,
+    copy_ssh_key,
+    create_openstack_instance,
     create_personal_git_repo,
+    delete_openstack_instance,
     download_manifest,
     downstream_install,
     enable_gateway_ports_connections,
@@ -12,6 +16,8 @@ from automation_tools import (  # flake8: noqa
     fix_hostname,
     fix_qdrouterd_listen_to_ipv6,
     foreman_debug,
+    get_hostname_from_ip,
+    host_pings,
     idp_authenticate,
     install_errata,
     install_katello_agent,
@@ -22,9 +28,11 @@ from automation_tools import (  # flake8: noqa
     partition_disk,
     performance_tuning,
     product_install,
+    product_upgrade,
     remove_katello_agent,
     relink_manifest,
     run_errata,
+    satellite6_upgrade,
     set_yum_debug_level,
     setup_abrt,
     setup_ddns,
@@ -39,6 +47,7 @@ from automation_tools import (  # flake8: noqa
     setup_proxy,
     setup_vm_provisioning,
     subscribe,
+    sync_capsule_tools_repos_to_upgrade,
     unsubscribe,
     update_basic_packages,
     update_rhsm_stage,
@@ -64,18 +73,4 @@ from automation_tools.satellite5 import (
 from automation_tools.utils import (
     distro_info,
     update_packages
-)
-from automation_tools.satellite6.upgrade import (
-    copy_ssh_key,
-    create_openstack_instance,
-    create_rhevm_instance,
-    delete_openstack_instance,
-    delete_rhevm_instance,
-    get_hostname_from_ip,
-    host_pings,
-    product_upgrade,
-    reboot,
-    satellite6_upgrade,
-    sync_capsule_tools_repos_to_upgrade,
-    wait_till_rhev_instance_status,
 )
