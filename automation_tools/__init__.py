@@ -955,6 +955,8 @@ def downstream_install(admin_password=None, run_katello_installer=True):
         Optional, defaults to 'changeme'. Foreman admin password.
     BASE_URL
         URL for the compose repository.
+    SATELLITE_VERSION
+        Satellite version.
 
     """
     if admin_password is None:
@@ -1120,6 +1122,13 @@ def product_install(distribution, create_vm=False, certificate_url=None,
     :param str certificate_url: where to fetch a fake certificate.
 
     """
+    # Fetch the Satellite Release information.
+    satellite_release = os.environ.get('SATELLITE_RELEASE', 'GA')
+    # SATELLITE_RELEASE should only be BETA or GA
+    if satellite_release.lower() not in ('beta', 'ga'):
+        print('Invalid release provided.  Values allowed: BETA, GA')
+        sys.exit(1)
+
     # Command-line arguments are passed in as strings.
     if isinstance(create_vm, str):
         create_vm = (create_vm.lower() == 'true')
@@ -1261,6 +1270,7 @@ def product_install(distribution, create_vm=False, certificate_url=None,
         host=host,
         sam=distribution.startswith('sam'),
         sat_version=satellite_version,
+        sat_release=satellite_release,
         **installer_options
     )
 
@@ -1848,7 +1858,7 @@ def java_workaround():
 
 
 def katello_installer(debug=False, sam=False, verbose=True, sat_version='6.2',
-                      **kwargs):
+                      sat_release='GA', **kwargs):
     """Runs the installer with ``kwargs`` as command options. If ``sam`` is
     True
 
@@ -1862,7 +1872,13 @@ def katello_installer(debug=False, sam=False, verbose=True, sat_version='6.2',
         sat_version = ''
     if sat_version == '6.2':
         proxy = 'foreman-proxy'
-        installer = 'foreman'
+        if sat_release.lower() == 'ga':
+            installer = 'satellite'
+            scenario = 'satellite'
+        elif sat_release.lower() == 'beta':
+            installer = 'foreman'
+            scenario = 'katello'
+
     extra_options = []
     if ('{0}-dns-forwarders'.format(proxy) in kwargs and
             isinstance(kwargs['{0}-dns-forwarders'.format(proxy)], list)):
@@ -1873,7 +1889,7 @@ def katello_installer(debug=False, sam=False, verbose=True, sat_version='6.2',
 
     run('{0}-installer {1} {2} {3} {4} {5}'.format(
         'sam' if sam else installer,
-        '--scenario katello' if installer == 'foreman' else '',
+        '--scenario {0}'.format(scenario) if sat_version == '6.2' else '',
         '-d' if debug else '',
         '-v' if verbose else '',
         ' '.join([
