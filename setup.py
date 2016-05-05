@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+import subprocess
+import sys
 
 try:
     from setuptools import setup
@@ -8,6 +10,19 @@ except ImportError:
 
 with open('README.rst', 'r') as f:
     readme = f.read()
+
+try:
+    output = str(subprocess.check_output(('curl --version')))
+    if 'NSS' in output:
+        curl_lib = 'nss'
+    elif 'OpenSSL' in output:
+        curl_lib = 'openssl'
+    else:
+        print('This System has unknown Cryptographic library.'
+              'Unable to install pycurl')
+        sys.exit(1)
+except Exception as e:
+    print(e)
 
 setup(
     name='automation_tools',
@@ -21,7 +36,10 @@ setup(
     package_data={'': ['LICENSE']},
     package_dir={'automation_tools': 'automation_tools'},
     include_package_data=True,
-    install_requires=['Fabric', 'lxml', 'python-novaclient', 'requests'],
+    install_requires=[
+        'Fabric', 'lxml', 'python-novaclient', 'requests',
+        'pycurl --global-option="--with-{0}"'.format(curl_lib),
+        'ovirt-engine-sdk-python'],
     license='GNU GPL v3.0',
     classifiers=(
         'Development Status :: 5 - Production/Stable',
