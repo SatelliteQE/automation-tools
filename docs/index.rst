@@ -14,14 +14,12 @@ Installation
 
 Install the following packages on your Operating System::
 
-    sudo yum -y install libxml-devel libxslt-devel
-
+    sudo yum -y install libcurl-devel libxml-devel libxslt-devel
 
 Also python packages listed in `requirements.txt` must be installed before
 automation-tools can be used::
 
     pip install -r requirements.txt
-
 
 Usage examples
 ==============
