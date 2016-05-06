@@ -1264,20 +1264,6 @@ def product_install(distribution, create_vm=False, certificate_url=None,
         **installer_options
     )
 
-    if distribution.startswith('satellite6'):
-        execute(setup_default_docker, host=host)
-        execute(katello_service, 'restart', host=host)
-        if not distribution.endswith('upstream'):
-            if os.environ.get('PXE_DEFAULT_TEMPLATE_URL') is not None:
-                execute(setup_foreman_discovery, host=host)
-            if os.environ.get('LIBVIRT_KEY_URL') is not None:
-                execute(setup_libvirt_key, host=host)
-            if os.environ.get('SATELLITE_VERSION') != '6.0':
-                execute(install_puppet_scap_client, host=host)
-                # Workaround for bug 1329394 - Install oscap only on rhel 7
-                if execute(distro_info, host=host)[host][1] == 7:
-                    execute(setup_oscap, host=host)
-
     certificate_url = certificate_url or os.environ.get(
         'FAKE_MANIFEST_CERT_URL')
     if certificate_url is not None:
@@ -1286,9 +1272,22 @@ def product_install(distribution, create_vm=False, certificate_url=None,
             certificate_url,
             host=host
         )
-
     execute(fix_qdrouterd_listen_to_ipv6, host=host)
     execute(enable_gateway_ports_connections, host=host)
+
+    if distribution.startswith('satellite6'):
+        execute(setup_default_docker, host=host)
+        execute(katello_service, 'restart', host=host)
+        if not distribution.endswith('upstream'):
+            if os.environ.get('LIBVIRT_KEY_URL') is not None:
+                execute(setup_libvirt_key, host=host)
+            if os.environ.get('SATELLITE_VERSION') != '6.0':
+                execute(install_puppet_scap_client, host=host)
+                # Workaround for bug 1329394 - Install oscap only on rhel 7
+                if execute(distro_info, host=host)[host][1] == 7:
+                    execute(setup_oscap, host=host)
+            if os.environ.get('PXE_DEFAULT_TEMPLATE_URL') is not None:
+                execute(setup_foreman_discovery, host=host)
 
 
 def fix_qdrouterd_listen_to_ipv6():
