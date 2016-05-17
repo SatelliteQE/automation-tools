@@ -1286,7 +1286,11 @@ def product_install(distribution, create_vm=False, certificate_url=None,
         sat_release=satellite_release,
         **installer_options
     )
-
+    # FIXME: temporary workaround for GemConflict in Snap10.0
+    execute(lambda: run(
+        "sed -i 's/0\.0\.16/0.0.14/' /opt/theforeman/tfm/root/usr/share/gems"
+        "/specifications/hammer_cli_foreman-0.5.1.6.gemspec"), host=host
+    )
     certificate_url = certificate_url or os.environ.get(
         'FAKE_MANIFEST_CERT_URL')
     if certificate_url is not None:
