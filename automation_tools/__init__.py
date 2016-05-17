@@ -352,7 +352,7 @@ def setup_fake_manifest_certificate(certificate_url=None):
     manage_daemon('restart', 'tomcat6' if distro_info()[1] <= 6 else 'tomcat')
 
 
-def setup_firewall(definitions=None):
+def setup_firewall(definitions=None, flush=True):
     """Setup firewall rules based on the ``definitions``.
 
     :param definitions: A dict containing the definitions for the
@@ -368,6 +368,8 @@ def setup_firewall(definitions=None):
                     4422,
                 ),
             }
+    :param flush: If ``True`` will clean up all rules before adding the rules
+        specified by ``definitions``.
     """
     if definitions is None:
         return
@@ -378,12 +380,23 @@ def setup_firewall(definitions=None):
             'iptables -I INPUT -m state --state NEW -p {0} --dport {1} '
             '-j ACCEPT'
         )
+        if flush:
+            run('iptables --flush')
     else:
         if run('systemctl status firewalld', quiet=True).failed:
             run('systemctl enable firewalld')
             run('systemctl start firewalld')
         exists_command = 'firewall-cmd --query-port="{1}/{0}"'
         command = 'firewall-cmd --permanent --add-port="{1}/{0}"'
+        if flush:
+            run(
+                'for port in $(firewall-cmd --permanent --list-ports); do '
+                'firewall-cmd --permanent --remove-port="$port"; done'
+            )
+            run(
+                'for port in $(firewall-cmd --list-ports); do '
+                'firewall-cmd --remove-port="$port"; done'
+            )
 
     for protocol in definitions:
         for port in definitions[protocol]:
