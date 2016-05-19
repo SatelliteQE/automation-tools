@@ -102,7 +102,7 @@ def satellite6_upgrade(admin_password=None):
     if to_version == '6.1':
         run('katello-installer --upgrade')
     else:
-        run('satellite-installer --scenario katello --upgrade')
+        run('satellite-installer --scenario satellite --upgrade')
     print('SATELLITE UPGRADE finished at: {0}'.format(time.ctime()))
     # Test the Upgrade is successful
     run('hammer -u admin -p {0} ping'.format(admin_password), warn_only=True)
@@ -228,6 +228,9 @@ def product_upgrade(
     TO_VERSION
         To which Satellite/Capsule version to upgrade.
         e.g '6.1','6.2'
+    OS
+        The OS Version on which the satellite is installed.
+        e.g 'rhel7','rhel6'
     RHEV_USER
         The username of a rhevm project to login.
     RHEV_PASSWD
@@ -257,11 +260,15 @@ def product_upgrade(
         print('Product name should be one of {0}'.format(', '.join(products)))
         sys.exit(1)
     if not os.environ.get('SATELLITE_HOSTNAME'):
-        if not sat_image:
+        if not sat_image and not os.environ.get('RHEV_SATELLITE'):
             print('Please provide either Satellite RHEVM template name or '
                   'Satellite HostName to perform upgrade!')
             sys.exit(1)
-        sat_instance = 'upgrade_{0}_auto'.format(sat_image)
+        version = os.environ.get('OS')
+        if not version:
+            print('Please provide OS version as rhel7 or rhel6, And retry !')
+            sys.exit(1)
+        sat_instance = 'upgrade_satellite_auto_{0}'.format(version)
         # Deleting Satellite instance if any
         execute(delete_rhevm_instance, sat_instance)
         print('Turning on Satellite Instance ....')
@@ -283,11 +290,11 @@ def product_upgrade(
     # For Capsule Upgrade
     if product == 'capsule':
         if not os.environ.get('CAPSULE_HOSTNAME'):
-            if not cap_image:
+            if not cap_image and not os.environ.get('RHEV_CAPSULE'):
                 print('Please provide either Capsule RHEVM template name or '
                       'Capsule HostName to perform upgrade!')
                 sys.exit(1)
-            cap_instance = 'upgrade_{0}_auto'.format(cap_image)
+            cap_instance = 'upgrade_capsule_auto_{0}'.format(version)
             # Deleting Capsule instance if any
             execute(delete_rhevm_instance, cap_instance)
             print('Turning on Capsule Instance ....')

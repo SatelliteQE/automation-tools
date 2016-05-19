@@ -281,11 +281,11 @@ def delete_rhevm_instance(instance_name, timeout=5):
 
     The following environment variables affect this command:
 
-    USERNAME
+    RHEV_USER
         The username of a rhevm project to login.
-    PASSWORD
+    RHEV_PASSWD
         The password of a rhevm project to login.
-    API_URL
+    RHEV_URL
         An url to API of rhevm project.
 
     :param instance_name: A string. RHEVM instance name to delete.
@@ -332,10 +332,10 @@ def sync_capsule_tools_repos_to_upgrade(admin_password=None):
 
     CAPSULE_URL
         The url for capsule repo from latest satellite compose.
-    FROM_VERSION:
+    FROM_VERSION
         Current Satellite version - to differentiate default organization.
         e.g. '6.1', '6.0'
-    CAP_SUB_DETAILS:
+    CAPSULE_SUBSCRIPTION
         List of cv_name, environment, ak_name attached to subscription of
         capsule in defined sequence.
         Optional, for upgrade on specific satellite and capsule.
@@ -354,7 +354,7 @@ def sync_capsule_tools_repos_to_upgrade(admin_password=None):
               'to perform Capsule Upgrade in feature!')
         sys.exit(1)
     version = distro_info()[1]
-    details = os.environ.get('CAP_SUB_DETAILS')
+    details = os.environ.get('CAPSULE_SUBSCRIPTION')
     if details is not None:
         cv_name, env_name, ak_name = [
             item.strip() for item in details.split(',')]
@@ -369,7 +369,7 @@ def sync_capsule_tools_repos_to_upgrade(admin_password=None):
     capsule_id = str(
         run(initials + 'capsule list | grep {0}'.format(
             env.get('capsule_host')))).split('|')[0].strip()
-    if not os.environ.get('CAP_SUB_DETAILS'):
+    if not os.environ.get('CAPSULE_SUBSCRIPTION'):
         run(initials + 'capsule content synchronize --id {0}'.format(
             capsule_id))
     # Create product capsule
