@@ -1,8 +1,5 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-import os
-import subprocess
-import sys
 
 try:
     from setuptools import setup
@@ -11,18 +8,6 @@ except ImportError:
 
 with open('README.rst', 'r') as f:
     readme = f.read()
-
-pycurl_version = str(subprocess.check_output('curl --version'.split()))
-if 'NSS' in pycurl_version:
-    os.environ['PYCURL_SSL_LIBRARY'] = 'nss'
-elif 'OpenSSL' in pycurl_version:
-    os.environ['PYCURL_SSL_LIBRARY'] = 'openssl'
-else:
-    print(
-        'This System has unknown Cryptographic library. Unable to install '
-        'pycurl'
-    )
-    sys.exit(1)
 
 setup(
     name='automation_tools',
