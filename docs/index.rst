@@ -16,10 +16,30 @@ Install the following packages on your Operating System::
 
     sudo yum -y install libcurl-devel libxml-devel libxslt-devel
 
-Also python packages listed in `requirements.txt` must be installed before
+Automation tools depends on ``pycurl`` being installed, but installing it,
+specially on a virtual environment, is not straight forward. You must run the
+following script in order to have ``pycurl`` installed properly::
+
+    # Make sure pip is updated
+    pip install -U pip
+
+    # Install pycurl using the proper cryptography library
+    if [ "$(curl --version | grep NSS 2>/dev/null)" ]; then
+        pip install --compile --install-option="--with-nss" pycurl
+    else
+        pip install --compile --install-option="--with-openssl" pycurl
+    fi
+
+Finally, python packages listed in `requirements.txt` must be installed before
 automation-tools can be used::
 
     pip install -r requirements.txt
+
+If you prefer, you can install both ``pycurl`` and automation-tools
+`requirements.txt` running just one command::
+
+    PYCURL_SSL_LIBRARY=$(curl -V | sed -n 's/.*\(NSS\|OpenSSL\).*/\L\1/p') \
+        pip install -r requirements.txt
 
 Usage examples
 ==============
