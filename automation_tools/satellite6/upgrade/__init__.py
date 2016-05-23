@@ -84,7 +84,8 @@ def satellite6_upgrade(admin_password=None):
         satellite_repo.close()
     # Stop katello services, except mongod
     run('katello-service stop')
-    run('service-wait mongod start')
+    if to_version == '6.1':
+        run('service-wait mongod start')
     run('yum clean all', warn_only=True)
     # Updating the packages again after setting sat6 repo
     print('Wait till packages update ... ')
@@ -96,7 +97,8 @@ def satellite6_upgrade(admin_password=None):
         reboot(120)
     # Stop the service again which started in restart
     run('katello-service stop')
-    run('service-wait mongod start')
+    if to_version == '6.1':
+        run('service-wait mongod start')
     # Running Upgrade
     print('SATELLITE UPGRADE started at: {0}'.format(time.ctime()))
     if to_version == '6.1':
