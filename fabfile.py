@@ -25,6 +25,7 @@ from automation_tools import (  # flake8: noqa
     remove_katello_agent,
     relink_manifest,
     run_errata,
+    set_service_check_status,
     set_yum_debug_level,
     setup_abrt,
     setup_ddns,

@@ -1287,6 +1287,9 @@ def product_install(distribution, create_vm=False, certificate_url=None,
         **installer_options
     )
 
+    # Temporary workaround to solve pulp message bus connection issue
+    execute(set_service_check_status, host=host)
+
     certificate_url = certificate_url or os.environ.get(
         'FAKE_MANIFEST_CERT_URL')
     if certificate_url is not None:
@@ -2777,4 +2780,14 @@ def set_yum_debug_level(level=1):
     run(
         'sed -i "s/^[#]*debuglevel=.*/debuglevel={0}/" /etc/yum.conf'
         .format(level)
+    )
+
+
+def set_service_check_status(user='admin', password='changeme',
+                             value='false'):
+    """Set service check status to given value"""
+    run(
+        'hammer -u {0} -p {1} settings set '
+        '--name=check_services_before_actions --value={2}'
+        .format(user, password, value)
     )
