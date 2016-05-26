@@ -1288,7 +1288,9 @@ def product_install(distribution, create_vm=False, certificate_url=None,
     )
 
     # Temporary workaround to solve pulp message bus connection issue
-    execute(set_service_check_status, host=host)
+    # only for 6.2 and above
+    if (sat_cdn_version not in ('6.0', '6.1')):
+        execute(set_service_check_status, host=host)
 
     certificate_url = certificate_url or os.environ.get(
         'FAKE_MANIFEST_CERT_URL')
