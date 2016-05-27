@@ -58,7 +58,7 @@ def satellite6_upgrade(admin_password=None):
     print('Wait till Packages update ... ')
     update_packages(quiet=True)
     # Rebooting the system to see possible errors
-    if os.environ.get('RHEV_SATELLITE'):
+    if os.environ.get('RHEV_SATELLITE') or os.environ.get('SAT_HOST'):
         reboot(120)
     # Setting Satellite61 Repos
     major_ver = distro_info()[1]
@@ -178,7 +178,7 @@ def satellite6_capsule_upgrade(admin_password=None):
     execute(lambda: run("scp -o 'StrictHostKeyChecking no' {0}-certs.tar "
                         "root@{0}:/home/".format(cap_host)), host=sat_host)
     # Rebooting the system again to see possible errors
-    if os.environ.get('RHEV_CAPSULE'):
+    if os.environ.get('RHEV_CAPSULE') or os.environ.get('CAP_HOST'):
         reboot(120)
     # Stopping the services again which started in reboot
     run('for i in qpidd pulp_workers pulp_celerybeat '
@@ -261,11 +261,22 @@ def product_upgrade(
     if product not in products:
         print('Product name should be one of {0}'.format(', '.join(products)))
         sys.exit(1)
+
+    missing_vars = [
+        var for var in ('SAT_IMAGE', 'SAT_HOST', 'CAP_IMAGE', 'CAP_HOST')
+        if var not in os.environ
+    ]
+    if missing_vars:
+        print('The following environment variable(s) must be set: '
+              '{0}.'.format(', '.join(missing_vars)))
+        sys.exit(1)
+
     if not os.environ.get('SATELLITE_HOSTNAME'):
         if not sat_image and not os.environ.get('RHEV_SATELLITE'):
-            print('Please provide either Satellite RHEVM template name or '
-                  'Satellite HostName to perform upgrade!')
-            sys.exit(1)
+            sat_image = os.environ.get('SAT_IMAGE')
+            sat_host = os.environ.get('SAT_HOST')
+        else:
+            sat_host = os.environ.get('RHEV_SATELLITE')
         version = os.environ.get('OS')
         if not version:
             print('Please provide OS version as rhel7 or rhel6, And retry !')
@@ -279,7 +290,6 @@ def product_upgrade(
             sat_instance,
             sat_image
         )
-        sat_host = os.environ.get('RHEV_SATELLITE')
         # Wait Till Instance gets up
         host_pings(sat_host)
         # Subscribe the instances to CDN
@@ -293,9 +303,10 @@ def product_upgrade(
     if product == 'capsule':
         if not os.environ.get('CAPSULE_HOSTNAME'):
             if not cap_image and not os.environ.get('RHEV_CAPSULE'):
-                print('Please provide either Capsule RHEVM template name or '
-                      'Capsule HostName to perform upgrade!')
-                sys.exit(1)
+                cap_image = os.environ.get('CAP_IMAGE')
+                cap_host = os.environ.get('CAP_HOST')
+            else:
+                cap_host = os.environ.get('RHEV_CAPSULE')
             cap_instance = 'upgrade_capsule_auto_{0}'.format(version)
             # Deleting Capsule instance if any
             execute(delete_rhevm_instance, cap_instance)
@@ -304,7 +315,6 @@ def product_upgrade(
                 create_rhevm_instance,
                 cap_instance, cap_image
             )
-            cap_host = os.environ.get('RHEV_CAPSULE')
         else:
             cap_host = os.environ.get('CAPSULE_HOSTNAME')
             env['capsule_host'] = cap_host
