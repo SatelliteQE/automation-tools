@@ -1281,7 +1281,7 @@ def product_install(distribution, create_vm=False, certificate_url=None,
     execute(
         katello_installer,
         host=host,
-        sam=distribution.startswith('sam'),
+        distribution=distribution,
         sat_version=satellite_version,
         sat_release=satellite_release,
         **installer_options
@@ -1875,8 +1875,8 @@ def java_workaround():
         run('yum install -y java-1.7.0-openjdk')
 
 
-def katello_installer(debug=False, sam=False, verbose=True, sat_version='6.2',
-                      sat_release='GA', **kwargs):
+def katello_installer(debug=False, distribution=None, verbose=True,
+                      sat_version='6.2', sat_release='GA', **kwargs):
     """Runs the installer with ``kwargs`` as command options. If ``sam`` is
     True
 
@@ -1886,9 +1886,9 @@ def katello_installer(debug=False, sam=False, verbose=True, sat_version='6.2',
     # different values
     proxy = 'capsule'
     installer = 'katello'
-    if sam:
+    if distribution == 'sam-upstream':
         sat_version = ''
-    if sat_version == '6.2':
+    if sat_version == '6.2' and distribution != 'satellite6-upstream':
         proxy = 'foreman-proxy'
         if sat_release.lower() == 'ga':
             installer = 'satellite'
@@ -1896,6 +1896,10 @@ def katello_installer(debug=False, sam=False, verbose=True, sat_version='6.2',
         elif sat_release.lower() == 'beta':
             installer = 'foreman'
             scenario = 'katello'
+    if distribution == 'satellite6-upstream':
+        proxy = 'foreman-proxy'
+        installer = 'foreman'
+        scenario = 'katello'
 
     extra_options = []
     if ('{0}-dns-forwarders'.format(proxy) in kwargs and
@@ -1906,7 +1910,7 @@ def katello_installer(debug=False, sam=False, verbose=True, sat_version='6.2',
                 '--{0}-dns-forwarders="{1}"'.format(proxy, forwarder))
 
     run('{0}-installer {1} {2} {3} {4} {5}'.format(
-        'sam' if sam else installer,
+        'sam' if distribution == 'sam-upstream' else installer,
         '--scenario {0}'.format(scenario) if sat_version == '6.2' else '',
         '-d' if debug else '',
         '-v' if verbose else '',
