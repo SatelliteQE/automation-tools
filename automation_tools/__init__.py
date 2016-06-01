@@ -546,31 +546,15 @@ def setup_abrt():
 
 def setup_oscap():
     """Task to setup oscap on foreman."""
-    # Check if ruby193-rubygem-foreman_openscap package is available
-    sat_version = os.environ.get('SATELLITE_VERSION')
-    if sat_version == '6.2':
-        result = run('yum list tfm-rubygem-foreman_openscap', quiet=True)
-    else:
-        result = run('yum list ruby193-rubygem-foreman_openscap', quiet=True)
-    if result.failed:
-        print('WARNING: OSCAP was not set up')
-        return
+    # Install required packages for the installation
+    packages = [
+        'rubygem-smart_proxy_openscap',
+        'ruby193-rubygem-foreman_openscap'
+    ]
+    run('yum install -y {0}'.format(' '.join(packages)))
 
-    if sat_version == '6.1':
-        # Install required packages for the installation
-        packages = [
-            'rubygem-smart_proxy_openscap',
-            'ruby193-rubygem-foreman_openscap'
-        ]
-        for package in packages:
-            run('yum install -y {0}'.format(package))
-
-        for daemon in ('foreman', 'httpd', 'foreman-proxy'):
-            manage_daemon('restart', daemon)
-    else:
-        # Run foreman-installer to enable oscap plugin
-        run('foreman-installer --enable-foreman-plugin-openscap '
-            '--enable-foreman-proxy-plugin-openscap')
+    for daemon in ('foreman', 'httpd', 'foreman-proxy'):
+        manage_daemon('restart', daemon)
 
 
 def install_puppet_scap_client():
@@ -1309,11 +1293,9 @@ def product_install(distribution, create_vm=False, certificate_url=None,
         if not distribution.endswith('upstream'):
             if os.environ.get('LIBVIRT_KEY_URL') is not None:
                 execute(setup_libvirt_key, host=host)
-            if os.environ.get('SATELLITE_VERSION') != '6.0':
+            if os.environ.get('SATELLITE_VERSION') == '6.1':
                 execute(install_puppet_scap_client, host=host)
-                # Workaround for bug 1329394 - Install oscap only on rhel 7
-                if execute(distro_info, host=host)[host][1] == 7:
-                    execute(setup_oscap, host=host)
+                execute(setup_oscap, host=host)
             if os.environ.get('PXE_DEFAULT_TEMPLATE_URL') is not None:
                 execute(setup_foreman_discovery, host=host)
 
