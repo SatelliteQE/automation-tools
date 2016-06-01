@@ -93,7 +93,7 @@ def satellite6_upgrade(admin_password=None):
     update_packages(quiet=False)
     print('YUM UPDATE finished at: {0}'.format(time.ctime()))
     # Rebooting the system again for possible errors
-    if os.environ.get('RHEV_SATELLITE'):
+    if os.environ.get('RHEV_SATELLITE') or os.environ.get('SAT_HOST'):
         reboot(120)
     # Stop the service again which started in restart
     run('katello-service stop')
