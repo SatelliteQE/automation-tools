@@ -153,9 +153,12 @@ def satellite6_capsule_upgrade(admin_password=None):
             major_ver, to_version))
     disable_repos('rhel-{0}-server-satellite-capsule-{1}-rpms'.format(
         major_ver, from_version))
-    # Stop katello services, except mongod
-    run('for i in qpidd pulp_workers pulp_celerybeat '
-        'pulp_resource_manager httpd; do service $i stop; done')
+    if from_version == '6.1' and major_ver == '6':
+        enable_repos('rhel-server-rhscl-{0}-rpms'.format(major_ver))
+    if from_version == '6.0':
+        # Stop katello services, except mongod
+        run('for i in qpidd pulp_workers pulp_celerybeat '
+            'pulp_resource_manager httpd; do service $i stop; done')
     run('yum clean all', warn_only=True)
     print('Wait till packages update ... ')
     print('YUM UPDATE started at: {0}'.format(time.ctime()))
@@ -180,9 +183,10 @@ def satellite6_capsule_upgrade(admin_password=None):
     # Rebooting the system again to see possible errors
     if os.environ.get('RHEV_CAPSULE') or os.environ.get('CAP_HOST'):
         reboot(120)
-    # Stopping the services again which started in reboot
-    run('for i in qpidd pulp_workers pulp_celerybeat '
-        'pulp_resource_manager httpd; do service $i stop; done')
+    if to_version == '6.1':
+        # Stopping the services again which started in reboot
+        run('for i in qpidd pulp_workers pulp_celerybeat '
+            'pulp_resource_manager httpd; do service $i stop; done')
     # Upgrading Katello installer
     print('CAPSULE UPGRADE started at: {0}'.format(time.ctime()))
     if to_version == '6.1':
