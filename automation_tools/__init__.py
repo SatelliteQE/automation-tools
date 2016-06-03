@@ -1293,8 +1293,9 @@ def product_install(distribution, create_vm=False, certificate_url=None,
         if not distribution.endswith('upstream'):
             if os.environ.get('LIBVIRT_KEY_URL') is not None:
                 execute(setup_libvirt_key, host=host)
-            if os.environ.get('SATELLITE_VERSION') == '6.1':
+            if os.environ.get('SATELLITE_VERSION') != '6.0':
                 execute(install_puppet_scap_client, host=host)
+            if os.environ.get('SATELLITE_VERSION') == '6.1':
                 execute(setup_oscap, host=host)
             if os.environ.get('PXE_DEFAULT_TEMPLATE_URL') is not None:
                 execute(setup_foreman_discovery, host=host)
