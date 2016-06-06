@@ -95,9 +95,11 @@ def satellite6_upgrade(admin_password=None):
     # Rebooting the system again for possible errors
     if os.environ.get('RHEV_SATELLITE') or os.environ.get('SAT_HOST'):
         reboot(120)
-    # Stop the service again which started in restart
-    run('katello-service stop')
     if to_version == '6.1':
+        # Stop the service again which started in restart
+        # This step is not required with 6.2 upgrade as installer itself stop
+        # all the services before upgrade
+        run('katello-service stop')
         run('service-wait mongod start')
     # Running Upgrade
     print('SATELLITE UPGRADE started at: {0}'.format(time.ctime()))
