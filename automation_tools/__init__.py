@@ -556,6 +556,10 @@ def setup_oscap():
     for daemon in ('foreman', 'httpd', 'foreman-proxy'):
         manage_daemon('restart', daemon)
 
+def oscap_content():
+    """Task to populate Default oscap-content."""
+    run('foreman-rake foreman_openscap:bulk_upload:default', warn_only=True)
+
 
 def install_puppet_scap_client():
     """Task to setup puppet-foreman_scap_client."""
@@ -1297,6 +1301,8 @@ def product_install(distribution, create_vm=False, certificate_url=None,
                 execute(install_puppet_scap_client, host=host)
             if os.environ.get('SATELLITE_VERSION') == '6.1':
                 execute(setup_oscap, host=host)
+            if os.environ.get('SATELLITE_VERSION') == '6.2':
+                execute(oscap_content, host=host)
             if os.environ.get('PXE_DEFAULT_TEMPLATE_URL') is not None:
                 execute(setup_foreman_discovery, host=host)
 
