@@ -2469,7 +2469,7 @@ def satellite6_capsule_upgrade(admin_password=None):
         'pulp_resource_manager httpd; do service $i stop; done')
     # Upgrading Katello installer
     print('CAPSULE UPGRADE started at: {0}'.format(time.ctime()))
-    run('capsule-installer --upgrade --certs-tar '
+    run('capsule-installer --upgrade --capsule-certs-tar '
         '/home/{0}-certs.tar'.format(cap_host))
     print('CAPSULE UPGRADE finished at: {0}'.format(time.ctime()))
     # Test The status of all katello services
