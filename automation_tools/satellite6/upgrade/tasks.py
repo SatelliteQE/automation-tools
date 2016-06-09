@@ -7,7 +7,6 @@ import novaclient
 import os
 import sys
 import time
-from automation_tools.utils import distro_info
 from fabric.api import env, execute, run
 from novaclient.client import Client
 from ovirtsdk.api import API
@@ -338,7 +337,6 @@ def sync_capsule_tools_repos_to_upgrade(admin_password=None):
     CAPSULE_SUBSCRIPTION
         List of cv_name, environment, ak_name attached to subscription of
         capsule in defined sequence.
-        Optional, for upgrade on specific satellite and capsule.
 
     """
     if os.environ.get('FROM_VERSION') == '6.1':
@@ -353,15 +351,18 @@ def sync_capsule_tools_repos_to_upgrade(admin_password=None):
         print('The Capsule repo URL is not provided '
               'to perform Capsule Upgrade in feature!')
         sys.exit(1)
-    version = distro_info()[1]
+    cv_name, env_name, ak_name = [
+        os.environ.get(env_var)
+        for env_var in ('CAPSULE_CV', 'CAPSULE_ENVIRONMENT', 'CAPSULE_AK')
+    ]
     details = os.environ.get('CAPSULE_SUBSCRIPTION')
     if details is not None:
         cv_name, env_name, ak_name = [
             item.strip() for item in details.split(',')]
-    else:
-        cv_name = 'rhel{0}_cv'.format(version)
-        env_name = 'DEV'
-        ak_name = 'rhel'
+    elif not all([cv_name, env_name, ak_name]):
+        print('Error! The CV, Env and AK details are not provided for Capsule'
+              'upgrade!')
+        sys.exit(1)
     if admin_password is None:
         admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme')
     initials = 'hammer -u admin -p {0} '.format(admin_password)

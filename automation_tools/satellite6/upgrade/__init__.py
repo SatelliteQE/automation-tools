@@ -254,7 +254,6 @@ def product_upgrade(
     CAPSULE_SUBSCRIPTION
         List of cv_name, environment, ak_name attached to subscription of
         capsule in defined sequence.
-        Optional, for upgrade on specific satellite and capsule.
     RHEV_SATELLITE
         The Satellite hostname on RHEVM instance.
         Optional, If want to run upgrade on RHEVM instance.
