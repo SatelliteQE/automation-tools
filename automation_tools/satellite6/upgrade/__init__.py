@@ -195,8 +195,8 @@ def satellite6_capsule_upgrade(admin_password=None):
         run('capsule-installer --upgrade --certs-tar '
             '/home/{0}-certs.tar'.format(cap_host))
     else:
-        run('satellite-installer --scenario capsule --upgrade --certs-tar '
-            '/home/{0}-certs.tar'.format(cap_host))
+        run('satellite-installer --scenario capsule --upgrade '
+            '--capsule-certs-tar /home/{0}-certs.tar'.format(cap_host))
     print('CAPSULE UPGRADE finished at: {0}'.format(time.ctime()))
     # Test The status of all katello services
     run('katello-service status', warn_only=True)
