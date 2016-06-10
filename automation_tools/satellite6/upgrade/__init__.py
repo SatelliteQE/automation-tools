@@ -322,7 +322,7 @@ def product_upgrade(
             )
         else:
             cap_host = os.environ.get('CAPSULE_HOSTNAME')
-            env['capsule_host'] = cap_host
+        env['capsule_host'] = cap_host
         # Copy ssh key from satellie to capsule
         copy_ssh_key(sat_host, cap_host)
         if os.environ.get('CAPSULE_URL') is not None:
