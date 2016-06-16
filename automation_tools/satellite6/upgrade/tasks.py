@@ -402,10 +402,11 @@ def sync_capsule_tools_repos_to_upgrade(admin_password=None):
     run(initials + 'content-view publish --name {0} '
         '--organization {1}'.format(cv_name, org))
     # promote cv
-    lc_env_id = str(
-        run(initials + 'lifecycle-environment list '
-            '--organization {0} | grep {1}'.format(org, env_name))).split(
-                '|')[0].strip()
+    lc = str(
+        run(initials + '--output csv lifecycle-environment list '
+            '--organization {0} --name {1}'.format(org, env_name)
+            )).split('\n')[1]
+    lc_env_id = lc.split(',')[0]
     cv_ver_id = str(
         run(initials + 'content-view version list --content-view {0} '
             '--organization {1} | grep {0}'.format(
