@@ -645,6 +645,8 @@ def vm_create():
         base image name
     TARGET_IMAGE
         target image name
+    SERVER_HOSTNAME
+        server hostname
     IMAGE_DIR
         path where the generated image will be stored
     CPU_FEATURE
@@ -681,6 +683,7 @@ def vm_create():
         'vm_domain': os.environ.get('VM_DOMAIN'),
         'source_image': os.environ.get('SOURCE_IMAGE'),
         'target_image': os.environ.get('TARGET_IMAGE'),
+        'hostname': os.environ.get('SERVER_HOSTNAME'),
         'image_dir': os.environ.get('IMAGE_DIR'),
         'cpu_feature': os.environ.get('CPU_FEATURE'),
         'bridge': os.environ.get('BRIDGE'),
@@ -690,13 +693,16 @@ def vm_create():
     }
 
     command_args = [
-        'snap-guest',
+        '/opt/snap-guest/snap-guest-test',
         '-b {source_image}',
         '-t {target_image}',
         '-m {vm_ram}',
         '-c {vm_cpu}',
         '-d {vm_domain} -f',
     ]
+
+    if options['hostname'] is not None:
+        command_args.append('--hostname {hostname}')
 
     if options['image_dir'] is not None:
         command_args.append('-p {image_dir}')
@@ -732,7 +738,7 @@ def vm_create():
         env['vm_ip'] = result.split('(')[1].split(')')[0]
     else:
         env['vm_ip'] = '{ip_addr}'.format(**options)
-    env['vm_domain'] = '{target_image}.{vm_domain}'.format(**options)
+    env['vm_domain'] = '{hostname}'.format(**options)
 
     # fix_hostname only if using VLAN Bridge.
     if os.environ.get('BRIDGE'):
