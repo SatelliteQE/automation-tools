@@ -133,6 +133,8 @@ def satellite6_capsule_upgrade(admin_password=None):
     TO_VERSION
         Capsule version to upgrade to and enable repos while upgrading.
         e.g '6.1','6.2'
+    CAPSULE_AK
+        AK name on Satellite using which capsule is registered
 
     """
     sat_host = env.get('satellite_host')
@@ -146,10 +148,27 @@ def satellite6_capsule_upgrade(admin_password=None):
         print('Wrong Capsule Version Provided to upgrade to. '
               'Provide one of 6.1, 6.2')
         sys.exit(1)
+    if not os.environ.get('CAPSULE_SUBSCRIPTION') and not os.environ.get(
+            'CAPSULE_AK'):
+        print('Neither CAPSULE_SUBSCRIPTION nor CAPSULE_AK environment '
+              'variables were defined. Make sure at least one of them is '
+              'defined.')
+        sys.exit(1)
     if admin_password is None:
         admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme')
     # Setting Capsule61 Repos
     major_ver = distro_info()[1]
+    # Re-register Capsule for 6.2
+    # AS per host unification feature: if there is a host registered where the
+    # Host and Content Host are in different organizations (e.g. host not in
+    # org, and content host in one), the content host will be unregistered as
+    # part of the upgrade process.
+    if to_version == '6.2':
+        ak_name = os.environ.get('CAPSULE_SUBSCRIPTION').split(',')[2].strip(
+            ) if os.environ.get('CAPSULE_SUBSCRIPTION') else os.environ.get(
+            'CAPSULE_AK')
+        run('subscription-manager register --org="Default_Organization" '
+            '--activationkey={0} --force'.format(ak_name))
     if os.environ.get('CAPSULE_URL') is None:
         enable_repos('rhel-{0}-server-satellite-capsule-{1}-rpms'.format(
             major_ver, to_version))
@@ -196,7 +215,7 @@ def satellite6_capsule_upgrade(admin_password=None):
             '/home/{0}-certs.tar'.format(cap_host))
     else:
         run('satellite-installer --scenario capsule --upgrade '
-            '--capsule-certs-tar /home/{0}-certs.tar'.format(cap_host))
+            '--certs-tar /home/{0}-certs.tar'.format(cap_host))
     print('CAPSULE UPGRADE finished at: {0}'.format(time.ctime()))
     # Test The status of all katello services
     run('katello-service status', warn_only=True)
@@ -301,7 +320,7 @@ def product_upgrade(
         execute(subscribe, host=sat_host)
     else:
         sat_host = os.environ.get('SATELLITE_HOSTNAME')
-        env['satellite_host'] = sat_host
+    env['satellite_host'] = sat_host
     # Rebooting the services
     execute(lambda: run('katello-service restart'), host=sat_host)
     # For Capsule Upgrade
