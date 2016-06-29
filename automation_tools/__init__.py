@@ -273,8 +273,9 @@ def setup_default_capsule(interface=None, run_katello_installer=True):
             print('Was not possible to fetch interface information')
             sys.exit(1)
 
-    proxy = 'capsule'
-    if os.environ.get('SATELLITE_VERSION') == '6.2':
+    if os.environ.get('SATELLITE_VERSION') in ('6.0', '6.1'):
+        proxy = 'capsule'
+    else:
         proxy = 'foreman-proxy'
 
     installer_options = {
@@ -982,10 +983,10 @@ def downstream_install(admin_password=None, run_katello_installer=True):
     satellite_repo.close()
 
     # Install required packages for the installation
-    if os.environ.get('SATELLITE_VERSION') == '6.2':
-        run('yum install -y satellite')
-    else:
+    if os.environ.get('SATELLITE_VERSION') in ('6.0', '6.1'):
         run('yum install -y katello')
+    else:
+        run('yum install -y satellite')
 
     installer_options = {
         'foreman-admin-password': admin_password,
@@ -1003,21 +1004,19 @@ def cdn_install(run_katello_installer=True):
 
     The following environment variables affect this command:
 
-    RHN_USERNAME
-        Red Hat Network username.
-    RHN_PASSWORD
-        Red Hat Network password.
-    RHN_POOLID
-        Optional. Red Hat Network pool ID. Determines what software will be
-        available from RHN.
     ADMIN_PASSWORD
         Optional, defaults to 'changeme'. Foreman admin password.
+    SATELLITE_VERSION
+        Satellite version.
 
     """
     admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme')
 
     # Install required packages for the installation
-    run('yum install -y katello')
+    if os.environ.get('SATELLITE_VERSION') in ('6.0', '6.1'):
+        run('yum install -y katello')
+    else:
+        run('yum install -y satellite')
 
     installer_options = {
         'foreman-admin-password': admin_password,
@@ -1037,13 +1036,6 @@ def iso_install(
 
     The following environment variables affect this command:
 
-    RHN_USERNAME
-        Red Hat Network username.
-    RHN_PASSWORD
-        Red Hat Network password.
-    RHN_POOLID
-        Optional. Red Hat Network pool ID. Determines what software will be
-        available from RHN.
     ISO_URL or BASE_URL
         The URL where the ISO will be downloaded.
     ADMIN_PASSWORD
@@ -1072,10 +1064,10 @@ def iso_install(
     iso_download(iso_url)
 
     # Create a 'check-out' folder, mount ISO to it...
-    run('mkdir ISO')
-    run('mount *.iso ISO -t iso9660 -o loop')
+    run('mkdir -p ~/ISO')
+    run('mount *.iso ~/ISO -t iso9660 -o loop')
     # ...and run the installer script.
-    with cd('/root/ISO'):
+    with cd('~/ISO'):
         if check_gpg_signatures is True:
             run('./install_packages')
         else:
@@ -1102,6 +1094,18 @@ def product_install(distribution, create_vm=False, certificate_url=None,
                     test_in_stage=False):
     """Task which install every product distribution.
 
+    The following environment variables affect this command:
+
+    RHN_USERNAME
+        Red Hat Network username.
+    RHN_PASSWORD
+        Red Hat Network password.
+    RHN_POOLID
+        Optional. Red Hat Network pool ID. Determines what software will be
+        available from RHN.
+    SATELLITE_VERSION
+        Satellite version.
+
     Product distributions are sam-upstream, satellite6-cdn,
     satellite6-downstream, satellite6-iso or satellite6-upstream.
 
@@ -1126,6 +1130,8 @@ def product_install(distribution, create_vm=False, certificate_url=None,
     :param str certificate_url: where to fetch a fake certificate.
 
     """
+    # Fetch the Satellite Version information.
+    satellite_version = os.environ.get('SATELLITE_VERSION')
     # Fetch the Satellite Release information.
     satellite_release = os.environ.get('SATELLITE_RELEASE', 'GA')
     # SATELLITE_RELEASE should only be BETA or GA
@@ -1187,9 +1193,6 @@ def product_install(distribution, create_vm=False, certificate_url=None,
                     env['vm_ip'],
                     host=env['vm_ip']
                 )
-
-    # Fetch the Satellite Version information.
-    satellite_version = os.environ.get('SATELLITE_VERSION')
 
     # When creating a vm the vm_ip will be set, otherwise use the fabric host
     host = env.get('vm_ip', env['host'])
@@ -1300,11 +1303,11 @@ def product_install(distribution, create_vm=False, certificate_url=None,
         if not distribution.endswith('upstream'):
             if os.environ.get('LIBVIRT_KEY_URL') is not None:
                 execute(setup_libvirt_key, host=host)
-            if os.environ.get('SATELLITE_VERSION') != '6.0':
+            if satellite_version != '6.0':
                 execute(install_puppet_scap_client, host=host)
-            if os.environ.get('SATELLITE_VERSION') == '6.1':
+            if satellite_version == '6.1':
                 execute(setup_oscap, host=host)
-            if os.environ.get('SATELLITE_VERSION') == '6.2':
+            if satellite_version in ('6.2', ''):
                 execute(oscap_content, host=host)
             if os.environ.get('PXE_DEFAULT_TEMPLATE_URL') is not None:
                 execute(setup_foreman_discovery, host=host)
@@ -1328,7 +1331,7 @@ def partition_disk():
     """
     run('umount /home')
     run('lvremove -f /dev/mapper/*home')
-    run("sed -i '/home/d' /etc/fstab")
+    run("sed -i '/\/home/d' /etc/fstab")
     run('lvresize -f -l +100%FREE /dev/mapper/*root')
     run('if uname -r | grep -q el6; then resize2fs -f /dev/mapper/*root; '
         'else xfs_growfs / && mount / -o inode64,remount; fi')
@@ -1385,7 +1388,10 @@ def iso_download(iso_url=None):
                 quiet=True,
             )
             if result.succeeded:
-                iso_filename = search('\w+\s+\*?([^\s]+)', result).group(1)
+                # match either '<hash> *<iso_filename>'
+                # or '{MD5|SHA1|SHA256} (<iso_filename>) = <hash>'
+                iso_filename = search(
+                    '\w+\s+[\*\(]?([^\s\)]+)', result).group(1)
                 break
 
         if iso_filename is None:
@@ -1394,7 +1400,7 @@ def iso_download(iso_url=None):
 
         iso_url = urljoin(iso_url, iso_filename)
 
-    run('wget {0}'.format(iso_url), quiet=True)
+    run('wget -nv {0}'.format(iso_url))
 
 
 # Miscelaneous tasks ==========================================================
