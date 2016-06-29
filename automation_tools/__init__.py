@@ -733,12 +733,12 @@ def vm_create():
     # Fetch Ip information via ping only when not using VLAN Bridges as we
     # know the VM's Ip address beforehand.
     if options['bridge'] is None:
-        result = run('ping -c 1 {0}.local'.format(
-            options['target_image']))
+        result = run('ping -c 1 {0}.local'.format(options['target_image']))
         env['vm_ip'] = result.split('(')[1].split(')')[0]
+        env['vm_domain'] = '{target_image}.{vm_domain}'.format(**options)
     else:
         env['vm_ip'] = '{ip_addr}'.format(**options)
-    env['vm_domain'] = '{hostname}'.format(**options)
+        env['vm_domain'] = '{hostname}'.format(**options)
 
     # fix_hostname only if using VLAN Bridge.
     if os.environ.get('BRIDGE'):
