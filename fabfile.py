@@ -76,6 +76,7 @@ from automation_tools.satellite6.upgrade.tasks import (
     create_rhevm_instance,
     delete_openstack_instance,
     delete_rhevm_instance,
+    reboot_rhevm_instance,
     sync_capsule_tools_repos_to_upgrade,
     wait_till_rhev_instance_status
 )
