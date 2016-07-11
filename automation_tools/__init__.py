@@ -595,6 +595,19 @@ def setup_foreman_discovery():
     run('rm -rf {0}'.format(template_file))
 
 
+def enable_ostree():
+    """Task to enable ostree plugin for Satellite on rhel7. This enables ostree
+    type repository.
+
+    """
+    os_version = distro_info()[1]
+    sat_version = os.environ.get('SATELLITE_VERSION')
+    # Enable ostree plugin only for Satellite6.2 installed on rhel7
+    if sat_version == '6.2' and os_version >= 7:
+        run('satellite-installer --scenario satellite '
+            '--katello-enable-ostree=true')
+
+
 def setup_libvirt_key():
     """Task to setup key pairs and verify host for secure communication between
     Satellite server and libvirt hypervisor (qemu+ssh).
@@ -1311,6 +1324,7 @@ def product_install(distribution, create_vm=False, certificate_url=None,
                 execute(oscap_content, host=host)
             if os.environ.get('PXE_DEFAULT_TEMPLATE_URL') is not None:
                 execute(setup_foreman_discovery, host=host)
+            execute(enable_ostree, host=host)
 
 
 def fix_qdrouterd_listen_to_ipv6():
