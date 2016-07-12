@@ -8,10 +8,9 @@ import sys
 import time
 from tasks import (
     create_rhevm_instance, delete_rhevm_instance,
-    reboot_rhevm_instance,
     sync_capsule_tools_repos_to_upgrade
 )
-from tools import copy_ssh_key, host_pings
+from tools import copy_ssh_key, host_pings, reboot
 from automation_tools import foreman_debug, set_yum_debug_level, subscribe
 from automation_tools.repository import enable_repos, disable_repos
 from automation_tools.satellite6.capsule import generate_capsule_certs
@@ -60,7 +59,7 @@ def satellite6_upgrade(admin_password=None):
     update_packages(quiet=True)
     # Rebooting the system to see possible errors
     if os.environ.get('RHEV_SATELLITE') or os.environ.get('SAT_HOST'):
-        reboot_rhevm_instance(env.get('satellite_instance'))
+        reboot(120)
     # Setting Satellite61 Repos
     major_ver = distro_info()[1]
     base_url = os.environ.get('BASE_URL')
@@ -95,7 +94,7 @@ def satellite6_upgrade(admin_password=None):
     print('YUM UPDATE finished at: {0}'.format(time.ctime()))
     # Rebooting the system again for possible errors
     if os.environ.get('RHEV_SATELLITE') or os.environ.get('SAT_HOST'):
-        reboot_rhevm_instance(env.get('satellite_instance'))
+        reboot(120)
     if to_version == '6.1':
         # Stop the service again which started in restart
         # This step is not required with 6.2 upgrade as installer itself stop
@@ -204,7 +203,7 @@ def satellite6_capsule_upgrade(admin_password=None):
                         "root@{0}:/home/".format(cap_host)), host=sat_host)
     # Rebooting the system again to see possible errors
     if os.environ.get('RHEV_CAPSULE') or os.environ.get('CAP_HOST'):
-        reboot_rhevm_instance(env.get('capsule_instance'))
+        reboot(120)
     if to_version == '6.1':
         # Stopping the services again which started in reboot
         run('for i in qpidd pulp_workers pulp_celerybeat '
@@ -287,17 +286,15 @@ def product_upgrade(
         print('Product name should be one of {0}'.format(', '.join(products)))
         sys.exit(1)
 
-    missing_vars = [
-        var for var in ('SAT_IMAGE', 'SAT_HOST', 'CAP_IMAGE', 'CAP_HOST')
-        if var not in os.environ
-    ]
-    if missing_vars:
-        print('The following environment variable(s) must be set: '
-              '{0}.'.format(', '.join(missing_vars)))
-        sys.exit(1)
-
     if not os.environ.get('SATELLITE_HOSTNAME'):
         if not sat_image and not os.environ.get('RHEV_SATELLITE'):
+            missing_vars = [
+                var for var in ('SAT_IMAGE', 'SAT_HOST')
+                if var not in os.environ]
+            if missing_vars:
+                print('The following environment variable(s) must be set: '
+                      '{0}.'.format(', '.join(missing_vars)))
+                sys.exit(1)
             sat_image = os.environ.get('SAT_IMAGE')
             sat_host = os.environ.get('SAT_HOST')
         else:
@@ -307,7 +304,6 @@ def product_upgrade(
             print('Please provide OS version as rhel7 or rhel6, And retry !')
             sys.exit(1)
         sat_instance = 'upgrade_satellite_auto_{0}'.format(version)
-        env['satellite_instance'] = sat_instance
         # Deleting Satellite instance if any
         execute(delete_rhevm_instance, sat_instance)
         print('Turning on Satellite Instance ....')
@@ -329,12 +325,18 @@ def product_upgrade(
     if product == 'capsule':
         if not os.environ.get('CAPSULE_HOSTNAME'):
             if not cap_image and not os.environ.get('RHEV_CAPSULE'):
+                missing_vars = [
+                    var for var in ('CAP_IMAGE', 'CAP_HOST')
+                    if var not in os.environ]
+                if missing_vars:
+                    print('The following environment variable(s) must be set: '
+                          '{0}.'.format(', '.join(missing_vars)))
+                    sys.exit(1)
                 cap_image = os.environ.get('CAP_IMAGE')
                 cap_host = os.environ.get('CAP_HOST')
             else:
                 cap_host = os.environ.get('RHEV_CAPSULE')
             cap_instance = 'upgrade_capsule_auto_{0}'.format(version)
-            env['capsule_instance'] = cap_instance
             # Deleting Capsule instance if any
             execute(delete_rhevm_instance, cap_instance)
             print('Turning on Capsule Instance ....')
