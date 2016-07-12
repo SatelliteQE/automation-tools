@@ -286,17 +286,15 @@ def product_upgrade(
         print('Product name should be one of {0}'.format(', '.join(products)))
         sys.exit(1)
 
-    missing_vars = [
-        var for var in ('SAT_IMAGE', 'SAT_HOST', 'CAP_IMAGE', 'CAP_HOST')
-        if var not in os.environ
-    ]
-    if missing_vars:
-        print('The following environment variable(s) must be set: '
-              '{0}.'.format(', '.join(missing_vars)))
-        sys.exit(1)
-
     if not os.environ.get('SATELLITE_HOSTNAME'):
         if not sat_image and not os.environ.get('RHEV_SATELLITE'):
+            missing_vars = [
+                var for var in ('SAT_IMAGE', 'SAT_HOST')
+                if var not in os.environ]
+            if missing_vars:
+                print('The following environment variable(s) must be set: '
+                      '{0}.'.format(', '.join(missing_vars)))
+                sys.exit(1)
             sat_image = os.environ.get('SAT_IMAGE')
             sat_host = os.environ.get('SAT_HOST')
         else:
@@ -327,6 +325,13 @@ def product_upgrade(
     if product == 'capsule':
         if not os.environ.get('CAPSULE_HOSTNAME'):
             if not cap_image and not os.environ.get('RHEV_CAPSULE'):
+                missing_vars = [
+                    var for var in ('CAP_IMAGE', 'CAP_HOST')
+                    if var not in os.environ]
+                if missing_vars:
+                    print('The following environment variable(s) must be set: '
+                          '{0}.'.format(', '.join(missing_vars)))
+                    sys.exit(1)
                 cap_image = os.environ.get('CAP_IMAGE')
                 cap_host = os.environ.get('CAP_HOST')
             else:

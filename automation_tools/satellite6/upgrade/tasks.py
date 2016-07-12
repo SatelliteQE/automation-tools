@@ -15,6 +15,10 @@ from ovirtsdk.infrastructure import errors
 from tools import get_hostname_from_ip, host_pings
 
 
+class RebootFailedException(Exception):
+    """Implements Failure on Rebooting RHEVM instance"""
+
+
 def get_rhevm_client():
     """Creates and returns a client for rhevm.
 
@@ -425,3 +429,25 @@ def sync_capsule_tools_repos_to_upgrade(admin_password=None):
         lambda: run('subscription-manager attach --pool={0}'.format(
             capsule_sub_id)),
         host=env.get('capsule_host'))
+
+
+def reboot_rhevm_instance(instance_name=None):
+    """Reboots the RHEVM instance and waits till get up.
+
+    :param str instance_name: Instance name on rhevm to reboot.
+    """
+    rhevm_client = get_rhevm_client()
+    rhevm_client.vms.get(name=instance_name).reboot()
+    time.sleep(5)
+    if wait_till_rhev_instance_status(
+            instance_name, 'reboot_in_progress', timeout=20):
+        print 'The instance {0} is now rebooting. Please Wait ........'.format(
+            instance_name)
+    else:
+        raise RebootFailedException('Failed to reboot rhevm instance '
+                                    '{0}'.format(instance_name))
+    if wait_till_rhev_instance_status(instance_name, 'up', timeout=400):
+        print 'The instance {0} rebooted Successfully'.format(instance_name)
+    else:
+        raise RebootFailedException('The rhevm instance {0} didn\'t turn up '
+                                    'after reboot!'.format(instance_name))
