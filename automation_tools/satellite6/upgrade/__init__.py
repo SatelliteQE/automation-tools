@@ -11,7 +11,13 @@ from tasks import (
     sync_capsule_tools_repos_to_upgrade
 )
 from tools import copy_ssh_key, host_pings, reboot
-from automation_tools import foreman_debug, set_yum_debug_level, subscribe
+from automation_tools import (
+    foreman_debug,
+    set_yum_debug_level,
+    setup_satellite_firewall,
+    setup_capsule_firewall,
+    subscribe,
+)
 from automation_tools.repository import enable_repos, disable_repos
 from automation_tools.satellite6.capsule import generate_capsule_certs
 from automation_tools.utils import distro_info, update_packages
@@ -53,6 +59,8 @@ def satellite6_upgrade(admin_password=None):
         admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme')
     # Setting yum stdout log level to be less verbose
     set_yum_debug_level()
+    # Setup firewall rules on Satellite
+    setup_satellite_firewall()
     # Removing rhel-released and rhel-optional repo
     run('rm -rf /etc/yum.repos.d/rhel-{optional,released}.repo')
     print('Wait till Packages update ... ')
@@ -156,6 +164,8 @@ def satellite6_capsule_upgrade(admin_password=None):
         sys.exit(1)
     if admin_password is None:
         admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme')
+    # Setup firewall rules on capsule node
+    setup_capsule_firewall()
     # Setting Capsule61 Repos
     major_ver = distro_info()[1]
     # Re-register Capsule for 6.2
