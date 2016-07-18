@@ -1231,8 +1231,9 @@ def product_install(distribution, create_vm=False, certificate_url=None,
     if os.environ.get('OS_UPGRADE_REPO'):
         os_upgrade_repo = os.environ.get('OS_UPGRADE_REPO')
         execute(create_custom_repos, rhel_candidate=os_upgrade_repo, host=host)
+    # Disabling machine update temporarily
     # Update the machine
-    execute(update_packages, host=host, warn_only=True)
+    # execute(update_packages, host=host, warn_only=True)
 
     if distribution in ('satellite6-downstream', 'satellite6-iso'):
         execute(java_workaround, host=host)
