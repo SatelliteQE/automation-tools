@@ -37,20 +37,25 @@ def copy_ssh_key(from_host, to_host):
     :param to_host: A string. Hostname on to which the ssh-key will be copied.
 
     """
+    execute(lambda: run('mkdir -p ~/.ssh'), host=from_host)
+    # do we have privkey? generate only pubkey
     execute(lambda: run(
-        '[ ! -f ~/.ssh/id_rsa.pub ] && '
-        'ssh-keygen -f ~/.ssh/id_rsa -t rsa -N \'\'', warn_only=True),
-        host=from_host)
-    if int(execute(lambda: run('[ -f ~/.ssh/id_rsa.pub ]; echo $?'),
-                   host=from_host)[from_host]) == 0:
-        pub_key = execute(lambda: run(
-            'cat ~/.ssh/id_rsa.pub'), host=from_host)[from_host]
-        execute(lambda: run('[ ! -f ~/.ssh/authorized_keys ] && '
-                            'touch ~/.ssh/authorized_keys',
-                            warn_only=True), host=to_host)
+        '[ ! -f ~/.ssh/id_rsa ] || '
+        'ssh-keygen -y -f ~/.ssh/id_rsa > ~/.ssh/id_rsa.pub'), host=from_host)
+    # dont we have still pubkey? generate keypair
+    execute(lambda: run(
+        '[ -f ~/.ssh/id_rsa.pub ] || '
+        'ssh-keygen -f ~/.ssh/id_rsa -t rsa -N \'\''), host=from_host)
+    # read pubkey content in sanitized way
+    pub_key = execute(lambda: run(
+        '[ ! -f ~/.ssh/id_rsa.pub ] || cat ~/.ssh/id_rsa.pub'),
+        host=from_host)[from_host]
+    if pub_key:
+        execute(lambda: run('mkdir -p ~/.ssh'), host=to_host)
+        # deploy pubkey to another host
         execute(lambda: run(
-            'echo "{0}" >> ~/.ssh/authorized_keys'.format(pub_key)),
-            host=to_host)
+            'echo "{0}" >> ~/.ssh/authorized_keys'.format(pub_key)
+        ), host=to_host)
 
 
 def host_pings(host, timeout=15):
