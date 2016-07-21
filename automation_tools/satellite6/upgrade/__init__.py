@@ -109,6 +109,9 @@ def satellite6_upgrade(admin_password=None):
         # all the services before upgrade
         run('katello-service stop')
         run('service-wait mongod start')
+    # Verifying impact of BZ #1357655 on upgrade
+    if os.environ.get('RHEV_SATELLITE') or os.environ.get('SAT_HOST'):
+        run('katello-installer --help', quiet=True)
     # Running Upgrade
     print('SATELLITE UPGRADE started at: {0}'.format(time.ctime()))
     if to_version == '6.1':
