@@ -221,6 +221,9 @@ def setup_default_docker():
     # https://github.com/fabric/fabric/issues/395#issuecomment-1846383
     # https://github.com/fabric/fabric/issues/395#issuecomment-32219270
     # https://github.com/docker/docker/issues/2758
+
+    # enable the service as it is disabled by default on RHEL7
+    manage_daemon('enable', 'docker', pty=(os_version >= 7))
     manage_daemon('restart', 'docker', pty=(os_version >= 7))
 
 
