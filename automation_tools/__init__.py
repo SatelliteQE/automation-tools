@@ -189,6 +189,8 @@ def setup_default_docker():
     # Install ``Docker`` package.
     if os_version >= 7:
         run('yum install -y docker', warn_only=True)
+        # enable the service as it is disabled by default
+        run('systemctl enable docker.service')
         # Disable 'extras' repo after installing Docker
         disable_repos('rhel-{0}-server-extras-rpms'.format(os_version))
     else:
