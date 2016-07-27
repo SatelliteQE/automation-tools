@@ -2064,12 +2064,28 @@ def idp_authenticate(idp=None):
     ugc2_tree = html.fromstring(ugc2_request.text)
     try:
         action_url_2 = ugc2_tree.xpath(
+            '//form[@method="post"]'
+        )[0].get('action')
+    except:
+        print('Error during parsing the values from the returned HTML.'
+              'The authentication procedure might have changed')
+        sys.exit(1)
+    ugc3_request = session.post(
+        action_url_2,
+        data={
+            u'username': user,
+            u'password': password
+        }
+    )
+    ugc3_tree = html.fromstring(ugc3_request.text)
+    try:
+        action_url_3 = ugc3_tree.xpath(
             '//form[@method="POST"]'
         )[0].get('action')
-        saml2_hash = ugc2_tree.xpath(
+        saml2_hash = ugc3_tree.xpath(
             '//input[@name="SAMLResponse"]'
         )[0].get('value')
-        relay2_hash = ugc2_tree.xpath(
+        relay2_hash = ugc3_tree.xpath(
             '//input[@name="RelayState"]'
         )[0].get('value')
     except:
@@ -2077,7 +2093,7 @@ def idp_authenticate(idp=None):
               'The authentication procedure might have changed')
         sys.exit(1)
     auth_request = session.post(
-        action_url_2,
+        action_url_3,
         data={
             u'SAMLResponse': saml2_hash,
             u'RelayState': relay2_hash,
