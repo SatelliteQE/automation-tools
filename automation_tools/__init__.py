@@ -1181,8 +1181,8 @@ def product_install(distribution, create_vm=False, certificate_url=None,
         sys.exit(1)
 
     if (distribution == 'satellite6-cdn' and
-            sat_cdn_version not in ('6.0', '6.1')):
-        raise ValueError("Satellite version should be either 6.0 or 6.1")
+            sat_cdn_version not in ('6.0', '6.1', '6.2')):
+        raise ValueError("Satellite version should be either 6.0 or 6.1 or 6.2")
 
     if selinux_mode is None:
         selinux_mode = os.environ.get('SELINUX_MODE', 'enforcing')
@@ -1301,8 +1301,8 @@ def product_install(distribution, create_vm=False, certificate_url=None,
     )
 
     # Temporary workaround to solve pulp message bus connection issue
-    # only for 6.2 and above
-    if (sat_cdn_version not in ('6.0', '6.1')):
+    # only for 6.1 and above
+    if (sat_cdn_version not in ('6.0', '6.1', '6.2')):
         execute(set_service_check_status, host=host)
 
     certificate_url = certificate_url or os.environ.get(
