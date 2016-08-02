@@ -1182,7 +1182,7 @@ def product_install(distribution, create_vm=False, certificate_url=None,
 
     if (distribution == 'satellite6-cdn' and
             sat_cdn_version not in ('6.0', '6.1', '6.2')):
-        raise ValueError("Satellite version should be either 6.0 or 6.1 or 6.2")
+        raise ValueError("Satellite version should be in [6.0, 6.1, 6.2]")
 
     if selinux_mode is None:
         selinux_mode = os.environ.get('SELINUX_MODE', 'enforcing')
@@ -1314,7 +1314,7 @@ def product_install(distribution, create_vm=False, certificate_url=None,
             host=host
         )
     execute(fix_qdrouterd_listen_to_ipv6, host=host)
-    execute(enable_gateway_ports_connections, host=host)
+    execute(setup_alternate_capsule_ports, host=host)
 
     if distribution.startswith('satellite6'):
         execute(setup_default_docker, host=host)
@@ -2168,14 +2168,6 @@ def relink_manifest(manifest_file=None):
         .format(new_manifest_file))
 
 
-def enable_gateway_ports_connections():
-    """Required by remote connections to SSH tunnels"""
-    run(
-        'sed -i "s/^[#]*GatewayPorts.*/GatewayPorts yes/" /etc/ssh/sshd_config'
-    )
-    manage_daemon('restart', 'sshd')
-
-
 def set_yum_debug_level(level=1):
     """Set default debug level for yum output"""
     run(
@@ -2192,3 +2184,13 @@ def set_service_check_status(user='admin', password='changeme',
         '--name=check_services_before_actions --value={2}'
         .format(user, password, value)
     )
+
+
+def setup_alternate_capsule_ports(port_range='9091-14999'):
+    """Setup alternate capsule ports in SELINUX and install tunneling tool
+
+    :param port_range: these ports will be added under websm_port_t type.
+    """
+    run('which nc || yum -d1 -y install nc', warn_only=True)
+    run('semanage port -a -t websm_port_t -p tcp {0}'
+        .format(port_range), warn_only=True)
