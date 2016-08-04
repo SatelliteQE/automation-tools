@@ -2191,6 +2191,9 @@ def setup_alternate_capsule_ports(port_range='9091-14999'):
 
     :param port_range: these ports will be added under websm_port_t type.
     """
-    run('which nc || yum -d1 -y install nc', warn_only=True)
+    # ncat (opposite to nc) supports -c option we use for capsule faking
+    nc_rpm = 'nmap' if distro_info()[1] < 7 else 'nmap-ncat'
+    run('which ncat || yum -d1 -y install {0}'.format(nc_rpm), warn_only=True)
+    # labelling custom port range so that passenger will be allowed to connect
     run('semanage port -a -t websm_port_t -p tcp {0}'
         .format(port_range), warn_only=True)
