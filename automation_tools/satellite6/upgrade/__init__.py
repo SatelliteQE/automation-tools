@@ -221,6 +221,8 @@ def satellite6_capsule_upgrade(admin_password=None):
         # Stopping the services again which started in reboot
         run('for i in qpidd pulp_workers pulp_celerybeat '
             'pulp_resource_manager httpd; do service $i stop; done')
+    # Setting Up firewall rules
+    setup_capsule_firewall()
     # Upgrading Katello installer
     print('CAPSULE UPGRADE started at: {0}'.format(time.ctime()))
     if to_version == '6.1':
