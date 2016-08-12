@@ -1232,10 +1232,13 @@ def product_install(distribution, create_vm=False, certificate_url=None,
         cdn_version=sat_cdn_version,
         host=host
     )
-    # Create custom OS beaker repo
+    # Create custom OS candidate repo and upgrade OS with it
     if os.environ.get('OS_UPGRADE_REPO'):
         os_upgrade_repo = os.environ.get('OS_UPGRADE_REPO')
         execute(create_custom_repos, rhel_candidate=os_upgrade_repo, host=host)
+        # If OS candidate repo was created then upgrade OS with it
+        execute(update_packages, host=host, warn_only=True)
+
     # Disabling machine update temporarily
     # Update the machine
     # execute(update_packages, host=host, warn_only=True)
