@@ -3,11 +3,17 @@ from __future__ import print_function
 import json
 
 from fabric.api import env, get, put, run, settings, task
-from fabric.operations import _AttributeList
-
-
-class _AttributeDict(dict):
-    """Simple dict subclass to allow arbitrary attibute access"""
+from hammer import (
+    hammer_activation_key_add_subscription,
+    hammer_activation_key_create,
+    hammer_content_view_add_repository,
+    hammer_content_view_create,
+    hammer_content_view_publish,
+    hammer_product_create,
+    hammer_repository_create,
+    hammer_repository_synchronize,
+    set_hammer_config
+)
 
 
 class ImproperlyConfigured(Exception):
@@ -70,6 +76,7 @@ class Config(object):
         self._key_filenames = set()
 
         self._parse()
+        set_hammer_config(self.admin_user, self.admin_password)
 
     def _parse(self):
         """Parse the configuration and store the contents"""
@@ -147,16 +154,6 @@ def _get_config():
         raise ImproperlyConfigured(
             'Make sure to run load_capsule_config task.')
     return config
-
-
-def _lower_dict_keys(d):
-    """Helper for ensuring that all dictionary keys are lowercase."""
-    if isinstance(d, list):
-        return [_lower_dict_keys(v) for v in d]
-    elif isinstance(d, dict):
-        return dict((k.lower(), _lower_dict_keys(v)) for k, v in d.iteritems())
-    else:
-        return d
 
 
 @task
@@ -275,207 +272,6 @@ def capsule_installer(
 
 
 @task
-def hammer(command):
-    """Run hammer -u <admin_user> -p <admin_password> --output json <command>.
-
-    :param str command: The hammer subcommand to run.
-    :return: Return a JSON decoded object containing the result of the command.
-        The returned object will exhibit ``failed`` and ``succeeded`` boolean
-        attributes specifying whether the command failed or succeeded, and will
-        also include the return code as the ``return_code`` attribute.
-    """
-    config = _get_config()
-    command_result = run(
-        'hammer --username {0} --password {1} --output json {2}'
-        .format(config.admin_user, config.admin_password, command),
-        quiet=True
-    )
-    result = _lower_dict_keys(json.loads(command_result))
-    print(result)
-    if isinstance(result, list):
-        result = _AttributeList(result)
-    elif isinstance(result, dict):
-        result = _AttributeDict(result)
-    result.succeeded = command_result.succeeded
-    result.failed = command_result.failed
-    result.return_code = command_result.return_code
-    return result
-
-
-@task
-def hammer_capsule_lcenvs(capsule_id):
-    """Get the available lifecycle environments of a capsule.
-
-    :param capsule_id: The capsule ID to get the availables lifecycle
-        environments.
-    :returns: A list of lifecycle environment dictonaries. For example:
-        ``[{u'organization': u'Default Organization', u'id': 1,
-        u'name': u'Library'}]``.
-    :rtype: list
-    """
-    return hammer(
-        'capsule content available-lifecycle-environments --id {0}'
-        .format(capsule_id),
-    )
-
-
-@task
-def hammer_capsule_add_lcenv(capsule_id, lcenv_id):
-    """Add the lifecycle environment to the capsule.
-
-    :param capsule_id: The capsule ID to add the lifecycle environment.
-    :param lcenv_id: The lifecycle environment ID to add to the capsule.
-    """
-    return hammer(
-        'capsule content add-lifecycle-environment '
-        '--environment-id {0} --id {1}'
-        .format(lcenv_id, capsule_id)
-    )
-
-
-@task
-def hammer_product_create(name, organization_id):
-    """Create a product
-
-    :param name: name of the product
-    :param organization_id: organization where the product will be created
-    """
-    return hammer(
-        'product create --name "{0}" --organization-id "{1}"'
-        .format(name, organization_id)
-    )
-
-
-@task
-def hammer_repository_create(name, organization_id, product_name, url):
-    """Create a repository
-
-    :param name: name of the repository
-    :param organization_id: organization where the repository will be created
-    :param product_name: name of the product which the repository belongs
-    :param url: repository source URL
-    """
-    return hammer(
-        'repository create --name "{0}" '
-        '--content-type "yum" '
-        '--organization-id "{1}" '
-        '--product "{2}" '
-        '--url "{3}"'
-        .format(name, organization_id, product_name, url)
-    )
-
-
-@task
-def hammer_repository_synchronize(name, organization_id, product_name):
-    """Synchronize a repository
-
-    :param name: name of the repository to synchronize
-    :param organization_id: organization_id where the repository was created
-    :param product_name: product name which the repository belongs
-    """
-    return hammer(
-        'repository synchronize --name "{0}" '
-        '--organization-id "{1}" '
-        '--product "{2}"'
-        .format(name, organization_id, product_name)
-    )
-
-
-@task
-def hammer_content_view_create(name, organization_id):
-    """Create a content view
-
-    :param name: name of the content view
-    :param organization_id: organization where the content view will be created
-    """
-    return hammer(
-        'content-view create --name "{0}" --organization-id "{1}"'
-        .format(name, organization_id)
-    )
-
-
-@task
-def hammer_content_view_add_repository(
-        name, organization_id, product_name, repository_name):
-    """Add a repository to a content view
-
-    :param name: name of the content view which the repository will be added
-    :param organization_id: organization where the content view, product and
-        repository were created
-    :param product_name: name of the product where the repository was created
-    :param repository_name: repository name which will be added to the content
-        view
-    """
-    return hammer(
-        'content-view add-repository --name "{0}" '
-        '--organization-id "{1}" '
-        '--product "{2}" '
-        '--repository "{3}"'
-        .format(name, organization_id, product_name, repository_name)
-    )
-
-
-@task
-def hammer_content_view_publish(name, organization_id):
-    """Publish a content view
-
-    :param name: name of the content view which will be published
-    :param organization_id: organization where the content view was created
-    """
-    return hammer(
-        'content-view publish --name "{0}" --organization-id "{1}"'
-        .format(name, organization_id)
-    )
-
-
-@task
-def hammer_activation_key_create(
-        name, organization_id, content_view_name,
-        lifecycle_environment_name='Library'):
-    """Create an activation key
-
-    :param name: name of the acktivation key which will be created
-    :param organization_id: organization where the activation key will be
-        created
-    :param content_view_name: content view name which will be linked to the
-        activation key
-    :param lifecycle_environment_name: lifecycle environment name which will be
-        linked to the activation key
-    """
-    return hammer(
-        'activation-key create --name "{0}" '
-        '--content-view "{1}" '
-        '--lifecycle-environment "{2}" '
-        '--organization-id "{3}"'
-        .format(
-            name,
-            content_view_name,
-            lifecycle_environment_name,
-            organization_id
-        )
-    )
-
-
-@task
-def hammer_activation_key_add_subscription(
-        name, organization_id, subscription_id):
-    """Add a subscription to an activation key
-
-    :param name: name of the activation key which the subscription will be
-        added
-    :param organization_id: organization where the activation key was created
-    :param subscription_id: subscription which will be added to the activation
-        key
-    """
-    return hammer(
-        'activation-key add-subscription --name "{0}" '
-        '--organization-id "{1}" '
-        '--subscription-id "{2}"'
-        .format(name, organization_id, subscription_id)
-    )
-
-
-@task
 def setup_capsule_content(
         activation_key_name,
         content_view_name,
@@ -554,37 +350,6 @@ def setup_capsule_content(
         activation_key_name, organization_id, content_view_name)
     hammer_activation_key_add_subscription(
         activation_key_name, organization_id, product_id)
-
-
-@task
-def hammer_capsule_list():
-    """Get the list of all Satellite capsules.
-
-    :returns: A list of (capsule_id, capsule_name) tuples. For example:
-        ``[{u'url': u'https://capsule1.example.com:9090', u'id': 1,
-        u'name': u'capsule1.example.com'}]``.
-    :rtype: list
-    """
-    return hammer('capsule list')
-
-
-def sync_capsule_content(capsule):
-    """Start content synchronization in the capsule. The content
-    synchronization will be asynchronously, check the capsule logs to see when
-    it have finished.
-
-    :param dict capsule: A capsule dictionary containing its ``id`` and
-        ``name``.
-    """
-    if capsule['id'] == 1:
-        print('Skipping default capsule...')
-        return
-    lcenvs = hammer_capsule_lcenvs(capsule['id'])
-    for lcenv in lcenvs:
-        hammer_capsule_add_lcenv(capsule['id'], lcenv['id'])
-    hammer(
-        'capsule content synchronize --async --id {0}'.format(capsule['id'])
-    )
 
 
 @task
