@@ -375,8 +375,8 @@ def setup_firewall(definitions=None, flush=True):
     """
     if definitions is None:
         return
-
-    if distro_info()[1] < 8:
+    os_version = distro_info()[1]
+    if os_version < 7:
         exists_command = r'iptables -nL INPUT | grep -E "^ACCEPT\s+{0}.*{1}"'
         command = (
             'iptables -I INPUT -m state --state NEW -p {0} --dport {1} '
@@ -388,16 +388,12 @@ def setup_firewall(definitions=None, flush=True):
         if run('systemctl status firewalld', quiet=True).failed:
             run('systemctl enable firewalld')
             run('systemctl start firewalld')
-        exists_command = 'firewall-cmd --query-port="{1}/{0}"'
+        exists_command = 'firewall-cmd --permanent --query-port="{1}/{0}"'
         command = 'firewall-cmd --permanent --add-port="{1}/{0}"'
         if flush:
             run(
                 'for port in $(firewall-cmd --permanent --list-ports); do '
                 'firewall-cmd --permanent --remove-port="$port"; done'
-            )
-            run(
-                'for port in $(firewall-cmd --list-ports); do '
-                'firewall-cmd --remove-port="$port"; done'
             )
 
     for protocol in definitions:
@@ -409,42 +405,48 @@ def setup_firewall(definitions=None, flush=True):
             if not rule_exists:
                 run(command.format(protocol, port))
 
-    if distro_info()[1] < 8:
-        # To make the changes persistent across reboots when using the
-        # command line use this command:
+    if os_version < 7:
+        # To make the changes persistent across reboots
         run('iptables-save > /etc/sysconfig/iptables')
+    else:
+        # To activate persistent settings as the current ones
+        run('firewall-cmd --reload')
 
 
 def setup_satellite_firewall():
     """Setup firewall rules that Satellite 6 needs to work properly."""
     setup_firewall({
         'tcp': (
-            # Port 443 for HTTPS (secure WWW) must be open for incoming
-            # connections.
-            443,
-            # Port 5671 must be open for SSL communication with managed
-            # systems.
-            5671,
             # Port 80 for HTTP (WWW) must be open to download the bootstrap
             # files.
             80,
-            # Port 8140 must be open for incoming Puppet connections with the
-            # managed systems.
-            8140,
-            # Port 9090 must be open for Foreman Smart Proxy connections with
-            # the managed systems.
-            9090,
-            # Port 22 must be open for connections via ssh
-            22,
-            # Port 5000 must be open for Docker registry communication.
-            5000,
+            # Port 443 for HTTPS (secure WWW) must be open for incoming
+            # connections.
+            443,
             # Ports 5646 and 5647 for qpidd
             5646,
             5647,
+            # Port 5671 must be open for SSL communication with managed
+            # systems.
+            5671,
             # Port 8000 for foreman-proxy service
             8000,
+            # Port 8140 must be open for incoming Puppet connections with the
+            # managed systems.
+            8140,
             # Port 8443 for Katello access the Isolated Capsule
             8443,
+            # Port 9090 must be open for Foreman Smart Proxy connections with
+            # the managed systems.
+            9090,
+            # Automation controls machine via ssh
+            22,
+            # Local docker listens on 2375/tcp (done by setup_default_docker)
+            2375,
+            # Port 5000 must be open for Docker registry communication.
+            5000,
+            # Local libvirt listens on 16509/tcp (done by katellovirt module)
+            16509,
         ),
         'udp': (
             # Port 53 must be open for DNS Capsule Feature.
