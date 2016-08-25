@@ -376,8 +376,7 @@ def setup_firewall(definitions=None, flush=True):
     if definitions is None:
         return
     os_version = distro_info()[1]
-    has_firewalld = run('rpm -q firewalld', quiet=True).succeeded
-    if os_version < 7 or not has_firewalld:
+    if os_version < 7:
         exists_command = r'iptables -nL INPUT | grep -E "^ACCEPT\s+{0}.*{1}"'
         command = (
             'iptables -I INPUT -m state --state NEW -p {0} --dport {1} '
@@ -386,6 +385,8 @@ def setup_firewall(definitions=None, flush=True):
         if flush:
             run('iptables --flush')
     else:
+        if run('rpm -q firewalld', quiet=True).failed:
+            run('yum install -y firewalld')
         if run('systemctl status firewalld', quiet=True).failed:
             run('systemctl enable firewalld')
             run('systemctl start firewalld')
@@ -406,7 +407,7 @@ def setup_firewall(definitions=None, flush=True):
             if not rule_exists:
                 run(command.format(protocol, port))
 
-    if os_version < 7 or not has_firewalld:
+    if os_version < 7:
         # To make the changes persistent across reboots
         run('iptables-save > /etc/sysconfig/iptables')
     else:
