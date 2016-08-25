@@ -7,6 +7,20 @@ import novaclient
 import os
 import sys
 import time
+from automation_tools.satellite6.hammer import (
+    get_attribute_value,
+    hammer,
+    hammer_activation_key_add_subscription,
+    hammer_capsule_list,
+    hammer_content_view_add_repository,
+    hammer_content_view_promote_version,
+    hammer_content_view_publish,
+    hammer_product_create,
+    hammer_repository_create,
+    hammer_repository_synchronize,
+    set_hammer_config,
+    sync_capsule_content
+)
 from fabric.api import env, execute, run
 from novaclient.client import Client
 from ovirtsdk.api import API
@@ -339,13 +353,6 @@ def sync_capsule_tools_repos_to_upgrade(admin_password=None):
         capsule in defined sequence.
 
     """
-    if os.environ.get('FROM_VERSION') == '6.1':
-        org = '\'Default Organization\''
-    elif os.environ.get('FROM_VERSION') == '6.0':
-        org = 'Default_Organization'
-    else:
-        print('Wrong FROM_VERSION Provided. Provide one of 6.1 or 6.0...')
-        sys.exit(1)
     capsule_repo = os.environ.get('CAPSULE_URL')
     if capsule_repo is None:
         print('The Capsule repo URL is not provided '
@@ -363,65 +370,47 @@ def sync_capsule_tools_repos_to_upgrade(admin_password=None):
         print('Error! The CV, Env and AK details are not provided for Capsule'
               'upgrade!')
         sys.exit(1)
-    if admin_password is None:
-        admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme')
-    initials = 'hammer -u admin -p {0} '.format(admin_password)
+    set_hammer_config()
     # First initiate the connection with capsule by syncing it
-    capsule_id = str(
-        run(initials + 'capsule list | grep {0}'.format(
-            env.get('capsule_host')))).split('|')[0].strip()
+    capsule_id = get_attribute_value(
+        hammer_capsule_list(), env.get('capsule_host'), 'id')
     if not os.environ.get('CAPSULE_SUBSCRIPTION'):
-        run(initials + 'capsule content synchronize --id {0}'.format(
-            capsule_id))
+        capsule = {'id': capsule_id}
+        sync_capsule_content(capsule, async=False)
     # Create product capsule
-    run(initials + 'product create --name capsule6_latest '
-        '--organization {0}'.format(org))
+    hammer_product_create('capsule6_latest', '1')
     time.sleep(2)
-    capsule_sub_id = str(
-        run(initials + 'subscription list --organization '
-            '{0} | grep capsule6_latest'.format(org))
-    ).split('|')[7].strip()
+    # Get product uuid to add in AK later
+    latest_cap_uuid = get_attribute_value(
+        hammer('subscription list --organization-id 1'), 'capsule6_latest',
+        'uuid')
     # create repo
-    run(initials + 'repository create --content-type yum '
-        '--name capsule6_latest_repo --label capsule6_latest_repo '
-        '--product capsule6_latest --publish-via-http true --url {0} '
-        '--organization {1}'.format(capsule_repo, org))
+    hammer_repository_create(
+        'capsule6_latest_repo', '1', 'capsule6_latest', capsule_repo)
     # Sync repos
-    run(initials + 'repository synchronize --name capsule6_latest_repo '
-        '--product capsule6_latest --organization {0}'.format(org))
-    run(initials + 'content-view list --organization {0} | '
-        'grep {1}'.format(org, cv_name))
-    capsule_repo_id = str(
-        run(initials + 'repository list --organization {0} | '
-            'grep capsule6_latest_repo'.format(org))).split('|')[0].strip()
+    hammer_repository_synchronize(
+        'capsule6_latest_repo', '1', 'capsule6_latest')
     # Add repos to CV
-    run(initials + 'content-view add-repository --name {0} '
-        '--repository-id {1} --organization {2}'.format(
-            cv_name, capsule_repo_id, org))
-    # publish cv
-    run(initials + 'content-view publish --name {0} '
-        '--organization {1}'.format(cv_name, org))
-    # promote cv
-    lc = str(
-        run(initials + '--output csv lifecycle-environment list '
-            '--organization {0} --name {1}'.format(org, env_name)
-            )).split('\n')[1]
-    lc_env_id = lc.split(',')[0]
-    cv_ver_id = str(
-        run(initials + 'content-view version list --content-view {0} '
-            '--organization {1} | grep {0}'.format(
-                cv_name, org))).split('|')[0].strip()
-    run(initials + 'content-view version promote --content-view {0} '
-        '--id {1} --lifecycle-environment-id {2} --organization '
-        '{3}'.format(cv_name, cv_ver_id, lc_env_id, org))
-    ak_id = str(
-        run(initials + 'activation-key list --organization '
-            '{0} | grep {1}'.format(org, ak_name))).split('|')[0].strip()
+    hammer_content_view_add_repository(
+        cv_name, '1', 'capsule6_latest', 'capsule6_latest_repo')
+    # Publish cv
+    hammer_content_view_publish(cv_name, '1')
+    # Promote cv
+    lc_env_id = get_attribute_value(
+        hammer('lifecycle-environment list --organization-id 1 '
+               '--name {}'.format(env_name)), env_name, 'id')
+    cv_version_data = hammer(
+        'content-view version list --content-view {} '
+        '--organization-id 1'.format(cv_name))
+    latest_cv_ver = sorted([float(data['name'].split(
+        '{} '.format(cv_name))[1]) for data in cv_version_data]).pop()
+    cv_ver_id = get_attribute_value(cv_version_data, '{0} {1}'.format(
+        cv_name, latest_cv_ver), 'id')
+    hammer_content_view_promote_version(cv_name, cv_ver_id, lc_env_id, '1')
     # Add new product subscriptions to AK
-    run(initials + 'activation-key add-subscription --id {0} --quantity 1 '
-        '--subscription-id {1}'.format(ak_id, capsule_sub_id))
+    hammer_activation_key_add_subscription(ak_name, '1', latest_cap_uuid)
     # Update subscription on capsule
     execute(
         lambda: run('subscription-manager attach --pool={0}'.format(
-            capsule_sub_id)),
+            latest_cap_uuid)),
         host=env.get('capsule_host'))
