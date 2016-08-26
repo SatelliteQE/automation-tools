@@ -962,6 +962,18 @@ def upstream_install(
             sam='--sam' if sam else ''
         ))
 
+    # Install support for various compute resources in upstream
+    compute_resources = [
+        'ec2',
+        'gce',
+        'libvirt',
+        'openstack',
+        'ovirt',
+        'rackspace',
+        'vmware',
+    ]
+    run('yum install -y foreman-{{{0}}}'.format(','.join(compute_resources)))
+
     installer_options = {
         'foreman-admin-password': admin_password,
     }
@@ -1251,29 +1263,27 @@ def product_install(distribution, create_vm=False, certificate_url=None,
         install_tasks[distribution], host=host, run_katello_installer=False
     )[host])
 
-    if distribution in (
-            'satellite6-cdn', 'satellite6-downstream', 'satellite6-iso'):
-        # When using VLAN Bridges os.environ.get('BRIDGE') is 'true' and
-        # executes with 'interface=eth0' for Satellite6-automation.
-        # When using Satellite6-installer one can specify custom interface.
-        if os.environ.get('BRIDGE') or os.environ.get('INTERFACE'):
-            # execute returns a dictionary mapping host strings to the given
-            # task's return value
-            installer_options.update(execute(
-                setup_default_capsule,
-                host=host,
-                # If an INTERFACE is specified it will be used otherwise would
-                # default to eth0 interface. Helpful for configuring DHCP and
-                # DNS capsule services.
-                interface=os.environ.get('INTERFACE') or 'eth0',
-                run_katello_installer=False
-            )[host])
-        else:
-            # execute returns a dictionary mapping host strings to the given
-            # task's return value.
-            installer_options.update(execute(
-                setup_default_capsule, host=host, run_katello_installer=False
-            )[host])
+    # When using VLAN Bridges os.environ.get('BRIDGE') is 'true' and
+    # executes with 'interface=eth0' for Satellite6-automation.
+    # When using Satellite6-installer one can specify custom interface.
+    if os.environ.get('BRIDGE') or os.environ.get('INTERFACE'):
+        # execute returns a dictionary mapping host strings to the given
+        # task's return value
+        installer_options.update(execute(
+            setup_default_capsule,
+            host=host,
+            # If an INTERFACE is specified it will be used otherwise would
+            # default to eth0 interface. Helpful for configuring DHCP and
+            # DNS capsule services.
+            interface=os.environ.get('INTERFACE') or 'eth0',
+            run_katello_installer=False
+        )[host])
+    else:
+        # execute returns a dictionary mapping host strings to the given
+        # task's return value.
+        installer_options.update(execute(
+            setup_default_capsule, host=host, run_katello_installer=False
+        )[host])
 
     # Firewall should be setup after setup_default_capsule clean the puppet
     # module it installs clean already created rules
@@ -1322,18 +1332,20 @@ def product_install(distribution, create_vm=False, certificate_url=None,
     if distribution.startswith('satellite6'):
         execute(setup_default_docker, host=host)
         execute(katello_service, 'restart', host=host)
+        # if we have ssh key to libvirt machine we can setup access to it
+        if os.environ.get('LIBVIRT_KEY_URL') is not None:
+            execute(setup_libvirt_key, host=host)
         if not distribution.endswith('upstream'):
-            if os.environ.get('LIBVIRT_KEY_URL') is not None:
-                execute(setup_libvirt_key, host=host)
             if satellite_version != '6.0':
                 execute(install_puppet_scap_client, host=host)
             if satellite_version == '6.1':
                 execute(setup_oscap, host=host)
             if satellite_version in ('6.2', ''):
                 execute(oscap_content, host=host)
-            if os.environ.get('PXE_DEFAULT_TEMPLATE_URL') is not None:
-                execute(setup_foreman_discovery, host=host)
             execute(enable_ostree, host=host)
+        # if we have PXE default template we can setup foreman discovery
+        if os.environ.get('PXE_DEFAULT_TEMPLATE_URL') is not None:
+            execute(setup_foreman_discovery, host=host)
 
 
 def fix_qdrouterd_listen_to_ipv6():
