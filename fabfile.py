@@ -7,6 +7,7 @@ from automation_tools import (  # flake8: noqa
     create_personal_git_repo,
     download_manifest,
     downstream_install,
+    enable_ostree,
     errata_upgrade,
     fix_hostname,
     fix_qdrouterd_listen_to_ipv6,
