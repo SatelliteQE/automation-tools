@@ -23,7 +23,7 @@ setup(
     install_requires=[
         'Fabric',
         'lxml',
-        'ovirt-engine-sdk-python',
+        'ovirt-engine-sdk-python==3.6.8.0',
         'pycurl',
         'python-novaclient',
         'requests',
