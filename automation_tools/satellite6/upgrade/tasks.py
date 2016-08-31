@@ -11,7 +11,6 @@ from automation_tools.satellite6.hammer import (
     get_attribute_value,
     hammer,
     hammer_activation_key_add_subscription,
-    hammer_capsule_list,
     hammer_content_view_add_repository,
     hammer_content_view_promote_version,
     hammer_content_view_publish,
@@ -19,7 +18,6 @@ from automation_tools.satellite6.hammer import (
     hammer_repository_create,
     hammer_repository_synchronize,
     set_hammer_config,
-    sync_capsule_content
 )
 from fabric.api import env, execute, run
 from novaclient.client import Client
@@ -360,7 +358,8 @@ def sync_capsule_tools_repos_to_upgrade(admin_password=None):
         sys.exit(1)
     cv_name, env_name, ak_name = [
         os.environ.get(env_var)
-        for env_var in ('CAPSULE_CV', 'CAPSULE_ENVIRONMENT', 'CAPSULE_AK')
+        for env_var in (
+            'RHEV_CAPSULE_CV', 'RHEV_CAPSULE_ENVIRONMENT', 'RHEV_CAPSULE_AK')
     ]
     details = os.environ.get('CAPSULE_SUBSCRIPTION')
     if details is not None:
@@ -371,19 +370,13 @@ def sync_capsule_tools_repos_to_upgrade(admin_password=None):
               'upgrade!')
         sys.exit(1)
     set_hammer_config()
-    # First initiate the connection with capsule by syncing it
-    capsule_id = get_attribute_value(
-        hammer_capsule_list(), env.get('capsule_host'), 'id')
-    if not os.environ.get('CAPSULE_SUBSCRIPTION'):
-        capsule = {'id': capsule_id}
-        sync_capsule_content(capsule, async=False)
     # Create product capsule
     hammer_product_create('capsule6_latest', '1')
     time.sleep(2)
     # Get product uuid to add in AK later
     latest_cap_uuid = get_attribute_value(
         hammer('subscription list --organization-id 1'), 'capsule6_latest',
-        'uuid')
+        'id')
     # create repo
     hammer_repository_create(
         'capsule6_latest_repo', '1', 'capsule6_latest', capsule_repo)

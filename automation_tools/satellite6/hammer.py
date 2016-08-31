@@ -29,7 +29,7 @@ def _lower_dict_keys(d):
         return d
 
 
-def get_attribute_value(hammer_result, attribute, search_key=None):
+def get_attribute_value(hammer_result, search_key, attribute):
     """Gets the attribute value from hammer_reult using the search key
 
     e.g. Run hammer() def for 'capsule list' and get hammer_result then
@@ -42,8 +42,6 @@ def get_attribute_value(hammer_result, attribute, search_key=None):
     """
     if isinstance(hammer_result, list):
         key_index = None
-        search_key = search_key.lower()
-        attribute - attribute.lower()
         for i in range(len(hammer_result)):
             if search_key in hammer_result[i].values():
                 key_index = i
@@ -84,7 +82,11 @@ def hammer(command):
         .format(env.get('hammer_user'), env.get('hammer_password'), command),
         quiet=True
     )
-    result = _lower_dict_keys(json.loads(command_result))
+    try:
+        data = json.loads(command_result)
+    except ValueError:
+        data = command_result
+    result = _lower_dict_keys(data)
     if isinstance(result, list):
         result = _AttributeList(result)
     elif isinstance(result, dict):
