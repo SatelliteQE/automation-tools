@@ -32,7 +32,7 @@ else:  # pylint:disable=F0401,E0611
 # =============================================================================
 
 
-def satellite6_upgrade(admin_password=None):
+def satellite6_upgrade():
     """Upgrades satellite from old version to latest version.
 
     :param admin_password: A string. Defaults to 'changeme'.
@@ -50,13 +50,14 @@ def satellite6_upgrade(admin_password=None):
         e.g '6.1','6.2'
     """
     to_version = os.environ.get('TO_VERSION')
+    rhev_sat_host = os.environ.get('RHEV_SAT_HOST')
+    base_url = os.environ.get('BASE_URL')
     if to_version not in ['6.1', '6.2']:
         print('Wrong Satellite Version Provided to upgrade to. '
               'Provide one of 6.1, 6.2')
         sys.exit(1)
     # Sync capsule and tools repo
-    if admin_password is None:
-        admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme')
+    admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme')
     # Setting yum stdout log level to be less verbose
     set_yum_debug_level()
     # Setup firewall rules on Satellite
@@ -66,19 +67,20 @@ def satellite6_upgrade(admin_password=None):
     print('Wait till Packages update ... ')
     update_packages(quiet=True)
     # Rebooting the system to see possible errors
-    if os.environ.get('RHEV_SATELLITE') or os.environ.get('SAT_HOST'):
+    if rhev_sat_host:
         reboot(120)
-    # Setting Satellite61 Repos
+    # Setting Satellite to_version Repos
     major_ver = distro_info()[1]
-    base_url = os.environ.get('BASE_URL')
     # Following disables the old satellite repo and extra repos enabled
-    # during subscribe e.g Load balancer
+    # during subscribe e.g Load balancer Repo
     disable_repos('*', silent=True)
     enable_repos('rhel-{0}-server-rpms'.format(major_ver))
     enable_repos('rhel-server-rhscl-{0}-rpms'.format(major_ver))
+    # If CDN upgrade then enable satellite latest version repo
     if base_url is None:
         enable_repos('rhel-{0}-server-satellite-{1}-rpms'.format(
             major_ver, to_version))
+    # Else, consider this as Downstream upgrade
     else:
         # Add Sat6 repo from latest compose
         satellite_repo = StringIO()
@@ -101,16 +103,17 @@ def satellite6_upgrade(admin_password=None):
     update_packages(quiet=False)
     print('YUM UPDATE finished at: {0}'.format(time.ctime()))
     # Rebooting the system again for possible errors
-    if os.environ.get('RHEV_SATELLITE') or os.environ.get('SAT_HOST'):
+    # Only for RHEV based satellite and not for personal one
+    if rhev_sat_host:
         reboot(120)
-    if to_version == '6.1':
-        # Stop the service again which started in restart
-        # This step is not required with 6.2 upgrade as installer itself stop
-        # all the services before upgrade
-        run('katello-service stop')
-        run('service-wait mongod start')
+        if to_version == '6.1':
+            # Stop the service again which started in restart
+            # This step is not required with 6.2 upgrade as installer itself
+            # stop all the services before upgrade
+            run('katello-service stop')
+            run('service-wait mongod start')
     # Verifying impact of BZ #1357655 on upgrade
-    if os.environ.get('RHEV_SATELLITE') or os.environ.get('SAT_HOST'):
+    if rhev_sat_host:
         run('katello-installer --help', quiet=True)
     # Running Upgrade
     print('SATELLITE UPGRADE started at: {0}'.format(time.ctime()))
@@ -125,11 +128,8 @@ def satellite6_upgrade(admin_password=None):
     run('katello-service status', warn_only=True)
 
 
-def satellite6_capsule_upgrade(admin_password=None):
+def satellite6_capsule_upgrade():
     """Upgrades capsule from existing version to latest version.
-
-    :param admin_password: A string. Defaults to 'changeme'.
-        Foreman admin password for hammer commands.
 
     The following environment variables affect this command:
 
@@ -144,29 +144,12 @@ def satellite6_capsule_upgrade(admin_password=None):
     TO_VERSION
         Capsule version to upgrade to and enable repos while upgrading.
         e.g '6.1','6.2'
-    CAPSULE_AK
-        AK name on Satellite using which capsule is registered
 
     """
     sat_host = env.get('satellite_host')
     cap_host = env.get('capsule_host')
     from_version = os.environ.get('FROM_VERSION')
-    if from_version not in ['6.1', '6.0']:
-        print('Wrong Capsule Version Provided. Provide one of 6.1, 6.0.')
-        sys.exit(1)
     to_version = os.environ.get('TO_VERSION')
-    if to_version not in ['6.1', '6.2']:
-        print('Wrong Capsule Version Provided to upgrade to. '
-              'Provide one of 6.1, 6.2')
-        sys.exit(1)
-    if not os.environ.get('CAPSULE_SUBSCRIPTION') and not os.environ.get(
-            'CAPSULE_AK'):
-        print('Neither CAPSULE_SUBSCRIPTION nor CAPSULE_AK environment '
-              'variables were defined. Make sure at least one of them is '
-              'defined.')
-        sys.exit(1)
-    if admin_password is None:
-        admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme')
     # Setup firewall rules on capsule node
     setup_capsule_firewall()
     # Setting Capsule61 Repos
@@ -179,9 +162,10 @@ def satellite6_capsule_upgrade(admin_password=None):
     if to_version == '6.2':
         ak_name = os.environ.get('CAPSULE_SUBSCRIPTION').split(',')[2].strip(
             ) if os.environ.get('CAPSULE_SUBSCRIPTION') else os.environ.get(
-            'CAPSULE_AK')
+            'RHEV_CAPSULE_AK')
         run('subscription-manager register --org="Default_Organization" '
             '--activationkey={0} --force'.format(ak_name))
+    # if CDN Upgrade enable cdn repo
     if os.environ.get('CAPSULE_URL') is None:
         enable_repos('rhel-{0}-server-satellite-capsule-{1}-rpms'.format(
             major_ver, to_version))
@@ -214,13 +198,13 @@ def satellite6_capsule_upgrade(admin_password=None):
     # Copying the capsule cert to capsule
     execute(lambda: run("scp -o 'StrictHostKeyChecking no' {0}-certs.tar "
                         "root@{0}:/home/".format(cap_host)), host=sat_host)
-    # Rebooting the system again to see possible errors
-    if os.environ.get('RHEV_CAPSULE') or os.environ.get('CAP_HOST'):
+    # Rebooting the system to see possible errors
+    if os.environ.get('RHEV_CAP_HOST'):
         reboot(120)
-    if to_version == '6.1':
-        # Stopping the services again which started in reboot
-        run('for i in qpidd pulp_workers pulp_celerybeat '
-            'pulp_resource_manager httpd; do service $i stop; done')
+        if to_version == '6.1':
+            # Stopping the services again which started in reboot
+            run('for i in qpidd pulp_workers pulp_celerybeat '
+                'pulp_resource_manager httpd; do service $i stop; done')
     # Setting Up firewall rules
     setup_capsule_firewall()
     # Upgrading Katello installer
@@ -236,8 +220,7 @@ def satellite6_capsule_upgrade(admin_password=None):
     run('katello-service status', warn_only=True)
 
 
-def product_upgrade(
-        product, sat_image=None, cap_image=None):
+def product_upgrade(product):
     """Task which upgrades the product.
 
     Product is satellite or capsule.
@@ -273,12 +256,6 @@ def product_upgrade(
     OS
         The OS Version on which the satellite is installed.
         e.g 'rhel7','rhel6'
-    RHEV_USER
-        The username of a rhevm project to login.
-    RHEV_PASSWD
-        The password of a rhevm project to login.
-    RHEV_URL
-        An url to API of rhevm project.
     SATELLITE_HOSTNAME
         The Satellite hostname to run upgrade on.
         Optional, If want to run upgrade on specific satellite.
@@ -288,82 +265,92 @@ def product_upgrade(
     CAPSULE_SUBSCRIPTION
         List of cv_name, environment, ak_name attached to subscription of
         capsule in defined sequence.
-    RHEV_SATELLITE
-        The Satellite hostname on RHEVM instance.
-        Optional, If want to run upgrade on RHEVM instance.
-    RHEV_CAPSULE
-        The Capsule hostname on RHEVM instance.
-        Optional, If want to run upgrade on RHEVM instance.
-
     """
     products = ['satellite', 'capsule']
     if product not in products:
         print('Product name should be one of {0}'.format(', '.join(products)))
         sys.exit(1)
-
-    if not os.environ.get('SATELLITE_HOSTNAME'):
-        if not sat_image and not os.environ.get('RHEV_SATELLITE'):
-            missing_vars = [
-                var for var in ('SAT_IMAGE', 'SAT_HOST')
-                if var not in os.environ]
-            if missing_vars:
-                print('The following environment variable(s) must be set: '
-                      '{0}.'.format(', '.join(missing_vars)))
-                sys.exit(1)
-            sat_image = os.environ.get('SAT_IMAGE')
-            sat_host = os.environ.get('SAT_HOST')
-        else:
-            sat_host = os.environ.get('RHEV_SATELLITE')
+    from_version = os.environ.get('FROM_VERSION')
+    if from_version not in ['6.1', '6.0']:
+        print('Wrong Upgrade Version Provided. Provide one of 6.1, 6.0.')
+        sys.exit(1)
+    to_version = os.environ.get('TO_VERSION')
+    if to_version not in ['6.1', '6.2']:
+        print('Wrong Upgrade Version Provided to upgrade to. Provide one of '
+              '6.1, 6.2')
+        sys.exit(1)
+    # ----------------- Satellite Upgrade ------------------
+    # If Personal Satellite Hostname provided
+    if os.environ.get('SATELLITE_HOSTNAME'):
+        sat_host = os.environ.get('SATELLITE_HOSTNAME')
+    # Else run upgrade on rhevm satellite
+    else:
+        # Get imamge name and Hostname from Jenkins environment
+        missing_vars = [
+            var for var in ('RHEV_SAT_IMAGE', 'RHEV_SAT_HOST')
+            if var not in os.environ]
+        # Check if image name and Hostname in jenkins are set
+        if missing_vars:
+            print('The following environment variable(s) must be set in jenkin'
+                  'environment: {0}.'.format(', '.join(missing_vars)))
+            sys.exit(1)
+        sat_image = os.environ.get('RHEV_SAT_IMAGE')
+        sat_host = os.environ.get('RHEV_SAT_HOST')
+        # Check If OS is set for creating an instance name in rhevm
         version = os.environ.get('OS')
         if not version:
             print('Please provide OS version as rhel7 or rhel6, And retry !')
             sys.exit(1)
         sat_instance = 'upgrade_satellite_auto_{0}'.format(version)
-        # Deleting Satellite instance if any
+        # Deleting Satellite instance if already exists
         execute(delete_rhevm_instance, sat_instance)
         print('Turning on Satellite Instance ....')
-        execute(
-            create_rhevm_instance,
-            sat_instance,
-            sat_image
-        )
+        execute(create_rhevm_instance, sat_instance, sat_image)
         # Wait Till Instance gets up
         host_pings(sat_host)
-        # Subscribe the instances to CDN
+        # Subscribe the instance to CDN
         execute(subscribe, host=sat_host)
-    else:
-        sat_host = os.environ.get('SATELLITE_HOSTNAME')
+        # Rebooting the services
+        execute(lambda: run('katello-service restart'), host=sat_host)
+    # Set satellite hostname in fabric environment
     env['satellite_host'] = sat_host
-    # Rebooting the services
-    execute(lambda: run('katello-service restart'), host=sat_host)
-    # For Capsule Upgrade
+    # -------------------- Capsule Upgrade ----------------
     if product == 'capsule':
-        if not os.environ.get('CAPSULE_HOSTNAME'):
-            if not cap_image and not os.environ.get('RHEV_CAPSULE'):
-                missing_vars = [
-                    var for var in ('CAP_IMAGE', 'CAP_HOST')
-                    if var not in os.environ]
-                if missing_vars:
-                    print('The following environment variable(s) must be set: '
-                          '{0}.'.format(', '.join(missing_vars)))
-                    sys.exit(1)
-                cap_image = os.environ.get('CAP_IMAGE')
-                cap_host = os.environ.get('CAP_HOST')
-            else:
-                cap_host = os.environ.get('RHEV_CAPSULE')
+        # If Personal Capsule Hostname provided
+        if os.environ.get('CAPSULE_HOSTNAME'):
+            cap_host = os.environ.get('CAPSULE_HOSTNAME')
+            # For Personal Satellite CAPSULE_SUBSCRIPTION is must
+            cap_subscription = os.environ.get('CAPSULE_SUBSCRIPTION')
+            if not cap_subscription:
+                print('CAPSULE_SUBSCRIPTION environment variable is not '
+                      'defined !')
+                sys.exit(1)
+            elif len(cap_subscription.split(',')) != 3:
+                print('CAPSULE_SUBSCRIPTION environment variable is not '
+                      'having all the details!')
+        # Else run upgrade on rhevm capsule
+        else:
+            # Get imamge name and Hostname from Jenkins environment
+            missing_vars = [
+                var for var in (
+                    'RHEV_CAP_IMAGE', 'RHEV_CAP_HOST', 'RHEV_CAPSULE_AK')
+                if var not in os.environ]
+            # Check if image name and Hostname in jenkins are set
+            if missing_vars:
+                print('The following jenkins environment variable(s) must be '
+                      'set: {0}.'.format(', '.join(missing_vars)))
+                sys.exit(1)
+            cap_image = os.environ.get('RHEV_CAP_IMAGE')
+            cap_host = os.environ.get('RHEV_CAP_HOST')
             cap_instance = 'upgrade_capsule_auto_{0}'.format(version)
-            # Deleting Capsule instance if any
+            # Deleting Capsule instance if already exists
             execute(delete_rhevm_instance, cap_instance)
             print('Turning on Capsule Instance ....')
-            execute(
-                create_rhevm_instance,
-                cap_instance, cap_image
-            )
-        else:
-            cap_host = os.environ.get('CAPSULE_HOSTNAME')
+            execute(create_rhevm_instance, cap_instance, cap_image)
+            # Restarting the services on capsule
+            execute(lambda: run('katello-service restart'), host=cap_host)
+        # Set capsule hostname in fabric environment
         env['capsule_host'] = cap_host
-        # Restarting the services on capsule
-        execute(lambda: run('katello-service restart'), host=cap_host)
         # Copy ssh key from satellie to capsule
         copy_ssh_key(sat_host, cap_host)
         if os.environ.get('CAPSULE_URL') is not None:
