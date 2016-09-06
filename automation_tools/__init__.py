@@ -1343,9 +1343,9 @@ def product_install(distribution, create_vm=False, certificate_url=None,
             if satellite_version in ('6.2', ''):
                 execute(oscap_content, host=host)
             execute(enable_ostree, host=host)
-        # if we have PXE default template we can setup foreman discovery
-        if os.environ.get('PXE_DEFAULT_TEMPLATE_URL') is not None:
-            execute(setup_foreman_discovery, host=host)
+            # if we have PXE default template we can setup foreman discovery
+            if os.environ.get('PXE_DEFAULT_TEMPLATE_URL') is not None:
+                execute(setup_foreman_discovery, host=host)
 
 
 def fix_qdrouterd_listen_to_ipv6():
