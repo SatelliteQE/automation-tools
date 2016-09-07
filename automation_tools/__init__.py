@@ -997,26 +997,21 @@ def install_prerequisites():
     manage_daemon('start', 'ntpd', warn_only=True)
 
 
-def upstream_install(
-        admin_password=None, sam=False, run_katello_installer=True):
-    """Task to install Foreman nightly using katello-deploy script"""
+def upstream_install(admin_password=None, run_katello_installer=True,
+                     puppet4=True):
+    """Task to install Foreman nightly using forklift scripts"""
     if admin_password is None:
         admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme')
 
-    os_version = distro_info()[1]
-
     # Install required packages for the installation
     run('yum install -y git ruby')
+    run('rm -rf forklift')
+    run('git clone -q https://github.com/Katello/forklift.git')
 
-    run('if [ -d katello-deploy ]; then rm -rf katello-deploy; fi')
-    run('git clone https://github.com/Katello/katello-deploy.git')
-
-    run('yum repolist')
-    run('cd katello-deploy && ./setup.rb --skip-installer '
-        '--os rhel{os_version} {sam}'.format(
-            os_version=os_version,
-            sam='--sam' if sam else ''
-        ))
+    run('yum -d2 repolist')
+    with cd('forklift'):
+        run('./setup.rb --skip-installer {0}'.format(
+            '--puppet-four' if puppet4 else ''))
 
     # Install support for various compute resources in upstream
     compute_resources = [
@@ -1032,9 +1027,10 @@ def upstream_install(
 
     installer_options = {
         'foreman-admin-password': admin_password,
+        'disable-system-checks': None,
     }
     if run_katello_installer:
-        katello_installer(sam=sam, **installer_options)
+        katello_installer(**installer_options)
         # Ensure that the installer worked
         run('hammer -u admin -p {0} ping'.format(admin_password))
     else:
@@ -1281,14 +1277,31 @@ def iso_install(
         return installer_options
 
 
-def sam_upstream_install(admin_password=None):
-    """Task to install SAM nightly using katello-deploy script"""
-    upstream_install(admin_password, sam=True)
+def sam_upstream_install(admin_password=None, run_katello_installer=True):
+    """Task to install SAM nightly"""
+
+    if admin_password is None:
+        admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme')
+
+    # TODO forklift (katello-deploy) dropped SAM support (--sam)
+    # DUMMY
+    #
+    # to be implemented...
+
+    installer_options = {
+        'foreman-admin-password': admin_password,
+    }
+    if run_katello_installer:
+        katello_installer(**installer_options)
+        # Ensure that the installer worked
+        run('hammer -u admin -p {0} ping'.format(admin_password))
+    else:
+        return installer_options
 
 
 def product_install(distribution, create_vm=False, certificate_url=None,
                     selinux_mode=None, sat_cdn_version=None,
-                    test_in_stage=False):
+                    test_in_stage=False, puppet4=False):
     """Task which install every product distribution.
 
     The following environment variables affect this command:
@@ -1441,7 +1454,8 @@ def product_install(distribution, create_vm=False, certificate_url=None,
     # execute returns a dictionary mapping host strings to the given task's
     # return value
     installer_options.update(execute(
-        install_tasks[distribution], host=host, run_katello_installer=False
+        install_tasks[distribution],
+        host=host, run_katello_installer=False, puppet4=puppet4
     )[host])
 
     # When using VLAN Bridges os.environ.get('BRIDGE') is 'true' and
@@ -1482,7 +1496,9 @@ def product_install(distribution, create_vm=False, certificate_url=None,
         # INSTALLER_OPTIONS are comma separated katello-installer options.
         # It will be of the form "key1=val1,key2=val2".
         ins_opt = os.environ.get('INSTALLER_OPTIONS')
-        ins_opt_dict = dict(i.split('=') for i in ins_opt.split(','))
+        ins_opt_dict = dict(
+            i.split('=') if '=' in i else [i, None] for i in ins_opt.split(',')
+        )
         installer_options.update(ins_opt_dict)
 
     execute(
@@ -2108,6 +2124,7 @@ def katello_installer(debug=False, distribution=None, verbose=True,
     proxy = 'capsule'
     installer = 'katello'
     if distribution == 'sam-upstream':
+        installer = 'sam'
         sat_version = ''
     if sat_version == '6.2' and distribution != 'satellite6-upstream':
         proxy = 'foreman-proxy'
@@ -2131,12 +2148,13 @@ def katello_installer(debug=False, distribution=None, verbose=True,
                 '--{0}-dns-forwarders="{1}"'.format(proxy, forwarder))
 
     run('{0}-installer {1} {2} {3} {4} {5}'.format(
-        'sam' if distribution == 'sam-upstream' else installer,
+        installer,
         '--scenario {0}'.format(scenario) if sat_version == '6.2' else '',
         '-d' if debug else '',
         '-v' if verbose else '',
         ' '.join([
-            '--{0}="{1}"'.format(key, val) for key, val in kwargs.items()
+            '--{0}="{1}"'.format(key, val) if val else '--{0}'.format(key)
+            for key, val in kwargs.items()
         ]),
         ' '.join(extra_options)
     ))
