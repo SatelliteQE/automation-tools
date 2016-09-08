@@ -573,31 +573,75 @@ def install_puppet_scap_client():
     run('yum -y install puppet-foreman_scap_client', warn_only=True)
 
 
-def setup_foreman_discovery():
-    """Task to setup foreman discovery."""
-    # Install required packages to enable discovery plugin
+def setup_foreman_discovery(sat_version, upstream=False):
+    """Task to setup foreman discovery.
+
+    The following environment variables affect this task:
+
+    * `PXE_DEFAULT_TEMPLATE_URL`
+    * `PXE_DEFAULT_TEMPLATE_URL_FOR_70`
+    * `PXELINUX_DISCOVERY_SNIPPET_URL`
+
+    :param str sat_version: should contain satellite version e.g. 6.1, 6.2
+    :param bool upstream: Flag whether we run on upstream. Default: ``False``.
+    """
     packages = (
         'tfm-rubygem-foreman_discovery',
         'rubygem-smart_proxy_discovery',
-        'foreman-discovery-image',
         'tfm-rubygem-hammer_cli_foreman_discovery',
     )
-    run('yum install -y {0}'.format(' '.join(packages)))
+    admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme')
+
+    if not upstream and sat_version in ('6.1', '6.2'):
+        run('yum install -y {0}'.format(' '.join(packages)), warn_only=True)
+        run('yum install -y foreman-discovery-image')
+        for daemon in ('foreman', 'httpd', 'foreman-proxy'):
+            manage_daemon('restart', daemon)
+        template_url = os.environ.get('PXE_DEFAULT_TEMPLATE_URL')
+        template_file = run('mktemp')
+        hostname = run('hostname -f', quiet=True).strip()
+        run('wget -O {0} {1}'.format(template_file, template_url))
+        run('sed -i -e "s/SatelliteCapsule_HOST/{0}/" {1}'
+            .format(hostname, template_file))
+        # Update the template
+        run('hammer -u admin -p {0} template update --name '
+            '"PXELinux global default" --file {1}'
+            .format(admin_password, template_file))
+        run('rm -rf {0}'.format(template_file))
+        return
+
+    if upstream:
+        run('yum install -y {0}'.format(' '.join(packages)), warn_only=True)
+        # Fetch the nightly FDI from upstream
+        image_url = 'http://downloads.theforeman.org/discovery/nightly/fdi-image-latest.tar'  # noqa
+        run('wget {0} + -O - | tar x --overwrite -C /var/lib/tftpboot/boot'
+            .format(image_url))
+    if not upstream and sat_version == '6.3':
+        # In 6.3, installer should install all required packages except FDI
+        run('rpm -q {0}'.format(' '.join(packages)))
+        run('yum install -y foreman-discovery-image')
 
     for daemon in ('foreman', 'httpd', 'foreman-proxy'):
-        manage_daemon('restart', daemon)
-
-    admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme')
-    template_url = os.environ.get('PXE_DEFAULT_TEMPLATE_URL')
-    if template_url is None:
-        print('You must specify the PXE default template URL')
-        sys.exit(1)
-
+            manage_daemon('restart', daemon)
+    # Unlock the default Locked template for discovery
+    run('hammer -u admin -p {0} template update --name '
+        '"PXELinux global default" --lock "false"'
+        .format(admin_password))
+    # Fetch the updated template where ONTIMEOUT set to 'discovery'
+    # Note that this template is for discovery7.0
+    template_url = os.environ.get('PXE_DEFAULT_TEMPLATE_URL_FOR_70')
+    # Fetch the updated discovery snippet where URL includes proxy port
+    snippet_url = os.environ.get('PXELINUX_DISCOVERY_SNIPPET_URL')
+    snippet_file = run('mktemp')
+    run('wget -O {0} {1}'.format(snippet_file, snippet_url))
+    # Update the template
+    run('hammer -u admin -p {0} template update --name '
+        '"pxelinux_discovery" --file {1}'
+        .format(admin_password, snippet_file))
+    run('rm -rf {0}'.format(snippet_file))
     template_file = run('mktemp')
-    hostname = run('hostname -f', quiet=True).strip()
     run('wget -O {0} {1}'.format(template_file, template_url))
-    run('sed -i -e "s/SatelliteCapsule_HOST/{0}/" {1}'
-        .format(hostname, template_file))
+    # Update the template
     run('hammer -u admin -p {0} template update --name '
         '"PXELinux global default" --file {1}'
         .format(admin_password, template_file))
@@ -1341,6 +1385,13 @@ def product_install(distribution, create_vm=False, certificate_url=None,
         # if we have ssh key to libvirt machine we can setup access to it
         if os.environ.get('LIBVIRT_KEY_URL') is not None:
             execute(setup_libvirt_key, host=host)
+        # setup_foreman_discovery for 6.1, 6.2 & upstream
+        execute(
+            setup_foreman_discovery,
+            sat_version=satellite_version,
+            upstream=distribution.endswith('upstream'),
+            host=host
+        )
         if not distribution.endswith('upstream'):
             if satellite_version != '6.0':
                 execute(install_puppet_scap_client, host=host)
@@ -1348,9 +1399,6 @@ def product_install(distribution, create_vm=False, certificate_url=None,
                 execute(setup_oscap, host=host)
             if satellite_version not in ('6.0', '6.1'):
                 execute(oscap_content, host=host)
-            # if we have PXE default template we can setup foreman discovery
-            if os.environ.get('PXE_DEFAULT_TEMPLATE_URL') is not None:
-                execute(setup_foreman_discovery, host=host)
         # ostree plugin is for Sat6.2+ and nightly (rhel7 only)
         if satellite_version not in ('6.0', '6.1'):
             execute(
