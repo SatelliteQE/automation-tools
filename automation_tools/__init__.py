@@ -261,7 +261,7 @@ def setup_default_capsule(interface=None, run_katello_installer=True):
         run('yum install -y libvirt')
         manage_daemon('enable', 'libvirtd')
         manage_daemon('start', 'libvirtd')
-        run('puppet module install -i /tmp domcleal/katellovirt')
+        run('puppet module install -i /tmp sat6qe/katellovirt')
         with cd('/tmp/katellovirt/'):
             run('grep -v virbr manifests/libvirt.pp > tempfile')
             run('mv -f tempfile manifests/libvirt.pp')
