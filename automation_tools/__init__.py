@@ -1088,6 +1088,107 @@ def downstream_install(admin_password=None, run_katello_installer=True):
     else:
         return installer_options
 
+def repofile_install(admin_password=None, run_katello_installer=True, repo_url=None):
+    """Task to install Satellite 6.3 via repo files
+
+    The following environment variables affect this command:
+
+    ADMIN_PASSWORD
+        Optional, defaults to 'changeme'. Foreman admin password.
+    REPO_FILE_URL
+        URL for the compose repository file to fetch.
+
+    """
+    if admin_password is None:
+        admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme')
+
+    if repo_url is None:
+       repo_url = os.environ.get('REPO_FILE_URL')
+
+    run('yum install -y wget')
+    run('wget -O /etc/yum.repos.d/satellite63.repo {0}'.format(repo_url))
+
+    # Install required packages for the installation
+    run('yum install -y satellite')
+
+    installer_options = {
+        'foreman-admin-password': admin_password,
+    }
+    if run_katello_installer:
+        katello_installer(**installer_options)
+        # Ensure that the installer worked
+        run('hammer -u admin -p {0} ping'.format(admin_password))
+    else:
+        return installer_options
+
+def ak_install(admin_password=None, clean_beaker=True, run_katello_installer=True):
+    """Task to install Satellite 6.3 via Activation Keys
+
+    The following environment variables affect this command:
+
+    ADMIN_PASSWORD
+        Optional, defaults to 'changeme'. Foreman admin password.
+    DOGFOOD_URL
+        URL for the Candlepin Cert RPM.
+    DOGFOOD_ORG
+        ORG for the sat63 to subscribe to.
+    DOGFOOD_ACTIVATIONKEY
+        AK for the sat63 to subscribe to.
+
+    """
+    if admin_password is None:
+        admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme')
+
+    # DOGFOOD Url
+    dogfood_url = os.getenv('DOGFOOD_URL')
+    if not dogfood_url:
+        print('You need to provide the Dogfood Url.')
+        sys.exit(1)
+    # Org
+    org = os.getenv('DOGFOOD_ORG')
+    if not org:
+        print('You need to provide the Organization to subscribe.')
+        sys.exit(1)
+    # Activation Key
+    act_key = os.getenv('DOGFOOD_ACTIVATIONKEY')
+    if not act_key:
+        print('You need to provide an activationkey.')
+        sys.exit(1)
+    # If this is a Beaker box, 'disable' Beaker repos
+    if clean_beaker is True:
+        run('mv /etc/yum.repos.d/beaker* .', warn_only=True)
+
+    # Clean up and install with basic packages.
+    clean_rhsm()
+    update_basic_packages()
+
+    # Install the cert file
+    run('yum -y localinstall {0}/pub/katello-ca-consumer-latest.noarch.rpm'.format(dogfood_url), warn_only=True)
+
+    # Register and subscribe
+    print('Register/Subscribe using Subscription-manager.')
+    cmd = (
+        'subscription-manager register --force --org="{0}" '
+        '--activationkey="{1}"'.format(org, act_key)
+    )
+    run(cmd)
+    print('Refreshing Subscription-manager.')
+    run('subscription-manager refresh')
+    print('Performing yum clean up.')
+    run('yum clean all', quiet=True)
+
+    # Install required packages for the installation
+    run('yum install -y satellite')
+
+    installer_options = {
+        'foreman-admin-password': admin_password,
+    }
+    if run_katello_installer:
+        katello_installer(**installer_options)
+        # Ensure that the installer worked
+        run('hammer -u admin -p {0} ping'.format(admin_password))
+    else:
+        return installer_options
 
 def cdn_install(run_katello_installer=True):
     """Installs Satellite 6 from CDN.
@@ -1240,6 +1341,8 @@ def product_install(distribution, create_vm=False, certificate_url=None,
         'satellite6-beta': cdn_install,
         'satellite6-cdn': cdn_install,
         'satellite6-downstream': downstream_install,
+        'satellite6-repofile' : repofile_install,
+        'satellite6-activationkey' : ak_install,
         'satellite6-iso': iso_install,
         'satellite6-upstream': upstream_install,
     }
@@ -1259,7 +1362,7 @@ def product_install(distribution, create_vm=False, certificate_url=None,
     if selinux_mode is None:
         selinux_mode = os.environ.get('SELINUX_MODE', 'enforcing')
 
-    if distribution == 'iso':
+    if distribution == 'satellite6-iso':
         iso_url = os.environ.get('ISO_URL')
         if iso_url is None:
             print('The ISO_URL environment variable should be defined')
@@ -1290,7 +1393,11 @@ def product_install(distribution, create_vm=False, certificate_url=None,
     # Register and subscribe machine to Red Hat
     if distribution == 'satellite6-cdn' and test_in_stage:
         execute(update_rhsm_stage, host=host)
-    execute(subscribe, host=host)
+
+    # Do not subscribe Satellite6.3 if using Activation Keys of Dogfood
+    # Server.
+    if distribution != 'satellite6-activationkey':
+        execute(subscribe, host=host)
 
     # Setting yum stdout log level to be less verbose
     execute(set_yum_debug_level, host=host)
@@ -1313,6 +1420,12 @@ def product_install(distribution, create_vm=False, certificate_url=None,
 
     if distribution in ('satellite6-downstream', 'satellite6-iso'):
         execute(java_workaround, host=host)
+
+    # Make sure downstream_install only is called for sat6.1 and sat6.2, as
+    # repofile_install and ak_install can be passed only for Sat6.3.
+    if satellite_version in ('6.1','6.2'):
+        if install_tasks[distribution] in ('repofile_install', 'ak_install'):
+            install_tasks[distribution] = 'downstream_install'
     # execute returns a dictionary mapping host strings to the given task's
     # return value
     installer_options.update(execute(
