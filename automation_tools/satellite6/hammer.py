@@ -234,8 +234,8 @@ def hammer_content_view_promote_version(
     :param organization_id: organization where the content view was created
     """
     return hammer('content-view version promote --content-view {0} --id {1} '
-                  '--lifecycle-environment-id {2} --organization-id 1'.format(
-                    cv_name, cv_ver_id, lc_env_id))
+                  '--lifecycle-environment-id {2} --organization-id 1'
+                  .format(cv_name, cv_ver_id, lc_env_id))
 
 
 @task
