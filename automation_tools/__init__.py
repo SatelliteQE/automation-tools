@@ -1088,7 +1088,9 @@ def downstream_install(admin_password=None, run_katello_installer=True):
     else:
         return installer_options
 
-def repofile_install(admin_password=None, run_katello_installer=True, repo_url=None):
+
+def repofile_install(admin_password=None, run_katello_installer=True,
+                     repo_url=None):
     """Task to install Satellite 6.3 via repo files
 
     The following environment variables affect this command:
@@ -1103,7 +1105,7 @@ def repofile_install(admin_password=None, run_katello_installer=True, repo_url=N
         admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme')
 
     if repo_url is None:
-       repo_url = os.environ.get('REPO_FILE_URL')
+        repo_url = os.environ.get('REPO_FILE_URL')
 
     run('yum install -y wget')
     run('wget -O /etc/yum.repos.d/satellite63.repo {0}'.format(repo_url))
@@ -1121,7 +1123,9 @@ def repofile_install(admin_password=None, run_katello_installer=True, repo_url=N
     else:
         return installer_options
 
-def ak_install(admin_password=None, clean_beaker=True, run_katello_installer=True):
+
+def ak_install(admin_password=None, clean_beaker=True,
+               run_katello_installer=True):
     """Task to install Satellite 6.3 via Activation Keys
 
     The following environment variables affect this command:
@@ -1163,7 +1167,8 @@ def ak_install(admin_password=None, clean_beaker=True, run_katello_installer=Tru
     update_basic_packages()
 
     # Install the cert file
-    run('yum -y localinstall {0}/pub/katello-ca-consumer-latest.noarch.rpm'.format(dogfood_url), warn_only=True)
+    run('yum -y localinstall {0}/pub/katello-ca-consumer-latest.noarch.rpm'
+        .format(dogfood_url), warn_only=True)
 
     # Register and subscribe
     print('Register/Subscribe using Subscription-manager.')
@@ -1189,6 +1194,7 @@ def ak_install(admin_password=None, clean_beaker=True, run_katello_installer=Tru
         run('hammer -u admin -p {0} ping'.format(admin_password))
     else:
         return installer_options
+
 
 def cdn_install(run_katello_installer=True):
     """Installs Satellite 6 from CDN.
@@ -1341,12 +1347,19 @@ def product_install(distribution, create_vm=False, certificate_url=None,
         'satellite6-beta': cdn_install,
         'satellite6-cdn': cdn_install,
         'satellite6-downstream': downstream_install,
-        'satellite6-repofile' : repofile_install,
-        'satellite6-activationkey' : ak_install,
+        'satellite6-repofile': repofile_install,
+        'satellite6-activationkey': ak_install,
         'satellite6-iso': iso_install,
         'satellite6-upstream': upstream_install,
     }
     distribution = distribution.lower()
+
+    # Make sure downstream_install only is called for sat6.1 and sat6.2, as
+    # repofile_install and ak_install can be passed only for Sat6.3.
+    if satellite_version in ('6.1', '6.2'):
+        if distribution in ('satellite6-repofile', 'satellite6-activationkey'):
+            distribution = 'satellite6-downstream'
+
     distributions = install_tasks.keys()
     installer_options = {}
 
@@ -1394,15 +1407,15 @@ def product_install(distribution, create_vm=False, certificate_url=None,
     if distribution == 'satellite6-cdn' and test_in_stage:
         execute(update_rhsm_stage, host=host)
 
-    # Do not subscribe Satellite6.3 if using Activation Keys of Dogfood
-    # Server.
-    if distribution != 'satellite6-activationkey':
-        execute(subscribe, host=host)
+    # Subscribe for all distributions to install prerequisities and updates.
+    # Then let's unsubscribe just before calling ak_install.
+    execute(subscribe, host=host)
 
     # Setting yum stdout log level to be less verbose
     execute(set_yum_debug_level, host=host)
 
     execute(install_prerequisites, host=host)
+
     execute(setenforce, selinux_mode, host=host)
     execute(
         enable_satellite_repos,
@@ -1421,11 +1434,10 @@ def product_install(distribution, create_vm=False, certificate_url=None,
     if distribution in ('satellite6-downstream', 'satellite6-iso'):
         execute(java_workaround, host=host)
 
-    # Make sure downstream_install only is called for sat6.1 and sat6.2, as
-    # repofile_install and ak_install can be passed only for Sat6.3.
-    if satellite_version in ('6.1','6.2'):
-        if install_tasks[distribution] in ('repofile_install', 'ak_install'):
-            install_tasks[distribution] = 'downstream_install'
+    # If using the internal dog food server's AK, unsubscribe from `CDN` first.
+    if distribution == 'satellite6-activationkey':
+        execute(unsubscribe, host=host)
+
     # execute returns a dictionary mapping host strings to the given task's
     # return value
     installer_options.update(execute(
