@@ -630,8 +630,8 @@ def setup_foreman_discovery(sat_version, upstream=False):
     for daemon in ('foreman', 'httpd', 'foreman-proxy'):
             manage_daemon('restart', daemon)
     # Unlock the default Locked template for discovery
-    run('hammer -u admin -p {0} template update --name '
-        '"PXELinux global default" --lock "false"'
+    run('hammer -u admin -p {0} template update '
+        '--name "PXELinux global default" --locked "false"'
         .format(admin_password))
     # Fetch the updated template where ONTIMEOUT set to 'discovery'
     # Note that this template is for discovery7.0
