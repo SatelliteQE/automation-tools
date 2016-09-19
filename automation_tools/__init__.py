@@ -1099,6 +1099,7 @@ def repofile_install(admin_password=None, run_katello_installer=True,
         URL for the compose repository file to fetch.
 
     """
+    os_version = distro_info()[1]
     if admin_password is None:
         admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme')
 
@@ -1107,6 +1108,11 @@ def repofile_install(admin_password=None, run_katello_installer=True,
 
     run('yum install -y wget')
     run('wget -O /etc/yum.repos.d/satellite63.repo {0}'.format(repo_url))
+
+    # Enable required repository
+    if os_version == '7':
+        run('subscription-manager repos --enable "rhel-{0}-server-optional-rpms"'
+            .format(os_version))
 
     # Install required packages for the installation
     run('yum install -y satellite')
