@@ -1342,12 +1342,6 @@ def product_install(distribution, create_vm=False, certificate_url=None,
     """
     # Fetch the Satellite Version information.
     satellite_version = os.environ.get('SATELLITE_VERSION')
-    # Fetch the Satellite Release information.
-    satellite_release = os.environ.get('SATELLITE_RELEASE', 'GA')
-    # SATELLITE_RELEASE should only be BETA or GA
-    if satellite_release.lower() not in ('beta', 'ga'):
-        print('Invalid release provided.  Values allowed: BETA, GA')
-        sys.exit(1)
 
     # Command-line arguments are passed in as strings.
     if isinstance(create_vm, str):
@@ -1506,7 +1500,6 @@ def product_install(distribution, create_vm=False, certificate_url=None,
         host=host,
         distribution=distribution,
         sat_version=satellite_version,
-        sat_release=satellite_release,
         **installer_options
     )
 
@@ -2113,7 +2106,7 @@ def java_workaround():
 
 
 def katello_installer(debug=False, distribution=None, verbose=True,
-                      sat_version='6.2', sat_release='GA', **kwargs):
+                      sat_version='6.2', **kwargs):
     """Runs the installer with ``kwargs`` as command options. If ``sam`` is
     True
 
@@ -2121,19 +2114,16 @@ def katello_installer(debug=False, distribution=None, verbose=True,
     # capsule-dns-forwarders should be repeated if setting more than one
     # value check if a list is being received and repeat the option with
     # different values
-    proxy = 'capsule'
-    installer = 'katello'
+    if sat_version in ('6.0', '6.1'):
+        proxy = 'capsule'
+        installer = 'katello'
     if distribution == 'sam-upstream':
         installer = 'sam'
         sat_version = ''
-    if sat_version == '6.2' and distribution != 'satellite6-upstream':
+    if sat_version in ('6.2', '6.3') and distribution != 'satellite6-upstream':
         proxy = 'foreman-proxy'
-        if sat_release.lower() == 'ga':
-            installer = 'satellite'
-            scenario = 'satellite'
-        elif sat_release.lower() == 'beta':
-            installer = 'foreman'
-            scenario = 'katello'
+        installer = 'satellite'
+        scenario = 'satellite'
     if distribution == 'satellite6-upstream':
         proxy = 'foreman-proxy'
         installer = 'foreman'
@@ -2149,7 +2139,8 @@ def katello_installer(debug=False, distribution=None, verbose=True,
 
     run('{0}-installer {1} {2} {3} {4} {5}'.format(
         installer,
-        '--scenario {0}'.format(scenario) if sat_version == '6.2' else '',
+        '--scenario {0}'
+        .format(scenario) if sat_version in ('6.2', '6.3') else '',
         '-d' if debug else '',
         '-v' if verbose else '',
         ' '.join([
