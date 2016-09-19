@@ -1110,7 +1110,7 @@ def repofile_install(admin_password=None, run_katello_installer=True,
     run('wget -O /etc/yum.repos.d/satellite63.repo {0}'.format(repo_url))
 
     # Enable required repository
-    if os_version == '7':
+    if os_version >= 7:
         run('subscription-manager repos --enable "rhel-{0}-server-optional-rpms"'
             .format(os_version))
 
