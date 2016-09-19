@@ -1009,6 +1009,8 @@ def upstream_install(admin_password=None, run_katello_installer=True,
     run('git clone -q https://github.com/Katello/forklift.git')
 
     run('yum -d2 repolist')
+    # For now, puppet-four is configured by default. Toggle option
+    # will be added later.
     with cd('forklift'):
         run('./setup.rb --skip-installer {0}'.format(
             '--puppet-four' if puppet4 else ''))
@@ -1301,7 +1303,7 @@ def sam_upstream_install(admin_password=None, run_katello_installer=True):
 
 def product_install(distribution, create_vm=False, certificate_url=None,
                     selinux_mode=None, sat_cdn_version=None,
-                    test_in_stage=False, puppet4=False):
+                    test_in_stage=False):
     """Task which install every product distribution.
 
     The following environment variables affect this command:
@@ -1449,7 +1451,7 @@ def product_install(distribution, create_vm=False, certificate_url=None,
     # return value
     installer_options.update(execute(
         install_tasks[distribution],
-        host=host, run_katello_installer=False, puppet4=puppet4
+        host=host, run_katello_installer=False
     )[host])
 
     # When using VLAN Bridges os.environ.get('BRIDGE') is 'true' and
