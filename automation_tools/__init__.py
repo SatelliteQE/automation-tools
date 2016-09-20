@@ -642,14 +642,14 @@ def setup_foreman_discovery(sat_version, upstream=False):
     run('wget -O {0} {1}'.format(snippet_file, snippet_url))
     # Update the template
     run('hammer -u admin -p {0} template update --name '
-        '"pxelinux_discovery" --file {1}'
+        '"pxelinux_discovery" --type "snippet" --file {1}'
         .format(admin_password, snippet_file))
     run('rm -rf {0}'.format(snippet_file))
     template_file = run('mktemp')
     run('wget -O {0} {1}'.format(template_file, template_url))
     # Update the template
     run('hammer -u admin -p {0} template update --name '
-        '"PXELinux global default" --file {1}'
+        '"PXELinux global default" --type "PXELinux" --file {1}'
         .format(admin_password, template_file))
     run('rm -rf {0}'.format(template_file))
 
