@@ -1374,6 +1374,8 @@ def product_install(distribution, create_vm=False, certificate_url=None,
     if satellite_version in ('6.1', '6.2'):
         if distribution in ('satellite6-repofile', 'satellite6-activationkey'):
             distribution = 'satellite6-downstream'
+    elif satellite_version == '6.3' and distribution == 'satellite6-downstream':
+        distribution = 'satellite6-activationkey'
 
     distributions = install_tasks.keys()
     installer_options = {}
@@ -2148,7 +2150,7 @@ def katello_installer(debug=False, distribution=None, verbose=True,
     run('{0}-installer {1} {2} {3} {4} {5}'.format(
         installer,
         '--scenario {0}'
-        .format(scenario) if sat_version in ('6.2', '6.3') else '',
+        .format(scenario) if sat_version in ('6.2', '6.3', 'nightly') else '',
         '-d' if debug else '',
         '-v' if verbose else '',
         ' '.join([
