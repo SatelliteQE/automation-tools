@@ -665,7 +665,8 @@ def enable_ostree(upstream=False):
         if upstream:
             create_custom_repos(centos_atomic='http://buildlogs.centos.org/'
                                 'centos/7/atomic/x86_64/Packages/')
-        run('{}-installer --scenario {} --katello-enable-ostree=true'
+        run('{}-installer --scenario {} --disable-system-checks '
+            '--katello-enable-ostree=true'
             .format(*['foreman', 'katello'] if upstream else ['satellite']*2))
         if upstream:
             delete_custom_repos('centos_atomic')
