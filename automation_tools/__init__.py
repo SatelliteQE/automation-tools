@@ -1114,9 +1114,10 @@ def repofile_install(admin_password=None, run_katello_installer=True,
 
     # Enable required repository
     if os_version >= 7:
-        run('subscription-manager repos --enable'
-            ' "rhel-{0}-server-optional-rpms"'
-            .format(os_version))
+        run(
+            'subscription-manager repos --enable '
+            '"rhel-{0}-server-optional-rpms"'.format(os_version)
+        )
 
     # Install required packages for the installation
     run('yum install -y satellite')
@@ -1378,8 +1379,10 @@ def product_install(distribution, create_vm=False, certificate_url=None,
     if satellite_version in ('6.1', '6.2'):
         if distribution in ('satellite6-repofile', 'satellite6-activationkey'):
             distribution = 'satellite6-downstream'
-    elif (satellite_version == '6.3' and
-            distribution == 'satellite6-downstream'):
+    elif (
+        satellite_version == '6.3' and
+        distribution == 'satellite6-downstream'
+    ):
         distribution = 'satellite6-activationkey'
 
     distributions = install_tasks.keys()
@@ -1390,8 +1393,10 @@ def product_install(distribution, create_vm=False, certificate_url=None,
             distribution, ', '.join(distributions)))
         sys.exit(1)
 
-    if (distribution == 'satellite6-cdn' and
-            sat_cdn_version not in ('6.0', '6.1', '6.2')):
+    if (
+        distribution == 'satellite6-cdn' and
+        sat_cdn_version not in ('6.0', '6.1', '6.2')
+    ):
         raise ValueError("Satellite version should be in [6.0, 6.1, 6.2]")
 
     if selinux_mode is None:
