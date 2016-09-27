@@ -654,7 +654,7 @@ def setup_foreman_discovery(sat_version, upstream=False):
     run('rm -rf {0}'.format(template_file))
 
 
-def enable_ostree(upstream=False):
+def enable_ostree(sat_version='6.3'):
     """Task to enable ostree plugin for Satellite on rhel7.
     This enables ostree type repository.
 
@@ -662,13 +662,15 @@ def enable_ostree(upstream=False):
     """
     os_version = distro_info()[1]
     if os_version >= 7:
-        if upstream:
+        if sat_version == 'nightly':
             create_custom_repos(centos_atomic='http://buildlogs.centos.org/'
                                 'centos/7/atomic/x86_64/Packages/')
-        run('{}-installer --scenario {} --disable-system-checks '
-            '--katello-enable-ostree=true'
-            .format(*['foreman', 'katello'] if upstream else ['satellite']*2))
-        if upstream:
+        run('{0}-installer --scenario {1} {2} --katello-enable-ostree=true'
+            .format(
+                'foreman' if sat_version == 'nightly' else 'satellite',
+                'katello' if sat_version == 'nightly' else 'satellite',
+                '--disable-system-checks' if sat_version == '6.3' else ''))
+        if sat_version == 'nightly':
             delete_custom_repos('centos_atomic')
     else:
         print('ostree plugin is supported only on rhel7+')
@@ -1112,7 +1114,8 @@ def repofile_install(admin_password=None, run_katello_installer=True,
 
     # Enable required repository
     if os_version >= 7:
-        run('subscription-manager repos --enable "rhel-{0}-server-optional-rpms"'
+        run('subscription-manager repos --enable'
+            ' "rhel-{0}-server-optional-rpms"'
             .format(os_version))
 
     # Install required packages for the installation
@@ -1375,7 +1378,8 @@ def product_install(distribution, create_vm=False, certificate_url=None,
     if satellite_version in ('6.1', '6.2'):
         if distribution in ('satellite6-repofile', 'satellite6-activationkey'):
             distribution = 'satellite6-downstream'
-    elif satellite_version == '6.3' and distribution == 'satellite6-downstream':
+    elif (satellite_version == '6.3' and
+            distribution == 'satellite6-downstream'):
         distribution = 'satellite6-activationkey'
 
     distributions = install_tasks.keys()
@@ -1553,7 +1557,7 @@ def product_install(distribution, create_vm=False, certificate_url=None,
         # ostree plugin is for Sat6.2+ and nightly (rhel7 only)
         if satellite_version not in ('6.0', '6.1'):
             execute(
-                enable_ostree, distribution.endswith('upstream'), host=host)
+                enable_ostree, sat_version=satellite_version, host=host)
 
 
 def fix_qdrouterd_listen_to_ipv6():
