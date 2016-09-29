@@ -268,15 +268,17 @@ def hammer_activation_key_create(
 
 @task
 def hammer_activation_key_add_subscription(
-        name, organization_id, subscription_id):
+        name, organization_id, product_name):
     """Add a subscription to an activation key
 
     :param name: name of the activation key which the subscription will be
         added
     :param organization_id: organization where the activation key was created
-    :param subscription_id: subscription which will be added to the activation
-        key
+    :param product_name: product name whose subscription will be added to the
+        activation key
     """
+    subscription_id = get_product_subscription_id(
+        organization_id, product_name)
     return hammer(
         'activation-key add-subscription --name "{0}" '
         '--organization-id "{1}" '
@@ -317,3 +319,30 @@ def sync_capsule_content(capsule, async=True):
     else:
         hammer('capsule content synchronize --async --id {0}'.format(
             capsule['id']))
+
+
+def get_product_subscription_id(organization_id, product_name):
+    """Returns products subscription id
+
+    :param string organization_id: Organization Id in which product is created
+    :param string product_name: Product name of which subscription id to return
+    """
+    return get_attribute_value(
+        hammer('subscription list --organization-id {}'.format(
+            organization_id)),
+        product_name,
+        'id')
+
+
+def attach_subscription_to_host(organization_id, product_name, hostname):
+    """Attaches product subscription to content host
+
+    :param string organization_id: Organization Id in which product is created
+    :param string product_name: Product name which to be added to content host
+    :param string hostname: The hostname into which the product subscription
+        will be added
+    """
+    subscription_id = get_product_subscription_id(
+        organization_id, product_name)
+    return hammer('host subscription attach --subscription-id {0} '
+                  '--host {1}'.format(subscription_id, hostname))

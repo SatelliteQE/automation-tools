@@ -8,6 +8,7 @@ import os
 import sys
 import time
 from automation_tools.satellite6.hammer import (
+    attach_subscription_to_host,
     get_attribute_value,
     hammer,
     hammer_activation_key_add_subscription,
@@ -17,7 +18,7 @@ from automation_tools.satellite6.hammer import (
     hammer_product_create,
     hammer_repository_create,
     hammer_repository_synchronize,
-    set_hammer_config,
+    set_hammer_config
 )
 from fabric.api import env, execute, run
 from novaclient.client import Client
@@ -167,6 +168,8 @@ def create_openstack_instance(
     print('SUCCESS !! The given IP has been pinged!!\n')
     print('Now, Getting the hostname from IP......\n')
     hostname = get_hostname_from_ip(str(floating_ip.ip))
+    if not hostname:
+        sys.exit(1)
     env['{0}_host'.format(product)] = hostname
     print('Pinging the Hostname:{0} ..........'.format(hostname))
     host_pings(hostname)
@@ -331,13 +334,12 @@ def delete_rhevm_instance(instance_name, timeout=5):
     rhevm_client.disconnect()
 
 
-def sync_capsule_tools_repos_to_upgrade(admin_password=None):
-    """This syncs capsule repos in Satellite server.
+def sync_capsule_repos_to_upgrade(capsules):
+    """This syncs capsule repo in Satellite server and also attaches
+    the capsule repo subscription to each capsule
 
-    Useful for upgrading Capsule in feature.
-
-    :param admin_password: A string. Defaults to 'changeme'.
-        Foreman admin password for hammer commands.
+    :param list capsules: The list of capsule hostnames to which new capsule
+    repo subscription will be attached
 
     Following environment variable affects this function:
 
@@ -346,10 +348,21 @@ def sync_capsule_tools_repos_to_upgrade(admin_password=None):
     FROM_VERSION
         Current Satellite version - to differentiate default organization.
         e.g. '6.1', '6.0'
+
+    Personal Upgrade Env Vars:
+
     CAPSULE_SUBSCRIPTION
         List of cv_name, environment, ak_name attached to subscription of
-        capsule in defined sequence.
+        capsule in defined sequence
 
+    Rhevm upgrade Env Vars:
+
+    RHEV_CAPSULE_CV
+        The CV name used in capsule subscription
+    RHEV_CAPSULE_ENVIRONMENT
+        The environment name used in capsule subscription
+    RHEV_CAPSULE_AK
+        The AK name used in capsule subscription
     """
     capsule_repo = os.environ.get('CAPSULE_URL')
     if capsule_repo is None:
@@ -373,20 +386,13 @@ def sync_capsule_tools_repos_to_upgrade(admin_password=None):
     # Create product capsule
     hammer_product_create('capsule6_latest', '1')
     time.sleep(2)
-    # Get product uuid to add in AK later
-    latest_cap_uuid = get_attribute_value(
-        hammer('subscription list --organization-id 1'), 'capsule6_latest',
-        'id')
-    # create repo
     hammer_repository_create(
         'capsule6_latest_repo', '1', 'capsule6_latest', capsule_repo)
-    # Sync repos
     hammer_repository_synchronize(
         'capsule6_latest_repo', '1', 'capsule6_latest')
     # Add repos to CV
     hammer_content_view_add_repository(
         cv_name, '1', 'capsule6_latest', 'capsule6_latest_repo')
-    # Publish cv
     hammer_content_view_publish(cv_name, '1')
     # Promote cv
     lc_env_id = get_attribute_value(
@@ -401,9 +407,166 @@ def sync_capsule_tools_repos_to_upgrade(admin_password=None):
         cv_name, latest_cv_ver), 'id')
     hammer_content_view_promote_version(cv_name, cv_ver_id, lc_env_id, '1')
     # Add new product subscriptions to AK
-    hammer_activation_key_add_subscription(ak_name, '1', latest_cap_uuid)
-    # Update subscription on capsule
-    execute(
-        lambda: run('subscription-manager attach --pool={0}'.format(
-            latest_cap_uuid)),
-        host=env.get('capsule_host'))
+    hammer_activation_key_add_subscription(ak_name, '1', 'capsule6_latest')
+    # Add this latest capsule repo to capsules to upgrade
+    for capsule in capsules:
+        attach_subscription_to_host('1', 'capsule6_latest', capsule)
+
+
+def generate_satellite_docker_clients_on_rhevm(client_os, clients_count):
+    """Generates satellite clients on docker as containers
+
+    :param string client_os: Client OS of which client to be generated
+        e.g: rhel6, rhel7
+    :param string clients_count: No of clients to generate
+
+    Environment Variables:
+
+    RHEV_SAT_HOST
+        The satellite hostname for which clients to be generated and
+        registered
+    RHEV_CLIENT_AK
+        The AK using which client will be registered to satellite
+    """
+    if int(clients_count) == 0:
+        print('Clients count to generate on Docker cannot be Zero !!')
+        sys.exit(1)
+    rhevm_client = get_rhevm_client()
+    instance_name = 'upgrade_dockered_clients_image_DND'
+    template_name = 'upgrade_dockered_image'
+    satellite_hostname = os.environ.get('RHEV_SAT_HOST')
+    ak = os.environ.get('RHEV_CLIENT_AK')
+    result = {}
+    docker_vm_status = rhevm_client.vms.get(
+        name=instance_name).get_status().get_state()
+    if docker_vm_status != 'up':
+        print('Docker VM is not up. Turning on, please wait ....')
+        create_rhevm_instance(instance_name, template_name)
+        wait_till_rhev_instance_status(instance_name, 'up')
+        print('Docker VM is now up !! Generating clients ....')
+    for count in range(int(clients_count)):
+        hostname = '{0}DockerClient{1}'.format(count, client_os)
+        container_id = run(
+            'docker run -d -h {0} -v /dev/log:/dev/log -e "SATHOST={1}" '
+            '-e "AK={2}" upgrade:{3}'.format(
+                hostname, satellite_hostname, ak, client_os))
+        result[hostname] = container_id
+    rhevm_client.disconnect()
+    return result
+
+
+def refresh_subscriptions_on_docker_clients(container_ids):
+    """Refreshes subscription on docker containers which are satellite clients
+
+    :param list container_ids: The list of container ids onto which
+    subscriptions will be refreshed
+    """
+    if container_ids is list:
+        for container_id in container_ids:
+            docker_execute_command(
+                container_id, 'subscription-manager refresh')
+            docker_execute_command(container_id, 'yum clean all')
+    else:
+        docker_execute_command(container_ids, 'subscription-manager refresh')
+        docker_execute_command(container_ids, 'yum clean all')
+
+
+def sync_tools_repos_to_upgrade(client_os, hosts):
+    """This syncs tools repo in Satellite server and also attaches
+    the new tools repo subscription onto each client
+
+    :param string client_os: The client OS of which tools repo to be synced
+        e.g: rhel6, rhel7
+    :param list hosts: The list of capsule hostnames to which new capsule
+        repo subscription will be attached
+
+    Following environment variable affects this function:
+
+    TOOLS_URL_{client_os}
+        The url of tools repo from latest satellite compose.
+    FROM_VERSION
+        Current Satellite version - to differentiate default organization.
+        e.g. '6.1', '6.0'
+
+    Personal Upgrade Env Vars:
+
+    CLIENT_SUBSCRIPTION
+        List of cv_name, environment, ak_name attached to subscription of
+        client in defined sequence
+
+    Rhevm upgrade Env Vars:
+
+    RHEV_CLIENT_CV
+        The CV name used in client subscription
+    RHEV_CLIENT_ENVIRONMENT
+        The environment name used in client subscription
+    RHEV_CLIENT_AK
+        The AK name used in client subscription
+    """
+    client_os = client_os.upper()
+    tools_repo = os.environ.get('TOOLS_URL_{}'.format(client_os))
+    if tools_repo is None:
+        print('The Tools Repo URL for {} is not provided '
+              'to perform Client Upgrade !'.format(client_os))
+        sys.exit(1)
+    cv_name, env_name, ak_name = [
+        os.environ.get(env_var)
+        for env_var in (
+            'RHEV_CLIENT_CV', 'RHEV_CLIENT_ENVIRONMENT', 'RHEV_CLIENT_AK')
+    ]
+    details = os.environ.get('CLIENT_SUBSCRIPTION')
+    if details is not None:
+        cv_name, env_name, ak_name = [
+            item.strip() for item in details.split(',')]
+    elif not all([cv_name, env_name, ak_name]):
+        print('Error! The CV, Env and AK details are not provided for Client'
+              'upgrade!')
+        sys.exit(1)
+    # Set hammer configuration
+    set_hammer_config()
+    hammer_product_create('tools6_latest', '1')
+    time.sleep(2)
+    hammer_repository_create(
+        'tools6_latest_repo', '1', 'tools6_latest', tools_repo)
+    hammer_repository_synchronize(
+        'tools6_latest_repo', '1', 'tools6_latest')
+    hammer_content_view_add_repository(
+        cv_name, '1', 'tools6_latest', 'tools6_latest_repo')
+    hammer_content_view_publish(cv_name, '1')
+    # Promote cv
+    lc_env_id = get_attribute_value(
+        hammer('lifecycle-environment list --organization-id 1 '
+               '--name {}'.format(env_name)), env_name, 'id')
+    cv_version_data = hammer(
+        'content-view version list --content-view {} '
+        '--organization-id 1'.format(cv_name))
+    latest_cv_ver = sorted([float(data['name'].split(
+        '{} '.format(cv_name))[1]) for data in cv_version_data]).pop()
+    cv_ver_id = get_attribute_value(cv_version_data, '{0} {1}'.format(
+        cv_name, latest_cv_ver), 'id')
+    hammer_content_view_promote_version(cv_name, cv_ver_id, lc_env_id, '1')
+    # Add new product subscriptions to AK
+    hammer_activation_key_add_subscription(ak_name, '1', 'tools6_latest')
+    # Add this latest tools repo to hosts to upgrade
+    for host in hosts:
+        attach_subscription_to_host('1', 'tools6_latest', host)
+
+
+def remove_all_docker_containers(only_running=True):
+    """Deletes docker containers from system forcefully
+
+    If only_running is set to true then only running containers will be deleted
+    else all running + stopped containers will be deleted
+
+    :param bool only_running: Whether to delete only running containers
+    """
+    run('docker rm $(docker ps -q{}) -f'.format('a' if only_running else ''))
+
+
+def docker_execute_command(container_id, command):
+    """Executes command on running docker container
+
+    :param string container_id: Running containers id to execute command
+    :param string command: Command to run on running container
+    """
+    run('docker exec {0} {1}'.format(container_id, command))

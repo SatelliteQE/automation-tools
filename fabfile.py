@@ -67,8 +67,10 @@ from automation_tools.utils import (
     update_packages
 )
 from automation_tools.satellite6.upgrade import (
-    product_upgrade,
-    satellite6_capsule_upgrade,
+    product_upgrade
+)
+from automation_tools.satellite6.upgrade.satellite import (
+    satellite6_setup,
     satellite6_upgrade
 )
 from automation_tools.satellite6.upgrade.tasks import (
@@ -76,7 +78,12 @@ from automation_tools.satellite6.upgrade.tasks import (
     create_rhevm_instance,
     delete_openstack_instance,
     delete_rhevm_instance,
-    sync_capsule_tools_repos_to_upgrade,
+    docker_execute_command,
+    generate_satellite_docker_clients_on_rhevm,
+    refresh_subscriptions_on_docker_clients,
+    remove_all_docker_containers,
+    sync_capsule_repos_to_upgrade,
+    sync_tools_repos_to_upgrade,
     wait_till_rhev_instance_status
 )
 from automation_tools.satellite6.upgrade.tools import (
