@@ -4,7 +4,6 @@ Many commands are affected by environment variables. Unless stated otherwise,
 all environment variables are required.
 """
 import subprocess
-import sys
 import time
 from fabric.api import execute, run
 
@@ -25,16 +24,16 @@ def reboot(halt_time=300):
     time.sleep(halt_time)
 
 
-def copy_ssh_key(from_host, to_host):
+def copy_ssh_key(from_host, to_hosts):
     """This will generate(if not already) ssh-key on from_host
-    and copy that ssh-key to to_host.
+    and copy that ssh-key to to_hosts.
 
-    Beware that both hosts should have authorized key added
+    Beware that to and from hosts should have authorized key added
     for test-running host.
 
-    :param from_host: A string. Hostname on which the key to be generated and
+    :param string from_host: Hostname on which the key to be generated and
         to be copied from.
-    :param to_host: A string. Hostname on to which the ssh-key will be copied.
+    :param list to_hosts: Hostnames on to which the ssh-key will be copied.
 
     """
     execute(lambda: run('mkdir -p ~/.ssh'), host=from_host)
@@ -51,11 +50,12 @@ def copy_ssh_key(from_host, to_host):
         '[ ! -f ~/.ssh/id_rsa.pub ] || cat ~/.ssh/id_rsa.pub'),
         host=from_host)[from_host]
     if pub_key:
-        execute(lambda: run('mkdir -p ~/.ssh'), host=to_host)
-        # deploy pubkey to another host
-        execute(lambda: run(
-            'echo "{0}" >> ~/.ssh/authorized_keys'.format(pub_key)
-        ), host=to_host)
+        for to_host in to_hosts:
+            execute(lambda: run('mkdir -p ~/.ssh'), host=to_host)
+            # deploy pubkey to another host
+            execute(lambda: run(
+                'echo "{0}" >> ~/.ssh/authorized_keys'.format(pub_key)
+            ), host=to_host)
 
 
 def host_pings(host, timeout=15):
@@ -75,14 +75,14 @@ def host_pings(host, timeout=15):
         )
         output = command.communicate()[0]
         # Checking the return code of ping is 0
+        if time.time() > timeup:
+            print('The timout for pinging the host {0} has reached!'.format(
+                host))
+            return False
         if int(output.split()[-1]) == 0:
             print('SUCCESS !! The given host {0} has been pinged!!'.format(
                 host))
-            break
-        elif time.time() > timeup:
-            print('The timout for pinging the host {0} has reached!'.format(
-                host))
-            sys.exit(1)
+            return True
         else:
             time.sleep(5)
 
@@ -100,7 +100,7 @@ def get_hostname_from_ip(ip, timeout=3):
     while True:
         if time.time() > timeup:
             print('The timeout for getting the Hostname from IP has reached!')
-            sys.exit(1)
+            return False
         try:
             output = execute(lambda: run('hostname'), host=ip)
             print('The hostname is: {0}'.format(output[ip]))
