@@ -579,7 +579,7 @@ def install_puppet_scap_client():
     run('yum -y install puppet-foreman_scap_client', warn_only=True)
 
 
-def setup_foreman_discovery(sat_version, upstream=False):
+def setup_foreman_discovery(sat_version):
     """Task to setup foreman discovery.
 
     The following environment variables affect this task:
@@ -589,7 +589,6 @@ def setup_foreman_discovery(sat_version, upstream=False):
     * `PXELINUX_DISCOVERY_SNIPPET_URL`
 
     :param str sat_version: should contain satellite version e.g. 6.1, 6.2
-    :param bool upstream: Flag whether we run on upstream. Default: ``False``.
     """
     packages = (
         'tfm-rubygem-foreman_discovery',
@@ -598,7 +597,7 @@ def setup_foreman_discovery(sat_version, upstream=False):
     )
     admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme')
 
-    if not upstream and sat_version in ('6.1', '6.2'):
+    if sat_version in ('6.1', '6.2'):
         run('yum install -y {0}'.format(' '.join(packages)), warn_only=True)
         run('yum install -y foreman-discovery-image')
         for daemon in ('foreman', 'httpd', 'foreman-proxy'):
@@ -616,13 +615,14 @@ def setup_foreman_discovery(sat_version, upstream=False):
         run('rm -rf {0}'.format(template_file))
         return
 
-    if upstream:
+    if sat_version == 'nightly':
         run('yum install -y {0}'.format(' '.join(packages)), warn_only=True)
         # Fetch the nightly FDI from upstream
         image_url = 'http://downloads.theforeman.org/discovery/nightly/fdi-image-latest.tar'  # noqa
         run('wget {0} + -O - | tar x --overwrite -C /var/lib/tftpboot/boot'
             .format(image_url))
-    if not upstream and sat_version == '6.3':
+
+    if sat_version == '6.3':
         # In 6.3, installer should install all required packages except FDI
         run('rpm -q {0}'.format(' '.join(packages)))
         run('yum install -y foreman-discovery-image')
@@ -1545,24 +1545,21 @@ def product_install(distribution, create_vm=False, certificate_url=None,
         # if we have ssh key to libvirt machine we can setup access to it
         if os.environ.get('LIBVIRT_KEY_URL') is not None:
             execute(setup_libvirt_key, host=host)
-        if not distribution.endswith('upstream'):
-            if satellite_version != '6.0':
-                execute(install_puppet_scap_client, host=host)
-            if satellite_version == '6.1':
-                execute(setup_oscap, host=host)
-            if satellite_version not in ('6.0', '6.1'):
-                execute(oscap_content, host=host)
-        # ostree plugin is for Sat6.2+ and nightly (rhel7 only)
-        if satellite_version not in ('6.0', '6.1'):
-            execute(
-                enable_ostree, sat_version=satellite_version, host=host)
-        # setup_foreman_discovery for 6.1, 6.2 & upstream
+        # setup_foreman_discovery
         execute(
             setup_foreman_discovery,
             sat_version=satellite_version,
-            upstream=distribution.endswith('upstream'),
             host=host
         )
+        if satellite_version not in ('6.0', 'nightly'):
+            execute(install_puppet_scap_client, host=host)
+        if satellite_version == '6.1':
+            execute(setup_oscap, host=host)
+        if satellite_version not in ('6.0', '6.1', 'nightly'):
+            execute(oscap_content, host=host)
+        # ostree plugin is for Sat6.2+ and nightly (rhel7 only)
+        if satellite_version not in ('6.0', '6.1'):
+            execute(enable_ostree, sat_version=satellite_version, host=host)
 
 
 def fix_qdrouterd_listen_to_ipv6():
