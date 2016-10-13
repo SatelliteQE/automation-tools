@@ -1545,13 +1545,6 @@ def product_install(distribution, create_vm=False, certificate_url=None,
         # if we have ssh key to libvirt machine we can setup access to it
         if os.environ.get('LIBVIRT_KEY_URL') is not None:
             execute(setup_libvirt_key, host=host)
-        # setup_foreman_discovery for 6.1, 6.2 & upstream
-        execute(
-            setup_foreman_discovery,
-            sat_version=satellite_version,
-            upstream=distribution.endswith('upstream'),
-            host=host
-        )
         if not distribution.endswith('upstream'):
             if satellite_version != '6.0':
                 execute(install_puppet_scap_client, host=host)
@@ -1563,6 +1556,13 @@ def product_install(distribution, create_vm=False, certificate_url=None,
         if satellite_version not in ('6.0', '6.1'):
             execute(
                 enable_ostree, sat_version=satellite_version, host=host)
+        # setup_foreman_discovery for 6.1, 6.2 & upstream
+        execute(
+            setup_foreman_discovery,
+            sat_version=satellite_version,
+            upstream=distribution.endswith('upstream'),
+            host=host
+        )
 
 
 def fix_qdrouterd_listen_to_ipv6():
