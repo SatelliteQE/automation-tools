@@ -8,8 +8,9 @@ import os
 import sys
 import time
 from automation_tools.satellite6.hammer import (
-    attach_subscription_to_host,
+    attach_subscription_to_host_from_satellite,
     get_attribute_value,
+    get_product_subscription_id,
     hammer,
     hammer_activation_key_add_subscription,
     hammer_content_view_add_repository,
@@ -334,6 +335,21 @@ def delete_rhevm_instance(instance_name, timeout=5):
     rhevm_client.disconnect()
 
 
+def attach_subscription_to_host_from_content_host(
+        subscription_id, dockered_host=False, container_id=None):
+    """Attaches product subscription to content host from host itself
+
+    :param string subscription_id: The product uuid/pool_id of which the
+    subscription to be attached to content host
+    """
+    attach_command = 'subscription-manager attach --pool={0}'.format(
+        subscription_id)
+    if not dockered_host:
+        run(attach_command)
+    else:
+        docker_execute_command(container_id, attach_command)
+
+
 def sync_capsule_repos_to_upgrade(capsules):
     """This syncs capsule repo in Satellite server and also attaches
     the capsule repo subscription to each capsule
@@ -410,7 +426,16 @@ def sync_capsule_repos_to_upgrade(capsules):
     hammer_activation_key_add_subscription(ak_name, '1', 'capsule6_latest')
     # Add this latest capsule repo to capsules to upgrade
     for capsule in capsules:
-        attach_subscription_to_host('1', 'capsule6_latest', capsule)
+        if os.environ.get('FROM_VERSION') == '6.1':
+            subscription_id = get_product_subscription_id(
+                '1', 'capsule6_latest')
+            execute(
+                attach_subscription_to_host_from_content_host,
+                subscription_id,
+                host=capsule)
+        else:
+            attach_subscription_to_host_from_satellite(
+                '1', 'capsule6_latest', capsule)
 
 
 def generate_satellite_docker_clients_on_rhevm(client_os, clients_count):
@@ -431,19 +456,9 @@ def generate_satellite_docker_clients_on_rhevm(client_os, clients_count):
     if int(clients_count) == 0:
         print('Clients count to generate on Docker cannot be Zero !!')
         sys.exit(1)
-    rhevm_client = get_rhevm_client()
-    instance_name = 'upgrade_dockered_clients_image_DND'
-    template_name = 'upgrade_dockered_image'
     satellite_hostname = os.environ.get('RHEV_SAT_HOST')
-    ak = os.environ.get('RHEV_CLIENT_AK')
+    ak = os.environ.get('RHEV_CLIENT_AK_{}'.format(client_os.upper()))
     result = {}
-    docker_vm_status = rhevm_client.vms.get(
-        name=instance_name).get_status().get_state()
-    if docker_vm_status != 'up':
-        print('Docker VM is not up. Turning on, please wait ....')
-        create_rhevm_instance(instance_name, template_name)
-        wait_till_rhev_instance_status(instance_name, 'up')
-        print('Docker VM is now up !! Generating clients ....')
     for count in range(int(clients_count)):
         hostname = '{0}DockerClient{1}'.format(count, client_os)
         container_id = run(
@@ -451,7 +466,6 @@ def generate_satellite_docker_clients_on_rhevm(client_os, clients_count):
             '-e "AK={2}" upgrade:{3}'.format(
                 hostname, satellite_hostname, ak, client_os))
         result[hostname] = container_id
-    rhevm_client.disconnect()
     return result
 
 
@@ -461,7 +475,7 @@ def refresh_subscriptions_on_docker_clients(container_ids):
     :param list container_ids: The list of container ids onto which
     subscriptions will be refreshed
     """
-    if container_ids is list:
+    if isinstance(container_ids, list):
         for container_id in container_ids:
             docker_execute_command(
                 container_id, 'subscription-manager refresh')
@@ -504,34 +518,39 @@ def sync_tools_repos_to_upgrade(client_os, hosts):
         The AK name used in client subscription
     """
     client_os = client_os.upper()
-    tools_repo = os.environ.get('TOOLS_URL_{}'.format(client_os))
-    if tools_repo is None:
+    tools_repo_url = os.environ.get('TOOLS_URL_{}'.format(client_os))
+    if tools_repo_url is None:
         print('The Tools Repo URL for {} is not provided '
               'to perform Client Upgrade !'.format(client_os))
         sys.exit(1)
     cv_name, env_name, ak_name = [
         os.environ.get(env_var)
         for env_var in (
-            'RHEV_CLIENT_CV', 'RHEV_CLIENT_ENVIRONMENT', 'RHEV_CLIENT_AK')
+            'RHEV_CLIENT_CV_{}'.format(client_os),
+            'RHEV_CLIENT_ENVIRONMENT'.format(client_os),
+            'RHEV_CLIENT_AK_{}'.format(client_os)
+        )
     ]
-    details = os.environ.get('CLIENT_SUBSCRIPTION')
+    details = os.environ.get('CLIENT_SUBSCRIPTION_{}'.format(client_os))
     if details is not None:
         cv_name, env_name, ak_name = [
             item.strip() for item in details.split(',')]
     elif not all([cv_name, env_name, ak_name]):
-        print('Error! The CV, Env and AK details are not provided for Client'
-              'upgrade!')
+        print('Error! The CV, Env and AK details are not provided for {} '
+              'Client upgrade!'.format(client_os))
         sys.exit(1)
     # Set hammer configuration
     set_hammer_config()
-    hammer_product_create('tools6_latest', '1')
-    time.sleep(2)
-    hammer_repository_create(
-        'tools6_latest_repo', '1', 'tools6_latest', tools_repo)
-    hammer_repository_synchronize(
-        'tools6_latest_repo', '1', 'tools6_latest')
-    hammer_content_view_add_repository(
-        cv_name, '1', 'tools6_latest', 'tools6_latest_repo')
+    tools_product = 'tools6_latest_{}'.format(client_os)
+    tools_repo = 'tools6_latest_repo_{}'.format(client_os)
+    # adding sleeps in between to avoid race conditions
+    time.sleep(20)
+    hammer_product_create(tools_product, '1')
+    time.sleep(10)
+    hammer_repository_create(tools_repo, '1', tools_product, tools_repo_url)
+    time.sleep(10)
+    hammer_repository_synchronize(tools_repo, '1', tools_product)
+    hammer_content_view_add_repository(cv_name, '1', tools_product, tools_repo)
     hammer_content_view_publish(cv_name, '1')
     # Promote cv
     lc_env_id = get_attribute_value(
@@ -546,10 +565,32 @@ def sync_tools_repos_to_upgrade(client_os, hosts):
         cv_name, latest_cv_ver), 'id')
     hammer_content_view_promote_version(cv_name, cv_ver_id, lc_env_id, '1')
     # Add new product subscriptions to AK
-    hammer_activation_key_add_subscription(ak_name, '1', 'tools6_latest')
+    hammer_activation_key_add_subscription(ak_name, '1', tools_product)
     # Add this latest tools repo to hosts to upgrade
     for host in hosts:
-        attach_subscription_to_host('1', 'tools6_latest', host)
+        if os.environ.get('FROM_VERSION') in ['6.0', '6.1']:
+            subscription_id = get_product_subscription_id('1', tools_product)
+            # If not User Hosts then, attach sub to dockered clients
+            if not all([
+                os.environ.get('CLIENT6_HOSTS'),
+                os.environ.get('CLIENT7_HOSTS')
+            ]):
+                docker_vm = os.environ.get('DOCKER_VM')
+                execute(
+                    attach_subscription_to_host_from_content_host,
+                    subscription_id,
+                    True,
+                    host,
+                    host=docker_vm)
+            # Else, Attach subs to user hosts
+            else:
+                execute(
+                    attach_subscription_to_host_from_content_host,
+                    subscription_id,
+                    host=host)
+        else:
+            attach_subscription_to_host_from_satellite(
+                '1', tools_product, host)
 
 
 def remove_all_docker_containers(only_running=True):
@@ -560,13 +601,24 @@ def remove_all_docker_containers(only_running=True):
 
     :param bool only_running: Whether to delete only running containers
     """
-    run('docker rm $(docker ps -q{}) -f'.format('a' if only_running else ''))
+    if int(run('docker ps -q{} | wc -l'.format(
+            '' if only_running else 'a'))) > 0:
+        run('docker rm $(docker ps -q{}) -f'.format(
+            '' if only_running else 'a'))
+    else:
+        print('{} docker containers are not present to delete.'.format(
+            'Running' if only_running else ''))
 
 
-def docker_execute_command(container_id, command):
+def docker_execute_command(container_id, command, quiet=False):
     """Executes command on running docker container
 
     :param string container_id: Running containers id to execute command
     :param string command: Command to run on running container
     """
-    run('docker exec {0} {1}'.format(container_id, command))
+    if not isinstance(quiet, bool):
+        if quiet.lower() == 'false':
+            quiet = False
+        elif quiet.lower() == 'true':
+            quiet = True
+    run('docker exec {0} {1}'.format(container_id, command), quiet=quiet)

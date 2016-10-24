@@ -334,8 +334,9 @@ def get_product_subscription_id(organization_id, product_name):
         'id')
 
 
-def attach_subscription_to_host(organization_id, product_name, hostname):
-    """Attaches product subscription to content host
+def attach_subscription_to_host_from_satellite(
+        organization_id, product_name, hostname):
+    """Attaches product subscription to content host from satellite
 
     :param string organization_id: Organization Id in which product is created
     :param string product_name: Product name which to be added to content host
