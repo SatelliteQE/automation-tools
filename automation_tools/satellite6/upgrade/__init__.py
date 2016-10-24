@@ -63,6 +63,7 @@ def setup_products_for_upgrade(product, os_version):
     :param string os_version: The os version on which product is installed
         e.g: rhel6, rhel7
     """
+    sat_host = cap_hosts = clients6 = clients7 = None
     sat_host = satellite6_setup(os_version)
     if product == 'capsule':
         cap_hosts = satellite6_capsule_setup(sat_host, os_version)
