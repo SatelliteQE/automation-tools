@@ -415,7 +415,8 @@ def setup_firewall(definitions=None, flush=True):
 
     if os_version < 7:
         # To make the changes persistent across reboots
-        run('iptables-save > /etc/sysconfig/iptables')
+        manage_daemon('save', 'iptables')
+        manage_daemon('enable', 'iptables')
     else:
         # To activate persistent settings as the current ones
         run('firewall-cmd --reload')
