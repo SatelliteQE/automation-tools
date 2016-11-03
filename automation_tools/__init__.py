@@ -1173,7 +1173,6 @@ def ak_install(admin_password=None, clean_beaker=True,
 
     # Clean up and install with basic packages.
     clean_rhsm()
-    update_basic_packages()
 
     # Install the cert file
     run('yum -y localinstall {0}/pub/katello-ca-consumer-latest.noarch.rpm'
@@ -1186,10 +1185,21 @@ def ak_install(admin_password=None, clean_beaker=True,
         '--activationkey="{1}"'.format(org, act_key)
     )
     run(cmd)
+
+    # Refresh subscriptions and clean up YUM
     print('Refreshing Subscription-manager.')
     run('subscription-manager refresh')
     print('Performing yum clean up.')
     run('yum clean all', quiet=True)
+
+    # Set yum stdout log level to be less verbose
+    set_yum_debug_level()
+
+    # Install some basic packages
+    update_basic_packages()
+    install_prerequisites()
+    # Update the machine
+    update_packages()
 
     # Install required packages for the installation
     run('yum install -y satellite')
@@ -1434,14 +1444,20 @@ def product_install(distribution, create_vm=False, certificate_url=None,
     if distribution == 'satellite6-cdn' and test_in_stage:
         execute(update_rhsm_stage, host=host)
 
-    # Subscribe for all distributions to install prerequisities and updates.
-    # Then let's unsubscribe just before calling ak_install.
-    execute(subscribe, host=host)
+    # Create custom OS beaker repo
+    if os.environ.get('OS_UPGRADE_REPO'):
+        os_upgrade_repo = os.environ.get('OS_UPGRADE_REPO')
+        execute(create_custom_repos, rhel_candidate=os_upgrade_repo, host=host)
 
-    # Setting yum stdout log level to be less verbose
-    execute(set_yum_debug_level, host=host)
-
-    execute(install_prerequisites, host=host)
+    # If NOT using an activationkey, subscribe to CDN and install some
+    # basic required packages.
+    if distribution != 'satellite6-activationkey':
+        execute(subscribe, host=host)
+        execute(install_prerequisites, host=host)
+        # Setting yum stdout log level to be less verbose
+        execute(set_yum_debug_level, host=host)
+        # Update the machine
+        execute(update_packages, host=host, warn_only=True)
 
     execute(setenforce, selinux_mode, host=host)
     execute(
@@ -1451,19 +1467,9 @@ def product_install(distribution, create_vm=False, certificate_url=None,
         cdn_version=sat_cdn_version,
         host=host
     )
-    # Create custom OS beaker repo
-    if os.environ.get('OS_UPGRADE_REPO'):
-        os_upgrade_repo = os.environ.get('OS_UPGRADE_REPO')
-        execute(create_custom_repos, rhel_candidate=os_upgrade_repo, host=host)
-    # Update the machine
-    execute(update_packages, host=host, warn_only=True)
 
     if distribution in ('satellite6-downstream', 'satellite6-iso'):
         execute(java_workaround, host=host)
-
-    # If using the internal dog food server's AK, unsubscribe from `CDN` first.
-    if distribution == 'satellite6-activationkey':
-        execute(unsubscribe, host=host)
 
     # execute returns a dictionary mapping host strings to the given task's
     # return value
