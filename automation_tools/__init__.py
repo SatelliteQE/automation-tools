@@ -1764,12 +1764,9 @@ def clean_rhsm():
 
 def update_basic_packages():
     """Updates some basic packages before we can run some real tests."""
-    subscribe(autosubscribe=True)
     update_packages('subscription-manager', 'yum-utils', quiet=True)
     run('yum install -y yum-plugin-security yum-security', quiet=True)
     run('rpm -q subscription-manager python-rhsm')
-    # Clean up
-    unsubscribe()
 
 
 def client_registration_test(clean_beaker=True, update_package=True,
@@ -1829,7 +1826,10 @@ def client_registration_test(clean_beaker=True, update_package=True,
 
     # Update some basic packages before we try to register
     if update_package is True:
+        subscribe(autosubscribe=True)
         update_basic_packages()
+        # Clean up
+        unsubscribe()
 
     # Install the cert file
     run('rpm -Uvh {0}'.format(cert_url), warn_only=True)
