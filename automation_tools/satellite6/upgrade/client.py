@@ -132,14 +132,14 @@ def satellite6_client_setup():
             os.environ.get('TOOLS_URL_RHEL6'),
             os.environ.get('TOOLS_URL_RHEL7')
         ]):
+            vers = ['6.0', '6.1']
             print ('Syncing Tools repos of rhel7 in Satellite:')
             execute(
                 sync_tools_repos_to_upgrade,
                 'rhel7',
                 # Containers_ids are not requied from sat version > 6.1 to
                 # attach the subscriprion to client
-                clients7.values() \
-                if from_version in ['6.0', '6.1'] else clients7.keys(),
+                clients7.values() if from_version in vers else clients7.keys(),
                 host=sat_host
             )
             print ('Syncing Tools repos of rhel6 in Satellite:')
@@ -148,8 +148,7 @@ def satellite6_client_setup():
                 'rhel6',
                 # Containers_ids are not requied from sat version > 6.1 to
                 # attach the subscriprion to client
-                clients6.values() \
-                if from_version in ['6.0', '6.1'] else clients6.keys(),
+                clients6.values() if from_version in vers else clients6.keys(),
                 host=sat_host
             )
         # Refresh subscriptions on clients
