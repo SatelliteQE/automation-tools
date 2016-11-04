@@ -1459,14 +1459,14 @@ def product_install(distribution, create_vm=False, certificate_url=None,
         # Update the machine
         execute(update_packages, host=host, warn_only=True)
 
+        execute(
+            enable_satellite_repos,
+            cdn=distribution.endswith('cdn'),
+            beta=distribution.endswith('beta'),
+            cdn_version=sat_cdn_version,
+            host=host
+        )
     execute(setenforce, selinux_mode, host=host)
-    execute(
-        enable_satellite_repos,
-        cdn=distribution.endswith('cdn'),
-        beta=distribution.endswith('beta'),
-        cdn_version=sat_cdn_version,
-        host=host
-    )
 
     if distribution in ('satellite6-downstream', 'satellite6-iso'):
         execute(java_workaround, host=host)
