@@ -1552,12 +1552,16 @@ def product_install(distribution, create_vm=False, certificate_url=None,
         # if we have ssh key to libvirt machine we can setup access to it
         if os.environ.get('LIBVIRT_KEY_URL') is not None:
             execute(setup_libvirt_key, host=host)
-        # setup_foreman_discovery
-        execute(
-            setup_foreman_discovery,
-            sat_version=satellite_version,
-            host=host
-        )
+        # Discovery packages being fetched for sat6.3 are currently latest
+        # from epel and not sattellite repos, hence broken.
+        # Temporary fix till we have this issue fixed.
+        if satellite_version != '6.3':
+            # setup_foreman_discovery
+            execute(
+                setup_foreman_discovery,
+                sat_version=satellite_version,
+                host=host
+            )
         if satellite_version not in ('6.0', 'nightly'):
             execute(install_puppet_scap_client, host=host)
         if satellite_version == '6.1':
