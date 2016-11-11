@@ -161,6 +161,24 @@ def hammer_repository_create(name, organization_id, product_name, url):
 
 
 @task
+def hammer_repository_set_enable(name, product, organization_id, arch):
+    """Enables a Redhat Repository
+
+    :param name: Name of the repository
+    :param product: Name of the Product where repository is listed
+    :param organization_id: Organization where the repository will be enabled
+    :param arch: The architecture x86_64 or i386 or ia64
+    """
+    return hammer(
+        'repository-set enable --name "{0}" '
+        '--product "{1}" '
+        '--organization-id {2} '
+        '--basearch "{3}"'.format(
+            name, product, organization_id, arch)
+    )
+
+
+@task
 def hammer_repository_synchronize(name, organization_id, product_name):
     """Synchronize a repository
 
@@ -297,6 +315,27 @@ def hammer_capsule_list():
     :rtype: list
     """
     return hammer('capsule list')
+
+
+@task
+def hammer_activation_key_content_override(
+        ak_name, content_label, value, org_id):
+    """Override Content value in Product Content of Actiavaton Key.
+
+    :param ak_name: AK name in which contnets to be overrided
+    :param content_label: Content name of to be overrided
+    :param value: True/False for override to yes/no
+    :param org_id: The organization to which AK belongs
+    """
+    ak_id = get_attribute_value(
+        hammer('activation-key list --organization-id {}'.format(org_id)),
+        ak_name,
+        'id'
+    )
+    return hammer(
+        'activation-key content-override --id {0} '
+        '--content-label {1} --value {2}'.format(
+            ak_id, content_label, value))
 
 
 def sync_capsule_content(capsule, async=True):

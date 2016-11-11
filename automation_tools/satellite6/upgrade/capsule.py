@@ -58,9 +58,13 @@ def satellite6_capsule_setup(sat_host, os_version):
         execute(create_rhevm_instance, cap_instance, cap_image)
         execute(lambda: run('katello-service restart'), host=cap_hosts)
     env['capsule_hosts'] = cap_hosts
+    if ',' in cap_hosts:
+        cap_hosts = cap_hosts.split(',')
+    else:
+        cap_hosts = [cap_hosts]
     copy_ssh_key(sat_host, cap_hosts)
-    if os.environ.get('CAPSULE_URL') is not None:
-        execute(sync_capsule_repos_to_upgrade, cap_hosts, host=sat_host)
+    execute(sync_capsule_repos_to_upgrade, cap_hosts, host=sat_host)
+    return cap_hosts
 
 
 def satellite6_capsule_upgrade(cap_host):

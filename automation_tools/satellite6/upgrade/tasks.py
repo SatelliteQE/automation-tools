@@ -13,11 +13,13 @@ from automation_tools.satellite6.hammer import (
     get_product_subscription_id,
     hammer,
     hammer_activation_key_add_subscription,
+    hammer_activation_key_content_override,
     hammer_content_view_add_repository,
     hammer_content_view_promote_version,
     hammer_content_view_publish,
     hammer_product_create,
     hammer_repository_create,
+    hammer_repository_set_enable,
     hammer_repository_synchronize,
     set_hammer_config
 )
@@ -361,9 +363,16 @@ def sync_capsule_repos_to_upgrade(capsules):
 
     CAPSULE_URL
         The url for capsule repo from latest satellite compose.
+        If not provided, capsule repo from Red Hat repositories will be enabled
     FROM_VERSION
         Current Satellite version - to differentiate default organization.
         e.g. '6.1', '6.0'
+    TO_VERSION
+        Upgradable Satellite version - To enable capsule repo
+        e.g '6.1', '6.2'
+    OS
+        OS version to enable next version capsule repo
+        e.g 'rhel7', 'rhel6'
 
     Personal Upgrade Env Vars:
 
@@ -381,10 +390,9 @@ def sync_capsule_repos_to_upgrade(capsules):
         The AK name used in capsule subscription
     """
     capsule_repo = os.environ.get('CAPSULE_URL')
-    if capsule_repo is None:
-        print('The Capsule repo URL is not provided '
-              'to perform Capsule Upgrade in feature!')
-        sys.exit(1)
+    from_version = os.environ.get('FROM_VERSION')
+    to_version = os.environ.get('TO_VERSION')
+    os_ver = os.environ.get('OS')[-1]
     cv_name, env_name, ak_name = [
         os.environ.get(env_var)
         for env_var in (
@@ -398,17 +406,27 @@ def sync_capsule_repos_to_upgrade(capsules):
         print('Error! The CV, Env and AK details are not provided for Capsule'
               'upgrade!')
         sys.exit(1)
+    if capsule_repo:
+        product_name = 'capsule6_latest'
+        repo_name = 'capsule6_latest_repo'
+    else:
+        # If custom capsule repo is not given then
+        # enable capsule repo from Redhat Repositories
+        product_name = 'Red Hat Satellite Capsule'
+        repo_name = 'Red Hat Satellite Capsule {0} (for RHEL {1} Server) ' \
+                    '(RPMs)'.format(to_version, os_ver)
     set_hammer_config()
     # Create product capsule
-    hammer_product_create('capsule6_latest', '1')
-    time.sleep(2)
-    hammer_repository_create(
-        'capsule6_latest_repo', '1', 'capsule6_latest', capsule_repo)
-    hammer_repository_synchronize(
-        'capsule6_latest_repo', '1', 'capsule6_latest')
+    if capsule_repo:
+        hammer_product_create(product_name, '1')
+        time.sleep(2)
+        hammer_repository_create(repo_name, '1', product_name, capsule_repo)
+    else:
+        hammer_repository_set_enable(repo_name, product_name, '1', 'x86_64')
+        repo_name = repo_name.replace('(', '').replace(')', '') + ' x86_64'
+    hammer_repository_synchronize(repo_name, '1', product_name)
     # Add repos to CV
-    hammer_content_view_add_repository(
-        cv_name, '1', 'capsule6_latest', 'capsule6_latest_repo')
+    hammer_content_view_add_repository(cv_name, '1', product_name, repo_name)
     hammer_content_view_publish(cv_name, '1')
     # Promote cv
     lc_env_id = get_attribute_value(
@@ -421,21 +439,30 @@ def sync_capsule_repos_to_upgrade(capsules):
         '{} '.format(cv_name))[1]) for data in cv_version_data]).pop()
     cv_ver_id = get_attribute_value(cv_version_data, '{0} {1}'.format(
         cv_name, latest_cv_ver), 'id')
-    hammer_content_view_promote_version(cv_name, cv_ver_id, lc_env_id, '1')
-    # Add new product subscriptions to AK
-    hammer_activation_key_add_subscription(ak_name, '1', 'capsule6_latest')
+    hammer_content_view_promote_version(
+        cv_name, cv_ver_id, lc_env_id, '1')
+    # If Downstream, Update AK with latest snap capsule product subscription
+    # If CDN, then the subscription of capsule product will be already added
+    if capsule_repo:
+        hammer_activation_key_add_subscription(ak_name, '1', product_name)
+    else:
+        content_label = 'rhel-{0}-server-satellite-capsule-{1}-rpms'.format(
+            os_ver, to_version)
+        hammer_activation_key_content_override(
+            ak_name, content_label, '1', '1')
     # Add this latest capsule repo to capsules to upgrade
-    for capsule in capsules:
-        if os.environ.get('FROM_VERSION') == '6.1':
-            subscription_id = get_product_subscription_id(
-                '1', 'capsule6_latest')
-            execute(
-                attach_subscription_to_host_from_content_host,
-                subscription_id,
-                host=capsule)
-        else:
-            attach_subscription_to_host_from_satellite(
-                '1', 'capsule6_latest', capsule)
+    if capsule_repo:
+        for capsule in capsules:
+            if from_version == '6.1':
+                subscription_id = get_product_subscription_id(
+                    '1', 'capsule6_latest')
+                execute(
+                    attach_subscription_to_host_from_content_host,
+                    subscription_id,
+                    host=capsule)
+            else:
+                attach_subscription_to_host_from_satellite(
+                    '1', 'capsule6_latest', capsule)
 
 
 def generate_satellite_docker_clients_on_rhevm(client_os, clients_count):
