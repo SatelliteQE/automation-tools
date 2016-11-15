@@ -93,6 +93,62 @@ def subscribe(autosubscribe=False):
         sys.exit(1)
 
 
+def subscribe_dogfood(clean_beaker=True):
+    """Registers and subscribes machine to dogfood Satellite.
+
+    The following environment variables affect this command:
+
+    DOGFOOD_URL
+        URL for the Candlepin Cert RPM.
+    DOGFOOD_ORG
+        ORG for the sat63 to subscribe to.
+    DOGFOOD_ACTIVATIONKEY
+        AK for the sat63 to subscribe to.
+
+    """
+
+    # DOGFOOD Url
+    dogfood_url = os.getenv('DOGFOOD_URL')
+    if not dogfood_url:
+        print('You need to provide the Dogfood Url.')
+        sys.exit(1)
+    # Org
+    org = os.getenv('DOGFOOD_ORG')
+    if not org:
+        print('You need to provide the Organization to subscribe.')
+        sys.exit(1)
+    # Activation Key
+    act_key = os.getenv('DOGFOOD_ACTIVATIONKEY')
+    if not act_key:
+        print('You need to provide an activationkey.')
+        sys.exit(1)
+
+    # If this is a Beaker box, 'disable' Beaker repos
+    if clean_beaker is True:
+        run('mv /etc/yum.repos.d/beaker* .', warn_only=True)
+
+    # Clean up and install with basic packages.
+    clean_rhsm()
+
+    # Install the cert file
+    run('yum -y localinstall {0}/pub/katello-ca-consumer-latest.noarch.rpm'
+        .format(dogfood_url), warn_only=True)
+
+    # Register and subscribe
+    print('Register/Subscribe using Subscription-manager.')
+    cmd = (
+        'subscription-manager register --force --org="{0}" '
+        '--activationkey="{1}"'.format(org, act_key)
+    )
+    run(cmd)
+
+    # Refresh subscriptions and clean up YUM
+    print('Refreshing Subscription-manager.')
+    run('subscription-manager refresh')
+    print('Performing yum clean up.')
+    run('yum clean all', quiet=True)
+
+
 def setup_ddns(entry_domain, host_ip):
     """Task to setup DDNS client
 
@@ -1131,73 +1187,17 @@ def repofile_install(admin_password=None, run_katello_installer=True,
         return installer_options
 
 
-def ak_install(admin_password=None, clean_beaker=True,
-               run_katello_installer=True):
+def ak_install(admin_password=None, run_katello_installer=True):
     """Task to install Satellite 6.3 via Activation Keys
 
     The following environment variables affect this command:
 
     ADMIN_PASSWORD
         Optional, defaults to 'changeme'. Foreman admin password.
-    DOGFOOD_URL
-        URL for the Candlepin Cert RPM.
-    DOGFOOD_ORG
-        ORG for the sat63 to subscribe to.
-    DOGFOOD_ACTIVATIONKEY
-        AK for the sat63 to subscribe to.
 
     """
     if admin_password is None:
         admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme')
-
-    # DOGFOOD Url
-    dogfood_url = os.getenv('DOGFOOD_URL')
-    if not dogfood_url:
-        print('You need to provide the Dogfood Url.')
-        sys.exit(1)
-    # Org
-    org = os.getenv('DOGFOOD_ORG')
-    if not org:
-        print('You need to provide the Organization to subscribe.')
-        sys.exit(1)
-    # Activation Key
-    act_key = os.getenv('DOGFOOD_ACTIVATIONKEY')
-    if not act_key:
-        print('You need to provide an activationkey.')
-        sys.exit(1)
-    # If this is a Beaker box, 'disable' Beaker repos
-    if clean_beaker is True:
-        run('mv /etc/yum.repos.d/beaker* .', warn_only=True)
-
-    # Clean up and install with basic packages.
-    clean_rhsm()
-
-    # Install the cert file
-    run('yum -y localinstall {0}/pub/katello-ca-consumer-latest.noarch.rpm'
-        .format(dogfood_url), warn_only=True)
-
-    # Register and subscribe
-    print('Register/Subscribe using Subscription-manager.')
-    cmd = (
-        'subscription-manager register --force --org="{0}" '
-        '--activationkey="{1}"'.format(org, act_key)
-    )
-    run(cmd)
-
-    # Refresh subscriptions and clean up YUM
-    print('Refreshing Subscription-manager.')
-    run('subscription-manager refresh')
-    print('Performing yum clean up.')
-    run('yum clean all', quiet=True)
-
-    # Set yum stdout log level to be less verbose
-    set_yum_debug_level()
-
-    # Install some basic packages
-    update_basic_packages()
-    install_prerequisites()
-    # Update the machine
-    update_packages()
 
     # Install required packages for the installation
     run('yum install -y satellite')
@@ -1442,28 +1442,32 @@ def product_install(distribution, create_vm=False, certificate_url=None,
     if distribution == 'satellite6-cdn' and test_in_stage:
         execute(update_rhsm_stage, host=host)
 
-    # Create custom OS beaker repo
+    # If we are using activationkey, subscribe to dogfood server
+    # otherwise subscribe to CDN
+    if distribution == 'satellite6-activationkey':
+        execute(subscribe_dogfood, host=host)
+    else:
+        execute(subscribe, host=host)
+        # Enable repos for Satellite and disable other ones
+        execute(enable_satellite_repos,
+                cdn=distribution.endswith('cdn'),
+                beta=distribution.endswith('beta'),
+                cdn_version=sat_cdn_version,
+                host=host)
+
+    # Setting yum stdout log level to be less verbose
+    execute(set_yum_debug_level, host=host)
+    # Install some basic packages
+    execute(update_basic_packages, host=host)
+    # Check hostname and start ntpd
+    execute(install_prerequisites, host=host)
+    # If defined, create custom repo with RHEL candidate for OS upgrade
     if os.environ.get('OS_UPGRADE_REPO'):
         os_upgrade_repo = os.environ.get('OS_UPGRADE_REPO')
         execute(create_custom_repos, rhel_candidate=os_upgrade_repo, host=host)
+    # Update the machine
+    execute(update_packages, host=host, warn_only=True)
 
-    # If NOT using an activationkey, subscribe to CDN and install some
-    # basic required packages.
-    if distribution != 'satellite6-activationkey':
-        execute(subscribe, host=host)
-        execute(install_prerequisites, host=host)
-        # Setting yum stdout log level to be less verbose
-        execute(set_yum_debug_level, host=host)
-        # Update the machine
-        execute(update_packages, host=host, warn_only=True)
-
-        execute(
-            enable_satellite_repos,
-            cdn=distribution.endswith('cdn'),
-            beta=distribution.endswith('beta'),
-            cdn_version=sat_cdn_version,
-            host=host
-        )
     execute(setenforce, selinux_mode, host=host)
 
     if distribution in ('satellite6-downstream', 'satellite6-iso'):
