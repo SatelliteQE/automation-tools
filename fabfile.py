@@ -41,6 +41,7 @@ from automation_tools import (  # flake8: noqa
     setup_proxy,
     setup_vm_provisioning,
     subscribe,
+    subscribe_dogfood,
     unsubscribe,
     update_basic_packages,
     update_rhsm_stage,
