@@ -1549,12 +1549,6 @@ def product_install(distribution, create_vm=False, certificate_url=None,
         # if we have ssh key to libvirt machine we can setup access to it
         if os.environ.get('LIBVIRT_KEY_URL') is not None:
             execute(setup_libvirt_key, host=host)
-        # setup_foreman_discovery
-        execute(
-            setup_foreman_discovery,
-            sat_version=satellite_version,
-            host=host
-        )
         if satellite_version not in ('6.0', 'nightly'):
             execute(install_puppet_scap_client, host=host)
         if satellite_version == '6.1':
@@ -1564,6 +1558,15 @@ def product_install(distribution, create_vm=False, certificate_url=None,
         # ostree plugin is for Sat6.2+ and nightly (rhel7 only)
         if satellite_version not in ('6.0', '6.1'):
             execute(enable_ostree, sat_version=satellite_version, host=host)
+        # setup_foreman_discovery
+        # setup_discovery_task needs to be run at last otherwise, any other
+        # tasks like ostree which is re-running installer would re-set the
+        # discovery templates as well. Please see #1387179 for more info.
+        execute(
+            setup_foreman_discovery,
+            sat_version=satellite_version,
+            host=host
+        )
 
 
 def fix_qdrouterd_listen_to_ipv6():
