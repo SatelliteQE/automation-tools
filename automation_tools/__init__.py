@@ -1279,7 +1279,7 @@ def iso_install(
 
     # Create a 'check-out' folder, mount ISO to it...
     run('mkdir -p ~/ISO')
-    run('mount *.iso ~/ISO -t iso9660 -o loop')
+    run('mount *dvd1.iso ~/ISO -t iso9660 -o loop')
     # ...and run the installer script.
     with cd('~/ISO'):
         if check_gpg_signatures is True:
