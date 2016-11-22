@@ -1060,6 +1060,7 @@ def install_prerequisites():
 def upstream_install(admin_password=None, run_katello_installer=True,
                      puppet4=True):
     """Task to install Foreman nightly using forklift scripts"""
+    os_version = distro_info()[1]
     if admin_password is None:
         admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme')
 
@@ -1067,13 +1068,25 @@ def upstream_install(admin_password=None, run_katello_installer=True,
     run('yum install -y git ruby')
     run('rm -rf forklift')
     run('git clone -q https://github.com/Katello/forklift.git')
+    # RHEL6 Nighlty requires Qpid rebuilt for rhel6
+    if os_version == 6:
+        create_custom_repos(qpid='https://copr-be.cloud.fedoraproject.org/'
+                                 'results/@qpid/qpid/epel-6-x86_64/')
+        qpid_pkgs = [
+            'qpid-dispatch-router',
+            'qpid-cpp-server-linearstore',
+            'qpid-cpp-client-devel',
+            'python-qpid'
+        ]
+        run('yum install -y {0}'.format(' '.join(qpid_pkgs)))
 
     run('yum -d2 repolist')
     # For now, puppet-four is configured by default. Toggle option
     # will be added later.
     with cd('forklift'):
-        run('./setup.rb --skip-installer {0}'.format(
-            '--puppet-four' if puppet4 else ''))
+        run('./setup.rb --skip-installer {0} {1}'.format(
+            '--puppet-four' if puppet4 else '',
+            '--version 1.13 --koji-repos' if os_version == 6 else ''))
 
     # Install support for various compute resources in upstream
     compute_resources = [
