@@ -1274,12 +1274,10 @@ def iso_install(
         os.environ.get('CHECK_GPG_SIGNATURES', '') == 'true'
     )
 
-    # Download the ISO
-    iso_download(iso_url)
-
-    # Create a 'check-out' folder, mount ISO to it...
+    # Create a mountpoint for ISO
     run('mkdir -p ~/ISO')
-    run('mount *.iso ~/ISO -t iso9660 -o loop')
+    # Download and mount the ISO
+    run('mount {0} ~/ISO -t iso9660 -o loop'.format(iso_download(iso_url)))
     # ...and run the installer script.
     with cd('~/ISO'):
         if check_gpg_signatures is True:
@@ -1660,8 +1658,9 @@ def iso_download(iso_url=None):
             sys.exit(1)
 
         iso_url = urljoin(iso_url, iso_filename)
-
-    run('wget -nv {0}'.format(iso_url))
+    local_iso_filename = run('mktemp')
+    run('wget -nv -O {0} {1}'.format(local_iso_filename, iso_url))
+    return local_iso_filename
 
 
 # Miscelaneous tasks ==========================================================
