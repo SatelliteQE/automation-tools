@@ -15,12 +15,14 @@ from automation_tools.satellite6.upgrade.client import (
     satellite6_client_setup,
     satellite6_client_upgrade
 )
-from fabric.api import execute
 from automation_tools.satellite6.upgrade.satellite import (
     satellite6_setup,
     satellite6_upgrade,
     satellite6_zstream_upgrade
 )
+from automation_tools.satellite6.log import LogAnalyzer
+from fabric.api import execute
+
 
 # =============================================================================
 # Satellite, Capsule and Client Upgrade
@@ -170,20 +172,22 @@ def product_upgrade(product):
         to_version = os.environ.get('TO_VERSION')
         sat_host, cap_hosts, clients6, clients7 = setup_products_for_upgrade(
             product, os.environ.get('OS'))
-        if from_version != to_version:
-            execute(satellite6_upgrade, host=sat_host)
-        elif from_version == to_version:
-            execute(satellite6_zstream_upgrade, host=sat_host)
-        # Generate foreman debug on satellite after upgrade
-        execute(foreman_debug, 'satellite_{}'.format(sat_host), host=sat_host)
-        if product == 'capsule':
-            for cap_host in cap_hosts:
-                execute(satellite6_capsule_upgrade, cap_host, host=cap_host)
-                # Generate foreman debug on capsule after upgrade
-                execute(
-                    foreman_debug,
-                    'capsule_{}'.format(cap_host),
-                    host=cap_host)
-        if product == 'client':
-            satellite6_client_upgrade('rhel6', clients6)
-            satellite6_client_upgrade('rhel7', clients7)
+        with LogAnalyzer(sat_host):
+            if from_version != to_version:
+                execute(satellite6_upgrade, host=sat_host)
+            elif from_version == to_version:
+                execute(satellite6_zstream_upgrade, host=sat_host)
+            # Generate foreman debug on satellite after upgrade
+            execute(foreman_debug, 'satellite_{}'.format(sat_host), host=sat_host)
+            if product == 'capsule':
+                for cap_host in cap_hosts:
+                    with LogAnalyzer(cap_host):
+                        execute(satellite6_capsule_upgrade, cap_host, host=cap_host)
+                        # Generate foreman debug on capsule after upgrade
+                        execute(
+                            foreman_debug,
+                            'capsule_{}'.format(cap_host),
+                            host=cap_host)
+            if product == 'client':
+                satellite6_client_upgrade('rhel6', clients6)
+                satellite6_client_upgrade('rhel7', clients7)
