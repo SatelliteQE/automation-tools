@@ -18,7 +18,8 @@ from automation_tools.satellite6.upgrade.client import (
 from fabric.api import execute
 from automation_tools.satellite6.upgrade.satellite import (
     satellite6_setup,
-    satellite6_upgrade
+    satellite6_upgrade,
+    satellite6_zstream_upgrade
 )
 
 # =============================================================================
@@ -165,9 +166,14 @@ def product_upgrade(product):
         The AK name used in client subscription
     """
     if check_necessary_env_variables_for_upgrade(product):
+        from_version = os.environ.get('FROM_VERSION')
+        to_version = os.environ.get('TO_VERSION')
         sat_host, cap_hosts, clients6, clients7 = setup_products_for_upgrade(
             product, os.environ.get('OS'))
-        execute(satellite6_upgrade, host=sat_host)
+        if from_version != to_version:
+            execute(satellite6_upgrade, host=sat_host)
+        elif from_version == to_version:
+            execute(satellite6_zstream_upgrade, host=sat_host)
         # Generate foreman debug on satellite after upgrade
         execute(foreman_debug, 'satellite_{}'.format(sat_host), host=sat_host)
         if product == 'capsule':

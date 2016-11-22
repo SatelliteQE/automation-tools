@@ -72,7 +72,8 @@ from automation_tools.satellite6.upgrade import (
 )
 from automation_tools.satellite6.upgrade.satellite import (
     satellite6_setup,
-    satellite6_upgrade
+    satellite6_upgrade,
+    satellite6_zstream_upgrade
 )
 from automation_tools.satellite6.upgrade.tasks import (
     create_openstack_instance,

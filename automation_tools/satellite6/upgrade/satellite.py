@@ -144,3 +144,53 @@ def satellite6_upgrade():
     set_hammer_config()
     hammer('ping')
     run('katello-service status', warn_only=True)
+
+
+def satellite6_zstream_upgrade():
+    """Upgrades Satellite Server to its latest zStream version
+
+    Note: For zstream upgrade both 'To' and 'From' version should be same
+
+    FROM_VERSION
+        Current satellite version which will be upgraded to latest version
+    TO_VERSION
+        Next satellite version to which satellite will be upgraded
+    """
+    from_version = os.environ.get('FROM_VERSION')
+    to_version = os.environ.get('TO_VERSION')
+    if not from_version == to_version:
+        print ('Error! zStream Upgrade cannot be performed as '
+               'FROM and TO versions are not same!')
+        sys.exit(1)
+    # Setting yum stdout log level to be less verbose
+    set_yum_debug_level()
+    setup_satellite_firewall()
+    # Stop katello services, except mongod
+    run('katello-service stop')
+    if to_version == '6.1':
+        run('service-wait mongod start')
+    run('yum clean all', warn_only=True)
+    # Updating the packages again after setting sat6 repo
+    print('Wait till packages update ... ')
+    print('YUM UPDATE started at: {0}'.format(time.ctime()))
+    update_packages(quiet=False)
+    print('YUM UPDATE finished at: {0}'.format(time.ctime()))
+    # Rebooting the system to check the possible issues if kernal is updated
+    reboot(120)
+    if to_version == '6.1':
+        # Stop the service again which started in restart
+        # This step is not required with 6.2 upgrade as installer itself
+        # stop all the services before upgrade
+        run('katello-service stop')
+        run('service-wait mongod start')
+    # Running Upgrade
+    print('SATELLITE UPGRADE started at: {0}'.format(time.ctime()))
+    if to_version == '6.1':
+        run('katello-installer --upgrade')
+    else:
+        run('satellite-installer --scenario satellite --upgrade')
+    print('SATELLITE UPGRADE finished at: {0}'.format(time.ctime()))
+    # Test the Upgrade is successful
+    set_hammer_config()
+    hammer('ping')
+    run('katello-service status', warn_only=True)
