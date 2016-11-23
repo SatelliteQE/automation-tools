@@ -1549,9 +1549,8 @@ def product_install(distribution, create_vm=False, certificate_url=None,
         execute(setup_default_docker, host=host)
         execute(katello_service, 'restart', host=host)
         # if we have ssh key to libvirt machine we can setup access to it
-        # Disabling libvirt related task until box is reinstalled
-        # if os.environ.get('LIBVIRT_KEY_URL') is not None:
-        # execute(setup_libvirt_key, host=host)
+        if os.environ.get('LIBVIRT_KEY_URL') is not None:
+            execute(setup_libvirt_key, host=host)
         if satellite_version not in ('6.0', 'nightly'):
             execute(install_puppet_scap_client, host=host)
         if satellite_version == '6.1':
