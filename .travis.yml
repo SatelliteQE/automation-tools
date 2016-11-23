@@ -1,8 +1,14 @@
 language: python
+python:
+    - "2.7"
 install:
     - pip install flake8
     - pip install -r requirements.txt
+    - pip install -r requirements-optional.txt coveralls
 script:
     - flake8 .
+    - py.test --cov=automation_tools tests/
+after_success:
+    - converalls
 notifications:
     irc: "chat.freenode.net#robottelo"

@@ -7,6 +7,7 @@ import os
 import sys
 
 from automation_tools import foreman_debug
+from automation_tools.satellite6.log import LogAnalyzer
 from automation_tools.satellite6.upgrade.capsule import (
     satellite6_capsule_setup,
     satellite6_capsule_upgrade
@@ -20,7 +21,6 @@ from automation_tools.satellite6.upgrade.satellite import (
     satellite6_upgrade,
     satellite6_zstream_upgrade
 )
-from automation_tools.satellite6.log import LogAnalyzer
 from fabric.api import execute
 
 
@@ -178,11 +178,13 @@ def product_upgrade(product):
             elif from_version == to_version:
                 execute(satellite6_zstream_upgrade, host=sat_host)
             # Generate foreman debug on satellite after upgrade
-            execute(foreman_debug, 'satellite_{}'.format(sat_host), host=sat_host)
+            execute(foreman_debug, 'satellite_{}'.format(sat_host),
+                    host=sat_host)
             if product == 'capsule':
                 for cap_host in cap_hosts:
                     with LogAnalyzer(cap_host):
-                        execute(satellite6_capsule_upgrade, cap_host, host=cap_host)
+                        execute(satellite6_capsule_upgrade, cap_host,
+                                host=cap_host)
                         # Generate foreman debug on capsule after upgrade
                         execute(
                             foreman_debug,
