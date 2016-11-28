@@ -25,6 +25,7 @@ setup(
         'lxml',
         'ovirt-engine-sdk-python==3.6.8.0',
         'pycurl',
+        'python-bugzilla',
         'python-novaclient',
         'requests',
     ],
