@@ -15,6 +15,7 @@ from lxml import html
 from re import search
 from urlparse import urlsplit
 
+from automation_tools.bz import bz_bug_is_open
 from automation_tools.repository import (
     create_custom_repos, delete_custom_repos, enable_satellite_repos,
     disable_repos
@@ -1057,6 +1058,19 @@ def install_prerequisites():
     manage_daemon('start', 'ntpd', warn_only=True)
 
 
+def install_puppet4(puppet4_repo=None):
+    """Task to install puppet4 prior Satellite installation"""
+    # Remove any puppet3 server to avoid conflicts
+    run('yum -y remove puppet-server', warn_only=True)
+    create_custom_repos(puppet4_repo=puppet4_repo)
+    # Install puppet4 (puppetserver is pulled in by installer)
+    run('yum -y install puppet-agent')
+    # Workaround for BZ #1381081 (Kafo::ParserError)
+    if bz_bug_is_open('1381081'):
+        run('/opt/puppetlabs/puppet/bin/gem install -q yard')
+        run('/opt/puppetlabs/bin/puppet module install puppetlabs-strings')
+
+
 def upstream_install(admin_password=None, run_katello_installer=True,
                      puppet4=True):
     """Task to install Foreman nightly using forklift scripts"""
@@ -1347,6 +1361,9 @@ def product_install(distribution, create_vm=False, certificate_url=None,
     If ``certificate_url`` parameter or ``FAKE_MANIFEST_CERT_URL`` env var is
     defined the setup_fake_manifest_certificate task will run.
 
+    ``PUPPET4_REPO`` env var can be defined to setup a Puppet4 repository
+    prior Satellite installation
+
     ``OS_UPGRADE_REPO`` env var can be defined to setup a custom repository
     before OS upgrade, it can be OS candidate repo when tesing OS compatibility
 
@@ -1459,6 +1476,11 @@ def product_install(distribution, create_vm=False, certificate_url=None,
     execute(update_basic_packages, host=host)
     # Check hostname and start ntpd
     execute(install_prerequisites, host=host)
+    # Sat6.3+: If defined, create Puppet4 repo for Satellite p4 installation
+    if satellite_version == '6.3':
+        puppet4_repo = os.environ.get('PUPPET4_REPO')
+        if puppet4_repo:
+            execute(install_puppet4, puppet4_repo=puppet4_repo, host=host)
     # If defined, create custom repo with RHEL candidate for OS upgrade
     if os.environ.get('OS_UPGRADE_REPO'):
         os_upgrade_repo = os.environ.get('OS_UPGRADE_REPO')

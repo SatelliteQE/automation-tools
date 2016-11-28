@@ -16,6 +16,7 @@ from automation_tools import (  # flake8: noqa
     install_errata,
     install_katello_agent,
     install_prerequisites,
+    install_puppet4,
     iso_download,
     iso_install,
     katello_service,
