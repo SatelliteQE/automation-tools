@@ -17,6 +17,7 @@ from automation_tools.satellite6.hammer import (
     hammer_content_view_add_repository,
     hammer_content_view_promote_version,
     hammer_content_view_publish,
+    hammer_determine_cv_and_env_from_ak,
     hammer_product_create,
     hammer_repository_create,
     hammer_repository_set_enable,
@@ -376,16 +377,11 @@ def sync_capsule_repos_to_upgrade(capsules):
 
     Personal Upgrade Env Vars:
 
-    CAPSULE_SUBSCRIPTION
-        List of cv_name, environment, ak_name attached to subscription of
-        capsule in defined sequence
+    CAPSULE_AK
+        The AK name used in capsule subscription
 
     Rhevm upgrade Env Vars:
 
-    RHEV_CAPSULE_CV
-        The CV name used in capsule subscription
-    RHEV_CAPSULE_ENVIRONMENT
-        The environment name used in capsule subscription
     RHEV_CAPSULE_AK
         The AK name used in capsule subscription
     """
@@ -393,29 +389,23 @@ def sync_capsule_repos_to_upgrade(capsules):
     from_version = os.environ.get('FROM_VERSION')
     to_version = os.environ.get('TO_VERSION')
     os_ver = os.environ.get('OS')[-1]
-    cv_name, env_name, ak_name = [
-        os.environ.get(env_var)
-        for env_var in (
-            'RHEV_CAPSULE_CV', 'RHEV_CAPSULE_ENVIRONMENT', 'RHEV_CAPSULE_AK')
-    ]
-    details = os.environ.get('CAPSULE_SUBSCRIPTION')
-    if details is not None:
-        cv_name, env_name, ak_name = [
-            item.strip() for item in details.split(',')]
-    elif not all([cv_name, env_name, ak_name]):
-        print('Error! The CV, Env and AK details are not provided for Capsule'
-              'upgrade!')
+    activation_key = os.environ.get(
+        'CAPSULE_AK', os.environ.get('RHEV_CAPSULE_AK'))
+    if activation_key is None:
+        print('Error! The AK name is not provided for Capsule upgrade! '
+              'Aborting...')
         sys.exit(1)
-    if capsule_repo:
-        product_name = 'capsule6_latest'
-        repo_name = 'capsule6_latest_repo'
-    else:
-        # If custom capsule repo is not given then
-        # enable capsule repo from Redhat Repositories
-        product_name = 'Red Hat Satellite Capsule'
-        repo_name = 'Red Hat Satellite Capsule {0} (for RHEL {1} Server) ' \
-                    '(RPMs)'.format(to_version, os_ver)
+    # Set hammer configuration
     set_hammer_config()
+    cv_name, env_name = hammer_determine_cv_and_env_from_ak(
+        activation_key, '1')
+    # If custom capsule repo is not given then
+    # enable capsule repo from Redhat Repositories
+    product_name = 'capsule6_latest' if capsule_repo \
+        else 'Red Hat Satellite Capsule'
+    repo_name = 'capsule6_latest_repo' if capsule_repo \
+        else 'Red Hat Satellite Capsule {0} (for RHEL {1} Server) ' \
+        '(RPMs)'.format(to_version, os_ver)
     # Create product capsule
     if capsule_repo:
         hammer_product_create(product_name, '1')
@@ -444,12 +434,13 @@ def sync_capsule_repos_to_upgrade(capsules):
     # If Downstream, Update AK with latest snap capsule product subscription
     # If CDN, then the subscription of capsule product will be already added
     if capsule_repo:
-        hammer_activation_key_add_subscription(ak_name, '1', product_name)
+        hammer_activation_key_add_subscription(
+            activation_key, '1', product_name)
     else:
         content_label = 'rhel-{0}-server-satellite-capsule-{1}-rpms'.format(
             os_ver, to_version)
         hammer_activation_key_content_override(
-            ak_name, content_label, '1', '1')
+            activation_key, content_label, '1', '1')
     # Add this latest capsule repo to capsules to upgrade
     if capsule_repo:
         for capsule in capsules:
@@ -531,16 +522,11 @@ def sync_tools_repos_to_upgrade(client_os, hosts):
 
     Personal Upgrade Env Vars:
 
-    CLIENT_SUBSCRIPTION
-        List of cv_name, environment, ak_name attached to subscription of
-        client in defined sequence
+    CLIENT_AK
+        The ak_name attached to subscription of client
 
     Rhevm upgrade Env Vars:
 
-    RHEV_CLIENT_CV
-        The CV name used in client subscription
-    RHEV_CLIENT_ENVIRONMENT
-        The environment name used in client subscription
     RHEV_CLIENT_AK
         The AK name used in client subscription
     """
@@ -550,24 +536,18 @@ def sync_tools_repos_to_upgrade(client_os, hosts):
         print('The Tools Repo URL for {} is not provided '
               'to perform Client Upgrade !'.format(client_os))
         sys.exit(1)
-    cv_name, env_name, ak_name = [
-        os.environ.get(env_var)
-        for env_var in (
-            'RHEV_CLIENT_CV_{}'.format(client_os),
-            'RHEV_CLIENT_ENVIRONMENT'.format(client_os),
-            'RHEV_CLIENT_AK_{}'.format(client_os)
-        )
-    ]
-    details = os.environ.get('CLIENT_SUBSCRIPTION_{}'.format(client_os))
-    if details is not None:
-        cv_name, env_name, ak_name = [
-            item.strip() for item in details.split(',')]
-    elif not all([cv_name, env_name, ak_name]):
-        print('Error! The CV, Env and AK details are not provided for {} '
-              'Client upgrade!'.format(client_os))
+    activation_key = os.environ.get(
+        'CLIENT_AK_{}'.format(client_os),
+        os.environ.get('RHEV_CLIENT_AK_{}'.format(client_os))
+    )
+    if activation_key is None:
+        print('Error! The AK details are not provided for {0} Client '
+              'upgrade!'.format(client_os))
         sys.exit(1)
     # Set hammer configuration
     set_hammer_config()
+    cv_name, env_name = hammer_determine_cv_and_env_from_ak(
+        activation_key, '1')
     tools_product = 'tools6_latest_{}'.format(client_os)
     tools_repo = 'tools6_latest_repo_{}'.format(client_os)
     # adding sleeps in between to avoid race conditions
@@ -592,7 +572,7 @@ def sync_tools_repos_to_upgrade(client_os, hosts):
         cv_name, latest_cv_ver), 'id')
     hammer_content_view_promote_version(cv_name, cv_ver_id, lc_env_id, '1')
     # Add new product subscriptions to AK
-    hammer_activation_key_add_subscription(ak_name, '1', tools_product)
+    hammer_activation_key_add_subscription(activation_key, '1', tools_product)
     # Add this latest tools repo to hosts to upgrade
     for host in hosts:
         if os.environ.get('FROM_VERSION') in ['6.0', '6.1']:

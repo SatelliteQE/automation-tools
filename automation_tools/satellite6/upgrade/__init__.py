@@ -131,12 +131,10 @@ def product_upgrade(product):
         The RHEL6 clients hostnames to run upgrade on
     CLIENT7_HOSTS
         The RHEL7 clients hostnames to run upgrade on.
-    CAPSULE_SUBSCRIPTION
-        List of cv_name, environment, ak_name attached to subscription of
-        capsule in defined sequence
-    CLIENT_SUBSCRIPTION
-        List of cv_name, environment, ak_name attached to subscription of
-        client in defined sequence
+    CAPSULE_AK
+        Activation Key name attached to the subscription of capsule
+    CLIENT_AK
+        Activation Key name attached to the subscription of client
 
     Environment variables required to run upgrade on RHEVM Setup and will be
     fetched from Jenkins:
@@ -154,16 +152,8 @@ def product_upgrade(product):
         The Docker VM IP/Hostname on rhevm to create and upgrade clients
     CLIENTS_COUNT
         The number of clients(docker containers) to generate to run upgrade
-    RHEV_CAPSULE_CV
-        The CV name used in capsule subscription
-    RHEV_CAPSULE_ENVIRONMENT
-        The environment name used in capsule subscription
     RHEV_CAPSULE_AK
         The AK name used in capsule subscription
-    RHEV_CLIENT_CV
-        The CV name used in client subscription
-    RHEV_CLIENT_ENVIRONMENT
-        The environment name used in client subscription
     RHEV_CLIENT_AK
         The AK name used in client subscription
     """
