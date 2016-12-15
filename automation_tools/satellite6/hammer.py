@@ -386,3 +386,18 @@ def attach_subscription_to_host_from_satellite(
         organization_id, product_name)
     return hammer('host subscription attach --subscription-id {0} '
                   '--host {1}'.format(subscription_id, hostname))
+
+
+def hammer_determine_cv_and_env_from_ak(ak_name, organization_id):
+    """Determines Content View and Lifecycle Environment from
+    Activation Key
+
+    :param string ak_name: Activation key name
+    :param int organization_id: Organization id in which ak created
+    :returns dictionary containing cv and lenv as keys with names as
+        their values
+    """
+    data = hammer('activation-key info --name {0} --organization-id '
+                  '{1}'.format(ak_name, organization_id))
+    return get_attribute_value(data, ak_name, 'content view'), \
+        get_attribute_value(data, ak_name, 'lifecycle environment')

@@ -26,14 +26,9 @@ def satellite6_capsule_setup(sat_host, os_version):
     # For User Defined Capsule
     if os.environ.get('CAPSULE_HOSTNAMES'):
         cap_hosts = os.environ.get('CAPSULE_HOSTNAMES')
-        cap_subscription = os.environ.get('CAPSULE_SUBSCRIPTION')
-        if not cap_subscription:
-            print('CAPSULE_SUBSCRIPTION environment variable is not '
-                  'defined !')
+        if not os.environ.get('CAPSULE_AK'):
+            print('CAPSULE_AK environment variable is not defined !')
             sys.exit(1)
-        elif len(cap_subscription.split(',')) != 3:
-            print('CAPSULE_SUBSCRIPTION environment variable is not '
-                  'having all the details!')
     # Else run upgrade on rhevm capsule
     else:
         # Get image name and Hostname from Jenkins environment
@@ -41,8 +36,6 @@ def satellite6_capsule_setup(sat_host, os_version):
             var for var in (
                 'RHEV_CAP_IMAGE',
                 'RHEV_CAP_HOST',
-                'RHEV_CAPSULE_CV',
-                'RHEV_CAPSULE_ENVIRONMENT',
                 'RHEV_CAPSULE_AK')
             if var not in os.environ]
         # Check if image name and Hostname in jenkins are set
@@ -97,9 +90,8 @@ def satellite6_capsule_upgrade(cap_host):
     # org, and content host in one), the content host will be unregistered as
     # part of the upgrade process.
     if to_version == '6.2':
-        ak_name = os.environ.get('CAPSULE_SUBSCRIPTION').split(',')[2].strip(
-            ) if os.environ.get('CAPSULE_SUBSCRIPTION') else os.environ.get(
-            'RHEV_CAPSULE_AK')
+        ak_name = os.environ.get('CAPSULE_AK') if os.environ.get(
+            'CAPSULE_AK') else os.environ.get('RHEV_CAPSULE_AK')
         run('subscription-manager register --org="Default_Organization" '
             '--activationkey={0} --force'.format(ak_name))
     # if CDN Upgrade enable cdn repo
