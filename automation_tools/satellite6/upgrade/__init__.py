@@ -21,6 +21,9 @@ from automation_tools.satellite6.upgrade.satellite import (
     satellite6_upgrade,
     satellite6_zstream_upgrade
 )
+from automation_tools.satellite6.upgrade.tasks import (
+    get_sat_version
+)
 from fabric.api import execute
 
 
@@ -164,7 +167,10 @@ def product_upgrade(product):
             product, os.environ.get('OS'))
         with LogAnalyzer(sat_host):
             if from_version != to_version:
-                execute(satellite6_upgrade, host=sat_host)
+                current_version = execute(
+                    get_sat_version, host=sat_host)
+                if not current_version == to_version:
+                    execute(satellite6_upgrade, host=sat_host)
             elif from_version == to_version:
                 execute(satellite6_zstream_upgrade, host=sat_host)
             # Generate foreman debug on satellite after upgrade

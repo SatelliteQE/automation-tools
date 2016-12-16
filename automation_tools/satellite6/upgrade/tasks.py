@@ -5,6 +5,7 @@ all environment variables are required.
 """
 import novaclient
 import os
+import re
 import sys
 import time
 from automation_tools.satellite6.hammer import (
@@ -406,54 +407,65 @@ def sync_capsule_repos_to_upgrade(capsules):
     repo_name = 'capsule6_latest_repo' if capsule_repo \
         else 'Red Hat Satellite Capsule {0} (for RHEL {1} Server) ' \
         '(RPMs)'.format(to_version, os_ver)
-    # Create product capsule
-    if capsule_repo:
-        hammer_product_create(product_name, '1')
-        time.sleep(2)
-        hammer_repository_create(repo_name, '1', product_name, capsule_repo)
-    else:
-        hammer_repository_set_enable(repo_name, product_name, '1', 'x86_64')
-        repo_name = repo_name.replace('(', '').replace(')', '') + ' x86_64'
-    hammer_repository_synchronize(repo_name, '1', product_name)
-    # Add repos to CV
-    hammer_content_view_add_repository(cv_name, '1', product_name, repo_name)
-    hammer_content_view_publish(cv_name, '1')
-    # Promote cv
-    lc_env_id = get_attribute_value(
-        hammer('lifecycle-environment list --organization-id 1 '
-               '--name {}'.format(env_name)), env_name, 'id')
-    cv_version_data = hammer(
-        'content-view version list --content-view {} '
-        '--organization-id 1'.format(cv_name))
-    latest_cv_ver = sorted([float(data['name'].split(
-        '{} '.format(cv_name))[1]) for data in cv_version_data]).pop()
-    cv_ver_id = get_attribute_value(cv_version_data, '{0} {1}'.format(
-        cv_name, latest_cv_ver), 'id')
-    hammer_content_view_promote_version(
-        cv_name, cv_ver_id, lc_env_id, '1')
-    # If Downstream, Update AK with latest snap capsule product subscription
-    # If CDN, then the subscription of capsule product will be already added
-    if capsule_repo:
-        hammer_activation_key_add_subscription(
-            activation_key, '1', product_name)
-    else:
-        content_label = 'rhel-{0}-server-satellite-capsule-{1}-rpms'.format(
-            os_ver, to_version)
-        hammer_activation_key_content_override(
-            activation_key, content_label, '1', '1')
+    try:
+        # Check if the product of latest capsule repo is already created,
+        # if not create one and attach the subscription to existing AK
+        get_attribute_value(hammer(
+            'product list --organization-id 1'), product_name, 'name')
+        if capsule_repo:
+            hammer_product_create(product_name, '1')
+            time.sleep(2)
+            hammer_repository_create(
+                repo_name, '1', product_name, capsule_repo)
+        else:
+            hammer_repository_set_enable(
+                repo_name, product_name, '1', 'x86_64')
+            repo_name = repo_name.replace('(', '').replace(')', '') + ' x86_64'
+        hammer_repository_synchronize(repo_name, '1', product_name)
+        # Add repos to CV
+        hammer_content_view_add_repository(
+            cv_name, '1', product_name, repo_name)
+        hammer_content_view_publish(cv_name, '1')
+        # Promote cv
+        lc_env_id = get_attribute_value(
+            hammer('lifecycle-environment list --organization-id 1 '
+                   '--name {}'.format(env_name)), env_name, 'id')
+        cv_version_data = hammer(
+            'content-view version list --content-view {} '
+            '--organization-id 1'.format(cv_name))
+        latest_cv_ver = sorted([float(data['name'].split(
+            '{} '.format(cv_name))[1]) for data in cv_version_data]).pop()
+        cv_ver_id = get_attribute_value(cv_version_data, '{0} {1}'.format(
+            cv_name, latest_cv_ver), 'id')
+        hammer_content_view_promote_version(
+            cv_name, cv_ver_id, lc_env_id, '1')
+        # If Downstream, Update AK with latest capsule repo subscription
+        # If CDN, then the subscription of capsule repo will be already added
+        if capsule_repo:
+            hammer_activation_key_add_subscription(
+                activation_key, '1', product_name)
+        else:
+            label = 'rhel-{0}-server-satellite-capsule-{1}-rpms'.format(
+                os_ver, to_version)
+            hammer_activation_key_content_override(
+                activation_key, label, '1', '1')
+    except KeyError:
+        print 'The product for latest Capsule repo is aready created!'
+        print 'Attaching that product subscription to capsule ....'
+    # If keyError is thrown as if the product is created already
     # Add this latest capsule repo to capsules to upgrade
     if capsule_repo:
         for capsule in capsules:
             if from_version == '6.1':
                 subscription_id = get_product_subscription_id(
-                    '1', 'capsule6_latest')
+                    '1', product_name)
                 execute(
                     attach_subscription_to_host_from_content_host,
                     subscription_id,
                     host=capsule)
             else:
                 attach_subscription_to_host_from_satellite(
-                    '1', 'capsule6_latest', capsule)
+                    '1', product_name, capsule)
 
 
 def generate_satellite_docker_clients_on_rhevm(client_os, clients_count):
@@ -629,3 +641,42 @@ def docker_execute_command(container_id, command, quiet=False):
         elif quiet.lower() == 'true':
             quiet = True
     run('docker exec {0} {1}'.format(container_id, command), quiet=quiet)
+
+
+def _extract_sat_version(command):
+    """Extracts Satellite version
+
+    :param string command: The command to run on Satellite that returns version
+    :return string: Satellite version
+    """
+    cmd_result = run(command, quiet=True)
+    version_re = (
+        r'[^\d]*(?P<version>\d(\.\d){1})'
+    )
+    result = re.search(version_re, cmd_result)
+    if result:
+        sat_version = result.group('version')
+        return sat_version, cmd_result
+    else:
+        return 'Unavailable', cmd_result
+
+
+def get_sat_version():
+    """Determines and returns the installed Satellite version on system
+
+    :return string: Satellite version
+    """
+    _SAT_6_2_VERSION_COMMAND = u'rpm -q satellite'
+    _SAT_LT_6_2_VERSION_COMMAND = (
+        u'grep "VERSION" /usr/share/foreman/lib/satellite/version.rb'
+    )
+    results = (
+        _extract_sat_version(cmd) for cmd in
+        (_SAT_6_2_VERSION_COMMAND, _SAT_LT_6_2_VERSION_COMMAND)
+    )
+    for version, cmd_result in results:
+        if version != 'Unavailable':
+            return version
+    print 'ERROR! The Satellite version is not detected due to:\n{}'.format(
+        cmd_result
+    )
