@@ -86,7 +86,7 @@ def satellite6_upgrade():
     update_packages(quiet=True)
     # Rebooting the system to see possible errors
     if rhev_sat_host:
-        reboot(120)
+        reboot(160)
     # Setting Satellite to_version Repos
     major_ver = distro_info()[1]
     # Following disables the old satellite repo and extra repos enabled
@@ -110,6 +110,8 @@ def satellite6_upgrade():
         put(local_path=satellite_repo,
             remote_path='/etc/yum.repos.d/sat6.repo')
         satellite_repo.close()
+    # Check what repos are set
+    run('yum repolist')
     # Stop katello services, except mongod
     run('katello-service stop')
     if to_version == '6.1':
@@ -123,7 +125,7 @@ def satellite6_upgrade():
     # Rebooting the system again for possible errors
     # Only for RHEV based satellite and not for personal one
     if rhev_sat_host:
-        reboot(120)
+        reboot(160)
         if to_version == '6.1':
             # Stop the service again which started in restart
             # This step is not required with 6.2 upgrade as installer itself
@@ -159,12 +161,37 @@ def satellite6_zstream_upgrade():
     from_version = os.environ.get('FROM_VERSION')
     to_version = os.environ.get('TO_VERSION')
     if not from_version == to_version:
-        print ('Error! zStream Upgrade cannot be performed as '
+        print ('Error! zStream Upgrade on Satellite cannot be performed as '
                'FROM and TO versions are not same!')
         sys.exit(1)
+    base_url = os.environ.get('BASE_URL')
     # Setting yum stdout log level to be less verbose
     set_yum_debug_level()
     setup_satellite_firewall()
+    major_ver = distro_info()[1]
+    # Following disables the old satellite repo and extra repos enabled
+    # during subscribe e.g Load balancer Repo
+    disable_repos('*', silent=True)
+    enable_repos('rhel-{0}-server-rpms'.format(major_ver))
+    enable_repos('rhel-server-rhscl-{0}-rpms'.format(major_ver))
+    # If CDN upgrade then enable satellite latest version repo
+    if base_url is None:
+        enable_repos('rhel-{0}-server-satellite-{1}-rpms'.format(
+            major_ver, to_version))
+    # Else, consider this as Downstream upgrade
+    else:
+        # Add Sat6 repo from latest compose
+        satellite_repo = StringIO()
+        satellite_repo.write('[sat6]\n')
+        satellite_repo.write('name=satellite 6\n')
+        satellite_repo.write('baseurl={0}\n'.format(base_url))
+        satellite_repo.write('enabled=1\n')
+        satellite_repo.write('gpgcheck=0\n')
+        put(local_path=satellite_repo,
+            remote_path='/etc/yum.repos.d/sat6.repo')
+        satellite_repo.close()
+    # Check what repos are set
+    run('yum repolist')
     # Stop katello services, except mongod
     run('katello-service stop')
     if to_version == '6.1':

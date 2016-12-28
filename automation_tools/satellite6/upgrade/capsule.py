@@ -2,17 +2,22 @@ import os
 import sys
 import time
 
-from automation_tools import setup_capsule_firewall
+from automation_tools import set_yum_debug_level, setup_capsule_firewall
+from automation_tools.bz import bz_bug_is_open
 from automation_tools.repository import enable_repos, disable_repos
 from automation_tools.satellite6.capsule import generate_capsule_certs
 from automation_tools.utils import distro_info, update_packages
-from fabric.api import env, execute, run
+from fabric.api import env, execute, put, run
 from automation_tools.satellite6.upgrade.tasks import (
     create_rhevm_instance,
     delete_rhevm_instance,
     sync_capsule_repos_to_upgrade
 )
 from automation_tools.satellite6.upgrade.tools import copy_ssh_key, reboot
+if sys.version_info[0] is 2:
+    from StringIO import StringIO  # (import-error) pylint:disable=F0401
+else:  # pylint:disable=F0401,E0611
+    from io import StringIO
 
 
 def satellite6_capsule_setup(sat_host, os_version):
@@ -82,6 +87,7 @@ def satellite6_capsule_upgrade(cap_host):
     sat_host = env.get('satellite_host')
     from_version = os.environ.get('FROM_VERSION')
     to_version = os.environ.get('TO_VERSION')
+    set_yum_debug_level()
     setup_capsule_firewall()
     major_ver = distro_info()[1]
     # Re-register Capsule for 6.2
@@ -94,14 +100,28 @@ def satellite6_capsule_upgrade(cap_host):
             'CAPSULE_AK') else os.environ.get('RHEV_CAPSULE_AK')
         run('subscription-manager register --org="Default_Organization" '
             '--activationkey={0} --force'.format(ak_name))
-    # if CDN Upgrade enable cdn repo
-    if os.environ.get('CAPSULE_URL') is None:
-        enable_repos('rhel-{0}-server-satellite-capsule-{1}-rpms'.format(
-            major_ver, to_version))
     disable_repos('rhel-{0}-server-satellite-capsule-{1}-rpms'.format(
         major_ver, from_version))
     if from_version == '6.1' and major_ver == '6':
         enable_repos('rhel-server-rhscl-{0}-rpms'.format(major_ver))
+    if os.environ.get('CAPSULE_URL'):
+        # This is a temporary workaround for BZ1372467
+        if bz_bug_is_open('1372467'):
+            print ('Applying Temporary fix for Bug 1372467....')
+            cap_repo = StringIO()
+            cap_repo.write('[cap6]\n')
+            cap_repo.write('name=Capsule 6\n')
+            cap_repo.write('baseurl={0}\n'.format(
+                os.environ.get('CAPSULE_URL')))
+            cap_repo.write('enabled=1\n')
+            cap_repo.write('gpgcheck=0\n')
+            put(local_path=cap_repo, remote_path='/etc/yum.repos.d/cap6.repo')
+            cap_repo.close()
+        else:
+            print ('ALERT!!!! The bug 1372467 is fixed! '
+                   'Please remove the workaroud from code!')
+    # Check what repos are set
+    run('yum repolist')
     if from_version == '6.0':
         # Stop katello services, except mongod
         run('for i in qpidd pulp_workers pulp_celerybeat '
@@ -141,5 +161,73 @@ def satellite6_capsule_upgrade(cap_host):
     else:
         run('satellite-installer --scenario capsule --upgrade '
             '--certs-tar /home/{0}-certs.tar'.format(cap_host))
+    print('CAPSULE UPGRADE finished at: {0}'.format(time.ctime()))
+    run('katello-service status', warn_only=True)
+
+
+def satellite6_capsule_zstream_upgrade():
+    """Upgrades Capsule to its latest zStream version
+
+    Note: For zstream upgrade both 'To' and 'From' version should be same
+
+    FROM_VERSION
+        Current satellite version which will be upgraded to latest version
+    TO_VERSION
+        Next satellite version to which satellite will be upgraded
+    """
+    from_version = os.environ.get('FROM_VERSION')
+    to_version = os.environ.get('TO_VERSION')
+    if not from_version == to_version:
+        print ('Error! zStream Upgrade on Capsule cannot be performed as '
+               'FROM and TO versions are not same!')
+        sys.exit(1)
+    major_ver = distro_info()[1]
+    set_yum_debug_level()
+    if os.environ.get('CAPSULE_URL'):
+        disable_repos('rhel-{0}-server-satellite-capsule-{1}-rpms'.format(
+            major_ver, from_version))
+        # This is a temporary workaround for BZ1372467
+        if bz_bug_is_open('1372467'):
+            print ('Applying Temporary fix for Bug 1372467....')
+            cap_repo = StringIO()
+            cap_repo.write('[cap6]\n')
+            cap_repo.write('name=Capsule 6\n')
+            cap_repo.write('baseurl={0}\n'.format(
+                os.environ.get('CAPSULE_URL')))
+            cap_repo.write('enabled=1\n')
+            cap_repo.write('gpgcheck=0\n')
+            put(local_path=cap_repo, remote_path='/etc/yum.repos.d/cap6.repo')
+            cap_repo.close()
+        else:
+            print ('ALERT!!!! The bug 1372467 is fixed! '
+                   'Please remove the workaroud from code!')
+    # Check what repos are set
+    run('yum repolist')
+    if from_version == '6.1' and major_ver == '6':
+        enable_repos('rhel-server-rhscl-{0}-rpms'.format(major_ver))
+    if from_version == '6.0':
+        # Stop katello services, except mongod
+        run('for i in qpidd pulp_workers pulp_celerybeat '
+            'pulp_resource_manager httpd; do service $i stop; done')
+    run('yum clean all', warn_only=True)
+    print('Wait till packages update ... ')
+    print('YUM UPDATE started at: {0}'.format(time.ctime()))
+    update_packages(quiet=False)
+    print('YUM UPDATE finished at: {0}'.format(time.ctime()))
+    # Rebooting the system to see possible errors
+    if os.environ.get('RHEV_CAP_HOST'):
+        reboot(120)
+        if from_version == '6.0':
+            # Stopping the services again which started in reboot
+            run('for i in qpidd pulp_workers pulp_celerybeat '
+                'pulp_resource_manager httpd; do service $i stop; done')
+    setup_capsule_firewall()
+    print('CAPSULE UPGRADE started at: {0}'.format(time.ctime()))
+    if to_version == '6.0':
+        run('katello-installer --upgrade')
+    elif to_version == '6.1':
+        run('capsule-installer --upgrade')
+    else:
+        run('satellite-installer --scenario capsule --upgrade ')
     print('CAPSULE UPGRADE finished at: {0}'.format(time.ctime()))
     run('katello-service status', warn_only=True)
