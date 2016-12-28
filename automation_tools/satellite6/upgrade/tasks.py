@@ -408,10 +408,21 @@ def sync_capsule_repos_to_upgrade(capsules):
         else 'Red Hat Satellite Capsule {0} (for RHEL {1} Server) ' \
         '(RPMs)'.format(to_version, os_ver)
     try:
-        # Check if the product of latest capsule repo is already created,
-        # if not create one and attach the subscription to existing AK
-        get_attribute_value(hammer(
-            'product list --organization-id 1'), product_name, 'name')
+        if capsule_repo:
+            # Check if the product of latest capsule repo is already created,
+            # if not create one and attach the subscription to existing AK
+            get_attribute_value(hammer(
+                'product list --organization-id 1'), product_name, 'name')
+            # If keyError is not thrown as if the product is created already
+            print 'The product for latest Capsule repo is aready created!'
+            print 'Attaching that product subscription to capsule ....'
+        else:
+            # In case of CDN Upgrade, the capsule repo has to be resynced
+            # and needs to publich/promote those contents
+            raise KeyError
+    except KeyError:
+        # If latest capsule repo is not created already(Fresh Upgrade),
+        # So create new....
         if capsule_repo:
             hammer_product_create(product_name, '1')
             time.sleep(2)
@@ -439,8 +450,6 @@ def sync_capsule_repos_to_upgrade(capsules):
             cv_name, latest_cv_ver), 'id')
         hammer_content_view_promote_version(
             cv_name, cv_ver_id, lc_env_id, '1')
-        # If Downstream, Update AK with latest capsule repo subscription
-        # If CDN, then the subscription of capsule repo will be already added
         if capsule_repo:
             hammer_activation_key_add_subscription(
                 activation_key, '1', product_name)
@@ -449,11 +458,8 @@ def sync_capsule_repos_to_upgrade(capsules):
                 os_ver, to_version)
             hammer_activation_key_content_override(
                 activation_key, label, '1', '1')
-    except KeyError:
-        print 'The product for latest Capsule repo is aready created!'
-        print 'Attaching that product subscription to capsule ....'
-    # If keyError is thrown as if the product is created already
-    # Add this latest capsule repo to capsules to upgrade
+    # Add this latest capsule repo to capsules to perform upgrade later
+    # If downstream capsule, Update AK with latest capsule repo subscription
     if capsule_repo:
         for capsule in capsules:
             if from_version == '6.1':
@@ -466,6 +472,9 @@ def sync_capsule_repos_to_upgrade(capsules):
             else:
                 attach_subscription_to_host_from_satellite(
                     '1', product_name, capsule)
+    else:
+        # In upgrade to CDN capsule, the subscription will be already attached
+        pass
 
 
 def generate_satellite_docker_clients_on_rhevm(client_os, clients_count):

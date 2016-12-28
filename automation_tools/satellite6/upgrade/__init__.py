@@ -10,7 +10,8 @@ from automation_tools import foreman_debug
 from automation_tools.satellite6.log import LogAnalyzer
 from automation_tools.satellite6.upgrade.capsule import (
     satellite6_capsule_setup,
-    satellite6_capsule_upgrade
+    satellite6_capsule_upgrade,
+    satellite6_capsule_zstream_upgrade
 )
 from automation_tools.satellite6.upgrade.client import (
     satellite6_client_setup,
@@ -179,8 +180,12 @@ def product_upgrade(product):
             if product == 'capsule':
                 for cap_host in cap_hosts:
                     with LogAnalyzer(cap_host):
-                        execute(satellite6_capsule_upgrade, cap_host,
-                                host=cap_host)
+                        if from_version != to_version:
+                            execute(satellite6_capsule_upgrade, cap_host,
+                                    host=cap_host)
+                        elif from_version == to_version:
+                            execute(satellite6_capsule_zstream_upgrade,
+                                    host=cap_host)
                         # Generate foreman debug on capsule after upgrade
                         execute(
                             foreman_debug,

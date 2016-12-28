@@ -52,8 +52,11 @@ def get_attribute_value(hammer_result, search_key, attribute):
                 'result to get attribute value'.format(search_key))
         return hammer_result[key_index][attribute]
     elif isinstance(hammer_result, dict):
-        if search_key in hammer_result.values():
-            return hammer_result[attribute]
+        if search_key not in hammer_result.values():
+            raise KeyError(
+                'Unable to find search_key {} in given hammer '
+                'result to get attribute value'.format(search_key))
+        return hammer_result[attribute]
     else:
         raise TypeError('hammer data is not one of type list/dict.')
 
@@ -399,5 +402,8 @@ def hammer_determine_cv_and_env_from_ak(ak_name, organization_id):
     """
     data = hammer('activation-key info --name {0} --organization-id '
                   '{1}'.format(ak_name, organization_id))
+    if not isinstance(data, (dict, list)):
+        raise KeyError(
+            'Wrong Activation key provided for determining CV and Env')
     return get_attribute_value(data, ak_name, 'content view'), \
         get_attribute_value(data, ak_name, 'lifecycle environment')
