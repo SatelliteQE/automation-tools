@@ -120,7 +120,7 @@ def analyze(log_file, content):
 
     _print_wrapper('### Analyzing %s:' % log_file)
     _print_wrapper('## Errors found:')
-    content_lines = content.split('\n')
+    content_lines = content.decode('utf-8').split('\n')
     regex = '|'.join(map(lambda token: '.*%s.*' % token, ERROR_TOKENS))
     error_re = re.compile(regex, re.IGNORECASE)
 

@@ -2,6 +2,7 @@
 from __future__ import unicode_literals
 
 import pytest
+
 from automation_tools.satellite6.log import LogAnalyzer, analyze
 
 
@@ -168,7 +169,7 @@ CONTENT_WITHOUT_ERROR = '''2016-11-23 05:41:54 [app] [I] Processing by Api::
 2016-11-23 05:41:54 [app] [I] processing report for
 2016-11-23 05:41:54 [app] [I] Imported report for
 2016-11-23 05:41:55 [app] [I] Rendered api/v2/reports/create.json (5.5ms)
-2016-11-23 05:41:55 [app] [I] Completed 201 Created in 61ms'''
+2016-11-23 05:41:55 [app] [I] Completed 201 Created in 61ms'''.encode('utf-8')
 
 REPORT_WITHOUT_ERROR = '''### Analyzing /var/log/candlepin/candlepin.log:
 ## Errors found:
@@ -197,7 +198,7 @@ ActionView::Template::Error (undefined method
 undefined method `cp_config' for
 An error has occurred, this and all later migrations canceled
 undefined method `import_data' for nil:NilClass (NoMethodError)
-undefined method `[]' for nil:NilClass (NoMethodError)'''
+undefined method `[]' for nil:NilClass (NoMethodError)'''.encode('utf-8')
 
 REPORT_WITH_ERROR = '''### Analyzing /var/log/candlepin/candlepin.log:
 ## Errors found:
@@ -238,11 +239,18 @@ REPORT_WITH_ERROR = '''### Analyzing /var/log/candlepin/candlepin.log:
 17: undefined method `import_data' for nil:NilClass (NoMethodError)
 18: undefined method `[]' for nil:NilClass (NoMethodError)'''
 
+CONTENT_WITH_SPECIAL_CHAR = 'éçã'.encode('utf-8')
+
+REPORT_WITH_SPECIAL_CHAR = '''### Analyzing /var/log/candlepin/candlepin.log:
+## Errors found:
+## Full log:
+1: éçã'''
 test_data = [
     (CONTENT_WITHOUT_ERROR, REPORT_WITHOUT_ERROR),
-    (CONTENT_WITH_ERROR, REPORT_WITH_ERROR)]
+    (CONTENT_WITH_ERROR, REPORT_WITH_ERROR),
+    (CONTENT_WITH_SPECIAL_CHAR, REPORT_WITH_SPECIAL_CHAR)]
 
-ids = ['without error', 'with error']
+ids = ['without error', 'with error', 'special char']
 
 
 @pytest.mark.parametrize("content,report", test_data, ids=ids)
