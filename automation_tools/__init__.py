@@ -1400,16 +1400,10 @@ def product_install(distribution, create_vm=False, certificate_url=None,
     }
     distribution = distribution.lower()
 
-    # Make sure downstream_install only is called for sat6.1 and sat6.2, as
-    # repofile_install and ak_install can be passed only for Sat6.3.
+    # Make sure downstream_install only is called for sat6.1 and sat6.2
     if satellite_version in ('6.1', '6.2'):
         if distribution in ('satellite6-repofile', 'satellite6-activationkey'):
             distribution = 'satellite6-downstream'
-    elif (
-        satellite_version == '6.3' and
-        distribution == 'satellite6-downstream'
-    ):
-        distribution = 'satellite6-activationkey'
 
     distributions = install_tasks.keys()
     installer_options = {}
