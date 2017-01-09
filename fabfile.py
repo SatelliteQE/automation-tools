@@ -12,7 +12,6 @@ from automation_tools import (  # flake8: noqa
     fix_hostname,
     fix_qdrouterd_listen_to_ipv6,
     foreman_debug,
-    idp_authenticate,
     install_errata,
     install_katello_agent,
     install_prerequisites,
