@@ -3,6 +3,7 @@ from __future__ import unicode_literals
 
 from itertools import cycle
 
+import os
 import re
 from fabric.api import execute, run
 
@@ -75,7 +76,7 @@ class LogAnalyzer(object):
                         'tail -n {} {}'.format(lines_appended, log_file),
                         quiet=True
                     )
-                    analyze(log_file, content)
+                    analyze(self.host, log_file, content)
 
         execute(fetch_appended_log_lines, host=self.host)
 
@@ -105,18 +106,41 @@ class LogAnalyzer(object):
         execute(get_line_count, host=self.host)
 
 
-def analyze(log_file, content):
+def _save_full_log(host, log_file_path, content):
+    """Save full log on upgrade-diff-logs dir
+
+    :param host: str with host name
+    :param log_file_path: file name path
+    :param content: content to be saved
+    """
+    dir_path = os.path.abspath('upgrade-diff-logs')
+    if not os.path.exists(dir_path):
+        os.mkdir(dir_path)
+    log_file_name = os.path.split(log_file_path)[-1]
+    log_file_name = '%s-%s' % (host, log_file_name)
+    file_path = os.path.join(dir_path, log_file_name)
+    with open(file_path, 'wb') as log_file:
+        log_file.write(content)
+        _print_wrapper('## Full upgrade logs saved on %s' % file_path)
+
+
+def analyze(host, log_file, content):
     """Analyzes appended content from a log file. For now it is only
     checking for ERROR status on regular log files.
 
+    :param host: str with host name
     :param log_file: str log file path on host
     :param content: str with log file content
     """
 
     def print_lines(lines_enumeration):
         """print lines with numbers"""
+        no_line_flag = True
         for i, line in lines_enumeration:
             _print_wrapper('{}: {}'.format(i, line))
+            no_line_flag = False
+        if no_line_flag:
+            _print_wrapper('None')
 
     _print_wrapper('### Analyzing %s:' % log_file)
     _print_wrapper('## Errors found:')
@@ -129,11 +153,9 @@ def analyze(log_file, content):
         enumerate(content_lines, start=1))
 
     print_lines(lines_with_error_enum)
-
-    _print_wrapper('## Full log:')
-    print_lines(enumerate(content_lines, start=1))
+    _save_full_log(host, log_file, content)
 
 
 def _print_wrapper(s):
-    """Just an wrapper to make mocking easier on tests"""
+    """Just a wrapper to make mocking easier on tests"""
     print(s.encode('utf-8'))
