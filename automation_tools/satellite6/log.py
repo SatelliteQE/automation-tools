@@ -136,4 +136,4 @@ def analyze(log_file, content):
 
 def _print_wrapper(s):
     """Just an wrapper to make mocking easier on tests"""
-    print(s)
+    print(s.encode('utf-8'))
