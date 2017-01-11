@@ -2335,7 +2335,7 @@ def set_service_check_status(user='admin', password='changeme',
     )
 
 
-def setup_alternate_capsule_ports(port_range='9091-14999'):
+def setup_alternate_capsule_ports(port_range='9400-14999'):
     """Setup alternate capsule ports in SELINUX and install tunneling tool
 
     :param port_range: these ports will be added under websm_port_t type.
