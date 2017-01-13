@@ -179,7 +179,7 @@ CONTENT_WITHOUT_ERROR = '''2016-11-23 05:41:54 [app] [I] Processing by Api::
 
 REPORT_WITHOUT_ERROR = '''### Analyzing /var/log/candlepin/candlepin.log:
 ## Errors found:
-None'''
+No errors found'''
 
 CONTENT_WITH_ERROR = '''c75ff8b-2ee0-4a6a-a94e-, org=] ERROR  org.
 SEVERE: The web application [/gutterball] registered the JDBC driver
@@ -224,7 +224,7 @@ CONTENT_WITH_SPECIAL_CHAR = 'éçã'.encode('utf-8')
 
 REPORT_WITH_SPECIAL_CHAR = '''### Analyzing /var/log/candlepin/candlepin.log:
 ## Errors found:
-None'''
+No errors found'''
 test_data = [
     (CONTENT_WITHOUT_ERROR, REPORT_WITHOUT_ERROR),
     (CONTENT_WITH_ERROR, REPORT_WITH_ERROR),

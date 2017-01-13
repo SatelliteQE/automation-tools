@@ -140,7 +140,7 @@ def analyze(host, log_file, content):
             _print_wrapper('{}: {}'.format(i, line))
             no_line_flag = False
         if no_line_flag:
-            _print_wrapper('None')
+            _print_wrapper('No errors found')
 
     _print_wrapper('### Analyzing %s:' % log_file)
     _print_wrapper('## Errors found:')
