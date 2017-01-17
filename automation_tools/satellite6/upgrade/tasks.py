@@ -449,7 +449,8 @@ def sync_capsule_repos_to_upgrade(capsules):
         cv_ver_id = get_attribute_value(cv_version_data, '{0} {1}'.format(
             cv_name, latest_cv_ver), 'id')
         hammer_content_view_promote_version(
-            cv_name, cv_ver_id, lc_env_id, '1')
+            cv_name, cv_ver_id, lc_env_id, '1',
+            False if from_version == '6.0' else True)
         if capsule_repo:
             hammer_activation_key_add_subscription(
                 activation_key, '1', product_name)
