@@ -280,7 +280,8 @@ def setup_default_docker():
 
     # enable the service as it is disabled by default on RHEL7
     manage_daemon('enable', 'docker', pty=(os_version >= 7))
-    manage_daemon('restart', 'docker', pty=(os_version >= 7))
+    manage_daemon('restart', 'docker', pty=(os_version >= 7),
+                  warn_only=bz_bug_is_open('1414821'))
 
 
 def setup_default_capsule(interface=None, run_katello_installer=True):
