@@ -500,7 +500,7 @@ def generate_satellite_docker_clients_on_rhevm(client_os, clients_count):
     ak = os.environ.get('RHEV_CLIENT_AK_{}'.format(client_os.upper()))
     result = {}
     for count in range(int(clients_count)):
-        hostname = '{0}DockerClient{1}'.format(count, client_os)
+        hostname = '{0}dockerclient{1}'.format(count, client_os)
         container_id = run(
             'docker run -d -h {0} -v /dev/log:/dev/log -e "SATHOST={1}" '
             '-e "AK={2}" upgrade:{3}'.format(
