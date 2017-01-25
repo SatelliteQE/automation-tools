@@ -98,6 +98,10 @@ def satellite6_upgrade():
     if base_url is None:
         enable_repos('rhel-{0}-server-satellite-{1}-rpms'.format(
             major_ver, to_version))
+        # Remove old custom sat repo
+        for fname in os.listdir('/etc/yum.repos.d/'):
+            if 'sat' in fname.lower():
+                os.remove('/etc/yum.repos.d/{}'.format(fname))
     # Else, consider this as Downstream upgrade
     else:
         # Add Sat6 repo from latest compose
@@ -178,6 +182,10 @@ def satellite6_zstream_upgrade():
     if base_url is None:
         enable_repos('rhel-{0}-server-satellite-{1}-rpms'.format(
             major_ver, to_version))
+        # Remove old custom sat repo
+        for fname in os.listdir('/etc/yum.repos.d/'):
+            if 'sat' in fname.lower():
+                os.remove('/etc/yum.repos.d/{}'.format(fname))
     # Else, consider this as Downstream upgrade
     else:
         # Add Sat6 repo from latest compose
