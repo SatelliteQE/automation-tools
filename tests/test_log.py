@@ -128,7 +128,7 @@ def test_log_analyzer_exit(mocker):
 
     assert analyze_mock.call_count == len(log_with_lines_appended)
     for log_file, content in log_files_content.items():
-        analyze_mock.assert_any_call(log_file, content)
+        analyze_mock.assert_any_call(analyzer.host, log_file, content)
 
 
 def test_log_analyzer_file_not_available(run_with_error):
@@ -164,6 +164,12 @@ def print_mock(mocker):
     return mocker.patch('automation_tools.satellite6.log._print_wrapper')
 
 
+@pytest.fixture
+def save_log_mock(mocker):
+    """Mock _print_wrapper function"""
+    return mocker.patch('automation_tools.satellite6.log._save_full_log')
+
+
 CONTENT_WITHOUT_ERROR = '''2016-11-23 05:41:54 [app] [I] Processing by Api::
 2016-11-23 05:41:54 [app] [I] Parameters: {"report"=>"[FILTERED]", "apiv"=>
 2016-11-23 05:41:54 [app] [I] processing report for
@@ -173,13 +179,7 @@ CONTENT_WITHOUT_ERROR = '''2016-11-23 05:41:54 [app] [I] Processing by Api::
 
 REPORT_WITHOUT_ERROR = '''### Analyzing /var/log/candlepin/candlepin.log:
 ## Errors found:
-## Full log:
-1: 2016-11-23 05:41:54 [app] [I] Processing by Api::
-2: 2016-11-23 05:41:54 [app] [I] Parameters: {"report"=>"[FILTERED]", "apiv"=>
-3: 2016-11-23 05:41:54 [app] [I] processing report for
-4: 2016-11-23 05:41:54 [app] [I] Imported report for
-5: 2016-11-23 05:41:55 [app] [I] Rendered api/v2/reports/create.json (5.5ms)
-6: 2016-11-23 05:41:55 [app] [I] Completed 201 Created in 61ms'''
+No errors found'''
 
 CONTENT_WITH_ERROR = '''c75ff8b-2ee0-4a6a-a94e-, org=] ERROR  org.
 SEVERE: The web application [/gutterball] registered the JDBC driver
@@ -218,33 +218,13 @@ REPORT_WITH_ERROR = '''### Analyzing /var/log/candlepin/candlepin.log:
 15: undefined method `cp_config' for
 16: An error has occurred, this and all later migrations canceled
 17: undefined method `import_data' for nil:NilClass (NoMethodError)
-18: undefined method `[]' for nil:NilClass (NoMethodError)
-## Full log:
-1: c75ff8b-2ee0-4a6a-a94e-, org=] ERROR  org.
-2: SEVERE: The web application [/gutterball] registered the JDBC driver
-3: NO problem on this line
-4: Exception in thread "Resource Destroyer in BasicResourcePool.close()"
-5: javax.persistence.PersistenceException: unexpected error when rollbacking
-6: Could not find the inverse association for repository
-7: PG::Error: ERROR: update or delete on table
-8: NoMethodError: undefined method
-9: usr/sbin/foreman-rake db:migrate returned 1 instead of one of [0]
-10: /usr/sbin/foreman-rake db:seed returned 1 instead of one of [0]
-11: [E] undefined method `finished' for nil:NilClass (NoMethodError)
-12: [ProxyAPI::ProxyException]: Unable to detect
-13: (ActiveModel::MissingAttributeError)
-14: ActionView::Template::Error (undefined method
-15: undefined method `cp_config' for
-16: An error has occurred, this and all later migrations canceled
-17: undefined method `import_data' for nil:NilClass (NoMethodError)
 18: undefined method `[]' for nil:NilClass (NoMethodError)'''
 
 CONTENT_WITH_SPECIAL_CHAR = 'éçã'.encode('utf-8')
 
 REPORT_WITH_SPECIAL_CHAR = '''### Analyzing /var/log/candlepin/candlepin.log:
 ## Errors found:
-## Full log:
-1: éçã'''
+No errors found'''
 test_data = [
     (CONTENT_WITHOUT_ERROR, REPORT_WITHOUT_ERROR),
     (CONTENT_WITH_ERROR, REPORT_WITH_ERROR),
@@ -254,11 +234,13 @@ ids = ['without error', 'with error', 'special char']
 
 
 @pytest.mark.parametrize("content,report", test_data, ids=ids)
-def test_analyse(content, report, print_mock):
+def test_analyse(content, report, print_mock, save_log_mock):
     """Test analyse find no errors on file content"""
     log_file = '/var/log/candlepin/candlepin.log'
-    analyze(log_file, content)
+    host = 'foo.bar.com'
+    analyze(host, log_file, content)
     args = [
         positional_args[0] for positional_args, _ in print_mock.call_args_list
     ]
     assert '\n'.join(args) == report
+    save_log_mock.assert_called_once_with(host, log_file, content)
