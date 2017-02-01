@@ -25,6 +25,7 @@ from automation_tools.satellite6.hammer import (
     hammer_repository_synchronize,
     set_hammer_config
 )
+from automation_tools.bz import bz_bug_is_open
 from fabric.api import env, execute, run
 from novaclient.client import Client
 from ovirtsdk.api import API
@@ -500,6 +501,8 @@ def generate_satellite_docker_clients_on_rhevm(client_os, clients_count):
     ak = os.environ.get('RHEV_CLIENT_AK_{}'.format(client_os.upper()))
     result = {}
     for count in range(int(clients_count)):
+        if bz_bug_is_open('1405085'):
+            time.sleep(5)
         hostname = '{0}dockerclient{1}'.format(count, client_os)
         container_id = run(
             'docker run -d -h {0} -v /dev/log:/dev/log -e "SATHOST={1}" '
