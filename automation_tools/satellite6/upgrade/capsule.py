@@ -3,21 +3,16 @@ import sys
 import time
 
 from automation_tools import set_yum_debug_level, setup_capsule_firewall
-from automation_tools.bz import bz_bug_is_open
 from automation_tools.repository import enable_repos, disable_repos
 from automation_tools.satellite6.capsule import generate_capsule_certs
 from automation_tools.utils import distro_info, update_packages
-from fabric.api import env, execute, put, run
+from fabric.api import env, execute, run
 from automation_tools.satellite6.upgrade.tasks import (
     create_rhevm_instance,
     delete_rhevm_instance,
     sync_capsule_repos_to_upgrade
 )
 from automation_tools.satellite6.upgrade.tools import copy_ssh_key, reboot
-if sys.version_info[0] is 2:
-    from StringIO import StringIO  # (import-error) pylint:disable=F0401
-else:  # pylint:disable=F0401,E0611
-    from io import StringIO
 
 
 def satellite6_capsule_setup(sat_host, os_version):
@@ -104,22 +99,6 @@ def satellite6_capsule_upgrade(cap_host):
         major_ver, from_version))
     if from_version == '6.1' and major_ver == '6':
         enable_repos('rhel-server-rhscl-{0}-rpms'.format(major_ver))
-    if os.environ.get('CAPSULE_URL'):
-        # This is a temporary workaround for BZ1372467
-        if bz_bug_is_open('1372467'):
-            print ('Applying Temporary fix for Bug 1372467....')
-            cap_repo = StringIO()
-            cap_repo.write('[cap6]\n')
-            cap_repo.write('name=Capsule 6\n')
-            cap_repo.write('baseurl={0}\n'.format(
-                os.environ.get('CAPSULE_URL')))
-            cap_repo.write('enabled=1\n')
-            cap_repo.write('gpgcheck=0\n')
-            put(local_path=cap_repo, remote_path='/etc/yum.repos.d/cap6.repo')
-            cap_repo.close()
-        else:
-            print ('ALERT!!!! The bug 1372467 is fixed! '
-                   'Please remove the workaroud from code!')
     # Check what repos are set
     run('yum repolist')
     if from_version == '6.0':
@@ -186,21 +165,6 @@ def satellite6_capsule_zstream_upgrade():
     if os.environ.get('CAPSULE_URL'):
         disable_repos('rhel-{0}-server-satellite-capsule-{1}-rpms'.format(
             major_ver, from_version))
-        # This is a temporary workaround for BZ1372467
-        if bz_bug_is_open('1372467'):
-            print ('Applying Temporary fix for Bug 1372467....')
-            cap_repo = StringIO()
-            cap_repo.write('[cap6]\n')
-            cap_repo.write('name=Capsule 6\n')
-            cap_repo.write('baseurl={0}\n'.format(
-                os.environ.get('CAPSULE_URL')))
-            cap_repo.write('enabled=1\n')
-            cap_repo.write('gpgcheck=0\n')
-            put(local_path=cap_repo, remote_path='/etc/yum.repos.d/cap6.repo')
-            cap_repo.close()
-        else:
-            print ('ALERT!!!! The bug 1372467 is fixed! '
-                   'Please remove the workaroud from code!')
     # Check what repos are set
     run('yum repolist')
     if from_version == '6.1' and major_ver == '6':
