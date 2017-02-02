@@ -1088,14 +1088,13 @@ def upstream_install(admin_password=None, run_katello_installer=True,
     run('yum install -y git ruby')
     run('rm -rf forklift')
     run('git clone -q https://github.com/Katello/forklift.git')
-    # https://github.com/Katello/forklift/pull/369 removed setup.rb that we use
-    # checkout before the change until we'll know how to proceed the new way
-    run('git checkout -q 336783394283fd15bf6ef29aee5a24917f99dfad')
 
-    run('yum -d2 repolist')
-    # For now, puppet-four is configured by default. Toggle option
-    # will be added later.
     with cd('forklift'):
+        # https://github.com/Katello/forklift/pull/369 removed setup.rb
+        # checkout right before until we'll know how to proceed the new way
+        run('git checkout -q 336783394283fd15bf6ef29aee5a24917f99dfad')
+        # For now, puppet-four is configured by default. Toggle option
+        # will be added later.
         run('./setup.rb --skip-installer {0}'.format(
             '--puppet-four' if puppet4 else ''))
 
