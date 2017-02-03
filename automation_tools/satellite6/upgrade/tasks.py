@@ -249,8 +249,8 @@ def wait_till_rhev_instance_status(instance_name, status, timeout=5):
     rhevm_client.disconnect()
 
 
-def create_rhevm_instance(instance_name, template_name,
-                          datacenter='Default', quota='admin', timeout=5):
+def create_rhevm_instance(instance_name, template_name, datacenter='Default',
+                          quota='admin', cluster='Default', timeout=5):
     """Creates rhevm Instance from template.
 
     The assigning template should have network and storage configuration saved
@@ -283,7 +283,7 @@ def create_rhevm_instance(instance_name, template_name,
     rhevm_client.vms.add(
         params.VM(
             name=instance_name,
-            cluster=rhevm_client.clusters.get('Default'),
+            cluster=rhevm_client.clusters.get(name=cluster),
             template=template, quota=quota))
     print('Waiting for instance to get up .....')
     if wait_till_rhev_instance_status(
@@ -292,6 +292,14 @@ def create_rhevm_instance(instance_name, template_name,
         if wait_till_rhev_instance_status(
                 instance_name, 'up', timeout=timeout):
             print('Instance {0} is now up !'.format(instance_name))
+            # We can fetch the Instance FQDN only if RHEV-agent is installed.
+            # Templates under SAT-QE datacenter includes RHEV-agents.
+            if rhevm_client.datacenters.get(name='SAT-QE'):
+                # get the hostname of instance
+                vm_fqdn = rhevm_client.vms.get(
+                    name=instance_name).get_guest_info().get_fqdn()
+                print('\t Instance FQDN : %s' % (vm_fqdn))
+                return vm_fqdn
     rhevm_client.disconnect()
 
 
