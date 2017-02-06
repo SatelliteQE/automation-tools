@@ -3,9 +3,82 @@
 Many commands are affected by environment variables. Unless stated otherwise,
 all environment variables are required.
 """
+import logging
+import os
 import subprocess
 import time
+
 from fabric.api import execute, run
+
+
+HIGHLIGHT_LEVEL_NUM = 25
+logging.addLevelName(HIGHLIGHT_LEVEL_NUM, 'HIGHLIGHT')
+
+
+class MyLogger(logging.Logger):
+    """New Logger class to add new logger level"""
+    def highlight(self, message, *args, **kws):
+        """New custom Logger level name highlight
+
+        Created to highlight the main events in logging
+        """
+        self.log(HIGHLIGHT_LEVEL_NUM, message, *args, **kws)
+
+
+class SingleLevelClassFilter(logging.Filter):
+    """New Logging level class filter"""
+    def __init__(self, level, reject):
+        """
+        :param int level: The level number to filter out
+        :param bool reject: Filters if set to False and doesnt filters if True
+        """
+        self.level = level
+        self.reject = reject
+
+    def filter(self, record):
+        if self.reject:
+            return (record.levelno != self.level)
+        else:
+            return (record.levelno == self.level)
+
+
+def logger():
+    """Logger to log messages to Console and to files
+
+    This logger creates two files:
+    full_upgrade: Contents all logging level logs
+    upgrade_highlights: Contents only Highlight logging level logs
+
+    These highlight level logs have been used as contents of Upgrade status
+    email sent via jenkins
+
+    :returns object log: Logger object to log different logging levels
+    """
+    logging.setLoggerClass(MyLogger)
+    log = logging.getLogger('upgrade_logging')
+    if not log.handlers:
+        # Log files
+        logfile_path = os.path.abspath('full_upgrade')
+        highlight_path = os.path.abspath('upgrade_highlights')
+        # Hamdlers
+        hdlr = logging.FileHandler(logfile_path)
+        hdlr2 = logging.FileHandler(highlight_path)
+        formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
+        hdlr.setFormatter(formatter)
+        ch = logging.StreamHandler()
+        # Filters
+        f1 = SingleLevelClassFilter(HIGHLIGHT_LEVEL_NUM, False)
+        hdlr2.addFilter(f1)
+        # Add Handlers
+        log.addHandler(hdlr)
+        log.addHandler(hdlr2)
+        log.addHandler(ch)
+        # Set Level
+        log.setLevel(logging.INFO)
+    return log
+
+
+log = logger()
 
 
 def reboot(halt_time=300):
@@ -16,7 +89,7 @@ def reboot(halt_time=300):
     :param int halt_time: Halt execution in seconds.
     """
     halt_time = halt_time
-    print('Rebooting the host, please wait .... ')
+    log.info('Rebooting the host, please wait .... ')
     try:
         run('reboot', warn_only=True)
     except:
@@ -76,12 +149,10 @@ def host_pings(host, timeout=15):
         output = command.communicate()[0]
         # Checking the return code of ping is 0
         if time.time() > timeup:
-            print('The timout for pinging the host {0} has reached!'.format(
-                host))
+            log.warning('The timout for pinging the host {0} has '
+                        'reached!'.format(host))
             return False
         if int(output.split()[-1]) == 0:
-            print('SUCCESS !! The given host {0} has been pinged!!'.format(
-                host))
             return True
         else:
             time.sleep(5)
@@ -99,11 +170,12 @@ def get_hostname_from_ip(ip, timeout=3):
     timeup = time.time() + int(timeout) * 60
     while True:
         if time.time() > timeup:
-            print('The timeout for getting the Hostname from IP has reached!')
+            log.warning(
+                'The timeout for getting the Hostname from IP has reached!')
             return False
         try:
             output = execute(lambda: run('hostname'), host=ip)
-            print('The hostname is: {0}'.format(output[ip]))
+            log.info('Hostname determined as: {0}'.format(output[ip]))
             break
         except:
             time.sleep(5)

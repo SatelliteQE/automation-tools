@@ -1,18 +1,23 @@
 import os
 import sys
-import time
 
 from automation_tools import set_yum_debug_level, setup_capsule_firewall
 from automation_tools.repository import enable_repos, disable_repos
 from automation_tools.satellite6.capsule import generate_capsule_certs
 from automation_tools.utils import distro_info, update_packages
+from datetime import datetime
 from fabric.api import env, execute, run
 from automation_tools.satellite6.upgrade.tasks import (
     create_rhevm_instance,
     delete_rhevm_instance,
     sync_capsule_repos_to_upgrade
 )
-from automation_tools.satellite6.upgrade.tools import copy_ssh_key, reboot
+from automation_tools.satellite6.upgrade.tools import (
+    copy_ssh_key, logger, reboot
+)
+
+
+logger = logger()
 
 
 def satellite6_capsule_setup(sat_host, os_version):
@@ -27,7 +32,7 @@ def satellite6_capsule_setup(sat_host, os_version):
     if os.environ.get('CAPSULE_HOSTNAMES'):
         cap_hosts = os.environ.get('CAPSULE_HOSTNAMES')
         if not os.environ.get('CAPSULE_AK'):
-            print('CAPSULE_AK environment variable is not defined !')
+            logger.warning('CAPSULE_AK environment variable is not defined !')
             sys.exit(1)
     # Else run upgrade on rhevm capsule
     else:
@@ -40,14 +45,14 @@ def satellite6_capsule_setup(sat_host, os_version):
             if var not in os.environ]
         # Check if image name and Hostname in jenkins are set
         if missing_vars:
-            print('The following environment variable(s) must be '
-                  'set: {0}.'.format(', '.join(missing_vars)))
+            logger.warning('The following environment variable(s) must be '
+                           'set: {0}.'.format(', '.join(missing_vars)))
             sys.exit(1)
         cap_image = os.environ.get('RHEV_CAP_IMAGE')
         cap_hosts = os.environ.get('RHEV_CAP_HOST')
         cap_instance = 'upgrade_capsule_auto_{0}'.format(os_version)
         execute(delete_rhevm_instance, cap_instance)
-        print('Turning on Capsule Instance ....')
+        logger.info('Turning on Capsule Instance ....')
         execute(create_rhevm_instance, cap_instance, cap_image)
         execute(lambda: run('katello-service restart'), host=cap_hosts)
     env['capsule_hosts'] = cap_hosts
@@ -57,6 +62,8 @@ def satellite6_capsule_setup(sat_host, os_version):
         cap_hosts = [cap_hosts]
     copy_ssh_key(sat_host, cap_hosts)
     execute(sync_capsule_repos_to_upgrade, cap_hosts, host=sat_host)
+    for cap_host in cap_hosts:
+        logger.info('Capsule {} is ready for Upgrade'.format(cap_host))
     return cap_hosts
 
 
@@ -79,6 +86,7 @@ def satellite6_capsule_upgrade(cap_host):
         e.g '6.1','6.2'
 
     """
+    logger.highlight('\n========== CAPSULE UPGRADE =================\n')
     sat_host = env.get('satellite_host')
     from_version = os.environ.get('FROM_VERSION')
     to_version = os.environ.get('TO_VERSION')
@@ -106,10 +114,12 @@ def satellite6_capsule_upgrade(cap_host):
         run('for i in qpidd pulp_workers pulp_celerybeat '
             'pulp_resource_manager httpd; do service $i stop; done')
     run('yum clean all', warn_only=True)
-    print('Wait till packages update ... ')
-    print('YUM UPDATE started at: {0}'.format(time.ctime()))
+    logger.info('Updating system and capsule packages ... ')
+    preyum_time = datetime.now().replace(microsecond=0)
     update_packages(quiet=False)
-    print('YUM UPDATE finished at: {0}'.format(time.ctime()))
+    postyum_time = datetime.now().replace(microsecond=0)
+    logger.highlight('Time taken for capsule packages update - {}'.format(
+        str(postyum_time-preyum_time)))
     if from_version == '6.0':
         run('yum install -y capsule-installer', warn_only=True)
         # Copy answer file from katello to capule installer
@@ -133,14 +143,16 @@ def satellite6_capsule_upgrade(cap_host):
             run('for i in qpidd pulp_workers pulp_celerybeat '
                 'pulp_resource_manager httpd; do service $i stop; done')
     setup_capsule_firewall()
-    print('CAPSULE UPGRADE started at: {0}'.format(time.ctime()))
+    preup_time = datetime.now().replace(microsecond=0)
     if to_version == '6.1':
         run('capsule-installer --upgrade --certs-tar '
             '/home/{0}-certs.tar'.format(cap_host))
     else:
         run('satellite-installer --scenario capsule --upgrade '
             '--certs-tar /home/{0}-certs.tar'.format(cap_host))
-    print('CAPSULE UPGRADE finished at: {0}'.format(time.ctime()))
+    postup_time = datetime.now().replace(microsecond=0)
+    logger.highlight('Time taken for Capsule Upgrade - {}'.format(
+        str(postup_time-preup_time)))
     run('katello-service status', warn_only=True)
 
 
@@ -154,11 +166,12 @@ def satellite6_capsule_zstream_upgrade():
     TO_VERSION
         Next satellite version to which satellite will be upgraded
     """
+    logger.highlight('\n========== CAPSULE UPGRADE =================\n')
     from_version = os.environ.get('FROM_VERSION')
     to_version = os.environ.get('TO_VERSION')
     if not from_version == to_version:
-        print ('Error! zStream Upgrade on Capsule cannot be performed as '
-               'FROM and TO versions are not same!')
+        logger.warning('zStream Upgrade on Capsule cannot be performed as '
+                       'FROM and TO versions are not same!')
         sys.exit(1)
     major_ver = distro_info()[1]
     set_yum_debug_level()
@@ -174,10 +187,12 @@ def satellite6_capsule_zstream_upgrade():
         run('for i in qpidd pulp_workers pulp_celerybeat '
             'pulp_resource_manager httpd; do service $i stop; done')
     run('yum clean all', warn_only=True)
-    print('Wait till packages update ... ')
-    print('YUM UPDATE started at: {0}'.format(time.ctime()))
+    logger.info('Updating system and capsule packages ... ')
+    preyum_time = datetime.now().replace(microsecond=0)
     update_packages(quiet=False)
-    print('YUM UPDATE finished at: {0}'.format(time.ctime()))
+    postyum_time = datetime.now().replace(microsecond=0)
+    logger.highlight('Time taken for capsule packages update - {}'.format(
+        str(postyum_time-preyum_time)))
     # Rebooting the system to see possible errors
     if os.environ.get('RHEV_CAP_HOST'):
         reboot(120)
@@ -186,12 +201,14 @@ def satellite6_capsule_zstream_upgrade():
             run('for i in qpidd pulp_workers pulp_celerybeat '
                 'pulp_resource_manager httpd; do service $i stop; done')
     setup_capsule_firewall()
-    print('CAPSULE UPGRADE started at: {0}'.format(time.ctime()))
+    preup_time = datetime.now().replace(microsecond=0)
     if to_version == '6.0':
         run('katello-installer --upgrade')
     elif to_version == '6.1':
         run('capsule-installer --upgrade')
     else:
         run('satellite-installer --scenario capsule --upgrade ')
-    print('CAPSULE UPGRADE finished at: {0}'.format(time.ctime()))
+    postup_time = datetime.now().replace(microsecond=0)
+    logger.highlight('Time taken for Capsule Upgrade - {}'.format(
+        str(postup_time-preup_time)))
     run('katello-service status', warn_only=True)

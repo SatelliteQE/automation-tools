@@ -23,14 +23,18 @@ from automation_tools.satellite6.upgrade.satellite import (
     satellite6_zstream_upgrade
 )
 from automation_tools.satellite6.upgrade.tasks import (
-    get_sat_version
+    get_sat_cap_version
 )
+from automation_tools.satellite6.upgrade.tools import logger
+from distutils.version import LooseVersion
 from fabric.api import execute
 
 
 # =============================================================================
 # Satellite, Capsule and Client Upgrade
 # =============================================================================
+
+logger = logger()
 
 
 def check_necessary_env_variables_for_upgrade(product):
@@ -40,7 +44,7 @@ def check_necessary_env_variables_for_upgrade(product):
     """
     failure = []
     # The upgrade product
-    products = ['satellite', 'capsule', 'client']
+    products = ['satellite', 'capsule', 'client', 'longrun']
     if product not in products:
         failure.append('Product name should be one of {0}.'.format(
             ', '.join(products)))
@@ -57,8 +61,9 @@ def check_necessary_env_variables_for_upgrade(product):
         failure.append('Please provide OS version as rhel7 or rhel6, '
                        'And retry !')
     if failure:
-        print('Warning !! Cannot Proceed Upgrade as:')
-        print('\n'.join(failure))
+        logger.warning('Cannot Proceed Upgrade as:')
+        for msg in failure:
+            logger.warning(msg)
         sys.exit(1)
     return True
 
@@ -71,10 +76,13 @@ def setup_products_for_upgrade(product, os_version):
         e.g: rhel6, rhel7
     """
     sat_host = cap_hosts = clients6 = clients7 = None
+    logger.info('Setting up Satellite ....')
     sat_host = satellite6_setup(os_version)
-    if product == 'capsule':
+    if product == 'capsule' or product == 'longrun':
+        logger.info('Setting up Capsule ....')
         cap_hosts = satellite6_capsule_setup(sat_host, os_version)
-    if product == 'client':
+    if product == 'client' or product == 'longrun':
+        logger.info('Setting up Clients ....')
         clients6, clients7 = satellite6_client_setup()
     return sat_host, cap_hosts, clients6, clients7
 
@@ -82,10 +90,11 @@ def setup_products_for_upgrade(product, os_version):
 def product_upgrade(product):
     """Task which upgrades the product.
 
-    Product is satellite or capsule or client.
+    Product is satellite or capsule or client or longrun.
     If product is satellite then upgrade only satellite
     If product is capsule then upgrade satellite and capsule
     If product is client then upgrade satellite and client
+    If product is longrun then upgrade satellite, capsule and client
 
     :param string product: product name wanted to upgrade.
 
@@ -164,30 +173,64 @@ def product_upgrade(product):
     if check_necessary_env_variables_for_upgrade(product):
         from_version = os.environ.get('FROM_VERSION')
         to_version = os.environ.get('TO_VERSION')
+        logger.info('Performing UPGRADE FROM {0} TO {1}'.format(
+            from_version, to_version))
         sat_host, cap_hosts, clients6, clients7 = setup_products_for_upgrade(
             product, os.environ.get('OS'))
         try:
             with LogAnalyzer(sat_host):
+                current = str(execute(
+                    get_sat_cap_version, 'sat', host=sat_host)[sat_host])
                 if from_version != to_version:
-                    current_version = execute(
-                        get_sat_version, host=sat_host)
-                    if not current_version == to_version:
-                        execute(satellite6_upgrade, host=sat_host)
+                    execute(satellite6_upgrade, host=sat_host)
                 else:
                     execute(satellite6_zstream_upgrade, host=sat_host)
+                upgraded = str(execute(
+                    get_sat_cap_version, 'sat', host=sat_host)[sat_host])
+                if LooseVersion(upgraded) > LooseVersion(current):
+                    logger.highlight(
+                        'The Satellite is upgraded from {0} to {1}'.format(
+                            current, upgraded))
+                else:
+                    logger.highlight(
+                        'The Satellite is NOT upgraded to next version. Now '
+                        'its {}'.format(upgraded))
                 # Generate foreman debug on satellite after upgrade
                 execute(foreman_debug, 'satellite_{}'.format(sat_host),
                         host=sat_host)
-                if product == 'capsule':
+                if product == 'capsule' or product == 'longrun':
                     for cap_host in cap_hosts:
                         try:
                             with LogAnalyzer(cap_host):
+                                current = str(execute(
+                                    get_sat_cap_version, 'cap', host=cap_host
+                                    )[cap_host])
                                 if from_version != to_version:
                                     execute(satellite6_capsule_upgrade,
                                             cap_host, host=cap_host)
                                 elif from_version == to_version:
                                     execute(satellite6_capsule_zstream_upgrade,
                                             host=cap_host)
+                                upgraded = str(execute(
+                                    get_sat_cap_version, 'cap', host=cap_host
+                                    )[cap_host])
+                                if current:
+                                    if LooseVersion(upgraded) > LooseVersion(
+                                            current):
+                                        logger.highlight(
+                                            'The Capsule is upgraded from {0} '
+                                            'to {1}.'.format(current, upgraded)
+                                        )
+                                    else:
+                                        logger.highlight(
+                                            'The Capsule is NOT upgraded to '
+                                            'next version. Now its {}'.format(
+                                                upgraded))
+                                else:
+                                    logger.hightlight(
+                                        'Unable to fetch previous version but '
+                                        'after upgrade capsule is {}.'.format(
+                                            upgraded))
                                 # Generate foreman debug on capsule postupgrade
                                 execute(
                                     foreman_debug,
@@ -199,7 +242,7 @@ def product_upgrade(product):
                                 foreman_debug, 'capsule_{}'.format(cap_host),
                                 host=cap_host)
                             raise
-                if product == 'client':
+                if product == 'client' or product == 'longrun':
                     satellite6_client_upgrade('rhel6', clients6)
                     satellite6_client_upgrade('rhel7', clients7)
         except Exception:

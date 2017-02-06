@@ -26,12 +26,19 @@ from automation_tools.satellite6.hammer import (
     set_hammer_config
 )
 from automation_tools.bz import bz_bug_is_open
+from automation_tools.satellite6.upgrade.tools import (
+    get_hostname_from_ip,
+    host_pings,
+    logger
+)
 from fabric.api import env, execute, run
 from novaclient.client import Client
 from ovirtsdk.api import API
 from ovirtsdk.xml import params
 from ovirtsdk.infrastructure import errors
-from tools import get_hostname_from_ip, host_pings
+
+
+logger = logger()
 
 
 def get_rhevm_client():
@@ -48,13 +55,14 @@ def get_rhevm_client():
     """
     username = os.environ.get('RHEV_USER')
     if username is None:
-        print('The RHEV_USER environment variable should be defined.')
+        logger.warning('The RHEV_USER environment variable should be defined.')
     password = os.environ.get('RHEV_PASSWD')
     if password is None:
-        print('The RHEV_PASSWD environment variable should be defined.')
+        logger.warning(
+            'The RHEV_PASSWD environment variable should be defined.')
     api_url = os.environ.get('RHEV_URL')
     if api_url is None:
-        print('An RHEV_URL environment variable should be defined.')
+        logger.warning('An RHEV_URL environment variable should be defined.')
     try:
         return API(
             url=api_url,
@@ -63,7 +71,7 @@ def get_rhevm_client():
             insecure=True
         )
     except errors.RequestError:
-        print('ERROR ! Invalid Credentials provided for RHEVM.')
+        logger.warning('Invalid Credentials provided for RHEVM.')
         sys.exit(1)
 
 
@@ -85,16 +93,16 @@ def get_openstack_client():
     """
     username = os.environ.get('USERNAME')
     if username is None:
-        print('The USERNAME environment variable should be defined.')
+        logger.warning('The USERNAME environment variable should be defined')
     password = os.environ.get('PASSWORD')
     if password is None:
-        print('The PASSWORD environment variable should be defined.')
+        logger.warning('The PASSWORD environment variable should be defined')
     auth_url = os.environ.get('AUTH_URL')
     if auth_url is None:
-        print('The AUTH_URL environment variable should be defined.')
+        logger.warning('The AUTH_URL environment variable should be defined')
     project_id = os.environ.get('PROJECT_ID')
     if project_id is None:
-        print('The PROJECT_ID environment variable should be defined.')
+        logger.warning('The PROJECT_ID environment variable should be defined')
     with Client(
         version=2,
         username=username,
@@ -147,7 +155,7 @@ def create_openstack_instance(
         openstack_client.floating_ip_pools.list()[0].name
     )
     # Create instance from the given parameters
-    print('Creating new Openstack instance {0}'.format(instance_name))
+    logger.info('Creating new Openstack instance {0}'.format(instance_name))
     instance = openstack_client.servers.create(
         name=instance_name,
         image=image.id,
@@ -159,31 +167,31 @@ def create_openstack_instance(
     timeup = time.time() + int(timeout) * 60
     while True:
         if time.time() > timeup:
-            print('The timeout for assigning the floating IP has reached!')
+            logger.warning(
+                'The timeout for assigning the floating IP has reached!')
             sys.exit(1)
         try:
             instance.add_floating_ip(floating_ip)
-            print('SUCCESS!! The floating IP {0} has been assigned '
-                  'to instance!'.format(floating_ip.ip))
+            logger.info('SUCCESS!! The floating IP {0} has been assigned '
+                        'to instance!'.format(floating_ip.ip))
             break
         except novaclient.exceptions.BadRequest:
             time.sleep(5)
     # Wait till DNS resolves the IP
-    print('Pinging the Host by IP:{0} ..........'.format(floating_ip.ip))
+    logger.info('Pinging the Host by IP:{0} ..........'.format(floating_ip.ip))
     host_pings(str(floating_ip.ip))
-    print('SUCCESS !! The given IP has been pinged!!\n')
-    print('Now, Getting the hostname from IP......\n')
+    logger.info('SUCCESS !! The given IP has been pinged!!\n')
+    logger.info('Now, Getting the hostname from IP......\n')
     hostname = get_hostname_from_ip(str(floating_ip.ip))
     if not hostname:
         sys.exit(1)
     env['{0}_host'.format(product)] = hostname
-    print('Pinging the Hostname:{0} ..........'.format(hostname))
+    logger.info('Pinging the Hostname:{0} ..........'.format(hostname))
     host_pings(hostname)
-    print('SUCCESS !! The obtained hostname from IP is pinged !!')
+    logger.info('SUCCESS !! The obtained hostname from IP is pinged !!')
     # Update the /etc/hosts file
     execute(lambda: run("echo {0} {1} >> /etc/hosts".format(
         floating_ip.ip, hostname)), host=hostname)
-    print('The Instance is ready for further Testing .....!!')
 
 
 def delete_openstack_instance(instance_name):
@@ -207,14 +215,13 @@ def delete_openstack_instance(instance_name):
     try:
         instance = openstack_client.servers.find(name=instance_name)
     except novaclient.exceptions.NotFound:
-        print('Instance {0} not found in Openstack project.'.format(
+        logger.error('Instance {0} not found in Openstack project.'.format(
             instance_name
         ))
         return
     instance.delete()
-    print('The instance {0} has been deleted from Openstack.'.format(
-        instance_name
-    ))
+    logger.info('Success! The instance {0} has been deleted from '
+                'Openstack.'.format(instance_name))
 
 
 def wait_till_rhev_instance_status(instance_name, status, timeout=5):
@@ -239,11 +246,12 @@ def wait_till_rhev_instance_status(instance_name, status, timeout=5):
     timeup = time.time() + int(timeout) * 60
     while True:
         if time.time() > timeup:
-            print('Timeout in turning VM instance {0} ...!'.format(status))
+            logger.warning(
+                'Timeout in turning VM instance {0}.'.format(status))
             sys.exit(1)
         vm_status = rhevm_client.vms.get(
             name=instance_name).get_status().get_state()
-        print('Current Status: {0}'.format(vm_status))
+        logger.info('Current Status: {0}'.format(vm_status))
         if vm_status == status:
             return True
         time.sleep(5)
@@ -279,33 +287,32 @@ def create_rhevm_instance(instance_name, template_name, datacenter='Default',
     template = rhevm_client.templates.get(name=template_name)
     datacenter = rhevm_client.datacenters.get(name=datacenter)
     quota = datacenter.quotas.get(name=quota)
-    print('Turning on instance {0} from template {1}. Please wait '
-          'till get up ...'.format(instance_name, template_name))
+    logger.info('Turning on instance {0} from template {1}. Please wait '
+                'till get up ...'.format(instance_name, template_name))
     rhevm_client.vms.add(
         params.VM(
             name=instance_name,
             cluster=rhevm_client.clusters.get(name=cluster),
             template=template, quota=quota))
-    print('Waiting for instance to get up .....')
     if wait_till_rhev_instance_status(
             instance_name, 'down', timeout=timeout):
         rhevm_client.vms.get(name=instance_name).start()
         if wait_till_rhev_instance_status(
                 instance_name, 'up', timeout=timeout):
-            print('Instance {0} is now up !'.format(instance_name))
+            logger.info('Instance {0} is now up !'.format(instance_name))
             # We can fetch the Instance FQDN only if RHEV-agent is installed.
             # Templates under SAT-QE datacenter includes RHEV-agents.
             if rhevm_client.datacenters.get(name='SAT-QE'):
                 # get the hostname of instance
                 vm_fqdn = rhevm_client.vms.get(
                     name=instance_name).get_guest_info().get_fqdn()
-                print('\t Instance FQDN : %s' % (vm_fqdn))
+                logger.info('\t Instance FQDN : %s' % (vm_fqdn))
                 # We need value of vm_fqdn so that we can use it with CI
                 # For now, we are exporting it as a variable value
                 # and source it to use via shell script
                 file_path = "/tmp/rhev_instance.txt"
-                with open(file_path, 'w') as file:
-                    file.write('export SAT_INSTANCE_FQDN={0}'.format(vm_fqdn))
+                with open(file_path, 'w') as f1:
+                    f1.write('export SAT_INSTANCE_FQDN={0}'.format(vm_fqdn))
     rhevm_client.disconnect()
 
 
@@ -328,10 +335,10 @@ def delete_rhevm_instance(instance_name, timeout=5):
     rhevm_client = get_rhevm_client()
     vm = rhevm_client.vms.list(query='name={0}'.format(instance_name))
     if not vm:
-        print('The instance {0} is not found '
-              'in RHEV to delete!'.format(instance_name))
+        logger.info('The instance {0} is not found '
+                    'in RHEV to delete!'.format(instance_name))
     else:
-        print('Deleting instance {0} from RHEVM.....'.format(instance_name))
+        logger.info('Deleting instance {0} from RHEVM.'.format(instance_name))
         if rhevm_client.vms.get(
                 name=instance_name).get_status().get_state() == 'up':
             rhevm_client.vms.get(name=instance_name).shutdown()
@@ -343,11 +350,12 @@ def delete_rhevm_instance(instance_name, timeout=5):
         timeup = time.time() + int(timeout) * 60
         while True:
             if time.time() > timeup:
-                print('The timeout for deleting RHEVM instance has reached!')
+                logger.warning(
+                    'The timeout for deleting RHEVM instance has reached!')
                 sys.exit(1)
             vm = rhevm_client.vms.list(query='name={0}'.format(instance_name))
             if not vm:
-                print('Instance {0} is now deleted from RHEVM!'.format(
+                logger.info('Instance {0} is now deleted from RHEVM!'.format(
                     instance_name))
                 break
     rhevm_client.disconnect()
@@ -400,6 +408,7 @@ def sync_capsule_repos_to_upgrade(capsules):
     RHEV_CAPSULE_AK
         The AK name used in capsule subscription
     """
+    logger.info('Syncing latest capsule repos in Satellite ...')
     capsule_repo = os.environ.get('CAPSULE_URL')
     from_version = os.environ.get('FROM_VERSION')
     to_version = os.environ.get('TO_VERSION')
@@ -407,8 +416,8 @@ def sync_capsule_repos_to_upgrade(capsules):
     activation_key = os.environ.get(
         'CAPSULE_AK', os.environ.get('RHEV_CAPSULE_AK'))
     if activation_key is None:
-        print('Error! The AK name is not provided for Capsule upgrade! '
-              'Aborting...')
+        logger.warning(
+            'The AK name is not provided for Capsule upgrade! Aborting...')
         sys.exit(1)
     # Set hammer configuration
     set_hammer_config()
@@ -428,8 +437,9 @@ def sync_capsule_repos_to_upgrade(capsules):
             get_attribute_value(hammer(
                 'product list --organization-id 1'), product_name, 'name')
             # If keyError is not thrown as if the product is created already
-            print 'The product for latest Capsule repo is aready created!'
-            print 'Attaching that product subscription to capsule ....'
+            logger.info(
+                'The product for latest Capsule repo is already created!')
+            logger.info('Attaching that product subscription to capsule ....')
         else:
             # In case of CDN Upgrade, the capsule repo has to be resynced
             # and needs to publich/promote those contents
@@ -508,7 +518,8 @@ def generate_satellite_docker_clients_on_rhevm(client_os, clients_count):
         The AK using which client will be registered to satellite
     """
     if int(clients_count) == 0:
-        print('Clients count to generate on Docker cannot be Zero !!')
+        logger.warning(
+            'Clients count to generate on Docker should be atleast 1 !')
         sys.exit(1)
     satellite_hostname = os.environ.get('RHEV_SAT_HOST')
     ak = os.environ.get('RHEV_CLIENT_AK_{}'.format(client_os.upper()))
@@ -571,16 +582,16 @@ def sync_tools_repos_to_upgrade(client_os, hosts):
     client_os = client_os.upper()
     tools_repo_url = os.environ.get('TOOLS_URL_{}'.format(client_os))
     if tools_repo_url is None:
-        print('The Tools Repo URL for {} is not provided '
-              'to perform Client Upgrade !'.format(client_os))
+        logger.warning('The Tools Repo URL for {} is not provided '
+                       'to perform Client Upgrade !'.format(client_os))
         sys.exit(1)
     activation_key = os.environ.get(
         'CLIENT_AK_{}'.format(client_os),
         os.environ.get('RHEV_CLIENT_AK_{}'.format(client_os))
     )
     if activation_key is None:
-        print('Error! The AK details are not provided for {0} Client '
-              'upgrade!'.format(client_os))
+        logger.warning('The AK details are not provided for {0} Client '
+                       'upgrade!'.format(client_os))
         sys.exit(1)
     # Set hammer configuration
     set_hammer_config()
@@ -650,9 +661,6 @@ def remove_all_docker_containers(only_running=True):
             '' if only_running else 'a'))) > 0:
         run('docker rm $(docker ps -q{}) -f'.format(
             '' if only_running else 'a'))
-    else:
-        print('{} docker containers are not present to delete.'.format(
-            'Running' if only_running else ''))
 
 
 def docker_execute_command(container_id, command, quiet=False):
@@ -660,49 +668,57 @@ def docker_execute_command(container_id, command, quiet=False):
 
     :param string container_id: Running containers id to execute command
     :param string command: Command to run on running container
+    :returns command output
     """
     if not isinstance(quiet, bool):
         if quiet.lower() == 'false':
             quiet = False
         elif quiet.lower() == 'true':
             quiet = True
-    run('docker exec {0} {1}'.format(container_id, command), quiet=quiet)
+    return run(
+        'docker exec {0} {1}'.format(container_id, command), quiet=quiet)
 
 
-def _extract_sat_version(command):
-    """Extracts Satellite version
+def _extract_sat_cap_version(command):
+    """Extracts Satellite and Capsule version
 
-    :param string command: The command to run on Satellite that returns version
-    :return string: Satellite version
+    :param string command: The command to run on Satellite and Capsule that
+    returns installed version
+    :return string: Satellite/Capsule version
     """
-    cmd_result = run(command, quiet=True)
-    version_re = (
-        r'[^\d]*(?P<version>\d(\.\d){1})'
-    )
-    result = re.search(version_re, cmd_result)
-    if result:
-        sat_version = result.group('version')
-        return sat_version, cmd_result
-    else:
-        return 'Unavailable', cmd_result
+    if command:
+        cmd_result = run(command, quiet=True)
+        version_re = (
+            r'[^\d]*(?P<version>\d(\.\d\.*\d*){1})'
+        )
+        result = re.search(version_re, cmd_result)
+        if result:
+            version = result.group('version')
+            return version, cmd_result
+    return 'Unavailable', cmd_result
 
 
-def get_sat_version():
-    """Determines and returns the installed Satellite version on system
+def get_sat_cap_version(product):
+    """Determines and returns the installed Satellite/Capsule version on system
 
-    :return string: Satellite version
+    :param string product: The product name as satellite/capsule
+    :return string: Satellite/Capsule version
     """
-    _SAT_6_2_VERSION_COMMAND = u'rpm -q satellite'
-    _SAT_LT_6_2_VERSION_COMMAND = (
-        u'grep "VERSION" /usr/share/foreman/lib/satellite/version.rb'
-    )
+    if 'sat' in product.lower():
+        _6_2_VERSION_COMMAND = u'rpm -q satellite'
+        _LT_6_2_VERSION_COMMAND = (
+            u'grep "VERSION" /usr/share/foreman/lib/satellite/version.rb'
+        )
+    if 'cap' in product.lower():
+        _6_2_VERSION_COMMAND = u'rpm -q satellite-capsule'
+        _LT_6_2_VERSION_COMMAND = 'None'
     results = (
-        _extract_sat_version(cmd) for cmd in
-        (_SAT_6_2_VERSION_COMMAND, _SAT_LT_6_2_VERSION_COMMAND)
+        _extract_sat_cap_version(cmd) for cmd in
+        (_6_2_VERSION_COMMAND, _LT_6_2_VERSION_COMMAND)
     )
     for version, cmd_result in results:
         if version != 'Unavailable':
             return version
-    print 'ERROR! The Satellite version is not detected due to:\n{}'.format(
+    logger.error('Error in detecting installed version due to:\n{}'.format(
         cmd_result
-    )
+    ))
