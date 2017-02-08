@@ -175,11 +175,20 @@ def setup_ddns(entry_domain, host_ip):
     target, domain = entry_domain.split('.', 1)
 
     run('yum localinstall -y {0}'.format(ddns_package_url))
-    run('echo "{0} {1} {2}" >> /etc/redhat-ddns/hosts'.format(
-        target, domain, ddns_hash))
-    fix_hostname(entry_domain, host_ip)
-    run('redhat-ddns-client enable')
-    run('redhat-ddns-client')
+
+    os_version = distro_info()[1]
+    if os_version >= 7:
+        run('echo "{0} {1} {2}" >> /etc/redhat-internal-ddns/hosts'.format(
+            target, domain, ddns_hash))
+        fix_hostname(entry_domain, host_ip)
+        run('redhat-internal-ddns-client.sh enable')
+        run('redhat-internal-ddns-client.sh update')
+    else:
+        run('echo "{0} {1} {2}" >> /etc/redhat-ddns/hosts'.format(
+            target, domain, ddns_hash))
+        fix_hostname(entry_domain, host_ip)
+        run('redhat-ddns-client enable')
+        run('redhat-ddns-client')
 
 
 def setup_proxy(run_katello_installer=True):
@@ -802,6 +811,8 @@ def vm_create():
         Now Sat6 VM can use isolated VLAN Bridge with static Ip address if
         available, otherwise uses the bridge br0 which provides a dhcp IP
         address from corporate network.
+    BRIDGE2
+        Specify another bridge to second NIC for the provisioned VM.
     IPADDR
         The static IP address from the VLAN which needs to be provided when
         using VLAN Bridge.
@@ -834,6 +845,7 @@ def vm_create():
         'image_dir': os.environ.get('IMAGE_DIR'),
         'cpu_feature': os.environ.get('CPU_FEATURE'),
         'bridge': os.environ.get('BRIDGE'),
+        'bridge2': os.environ.get('BRIDGE2'),
         'ip_addr': os.environ.get('IPADDR'),
         'netmask': os.environ.get('NETMASK'),
         'gateway': os.environ.get('GATEWAY'),
@@ -861,6 +873,9 @@ def vm_create():
         command_args.append('-n bridge={bridge}')
     else:
         command_args.append('-n bridge=br0')
+
+    if options['bridge2'] is not None:
+        command_args.append('--network2 bridge={bridge2}')
 
     if options['ip_addr'] is not None:
         command_args.append('--static-ipaddr {ip_addr}')
@@ -895,6 +910,18 @@ def vm_create():
             entry_domain=env['vm_domain'],
             host_ip=env['vm_ip'],
             host=env['vm_ip'],
+        )
+
+    # Execute setup_ddns only if not using VLAN Bridges.
+    if (
+        os.environ.get('BRIDGE') is None and
+        'DDNS_HASH' in os.environ and 'DDNS_PACKAGE_URL' in os.environ
+    ):
+        execute(
+            setup_ddns,
+            env['vm_domain'],
+            env['vm_ip'],
+            host=env['vm_ip']
         )
 
 
@@ -1695,16 +1722,6 @@ def product_install(distribution, create_vm=False, certificate_url=None,
 
         execute(vm_destroy, target_image, delete_image=True)
         execute(vm_create)
-
-        # Execute setup_ddns only if not using VLAN Bridges.
-        if os.environ.get('BRIDGE') is None:
-            if 'DDNS_HASH' in os.environ or 'DDNS_PACKAGE_URL' in os.environ:
-                execute(
-                    setup_ddns,
-                    env['vm_domain'],
-                    env['vm_ip'],
-                    host=env['vm_ip']
-                )
 
     # When creating a vm the vm_ip will be set, otherwise use the fabric host
     host = env.get('vm_ip', env['host'])
