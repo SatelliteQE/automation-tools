@@ -2347,9 +2347,10 @@ def setup_alternate_capsule_ports(port_range='9400-14999'):
 
     :param port_range: these ports will be added under websm_port_t type.
     """
-    # ncat (opposite to nc) supports -c option we use for capsule faking
-    nc_rpm = 'nmap' if distro_info()[1] < 7 else 'nmap-ncat'
-    run('which ncat || yum -d1 -y install {0}'.format(nc_rpm), warn_only=True)
+    # nmap is used by checks for open port during capsule faking
+    # nmap's ncat (opposite to nc) supports -c option we use for capsule faking
+    # and rhel7 has separate package for ncat named nmap-ncat
+    run('which nmap || yum -d1 -y install nmap', warn_only=True)
     # labelling custom port range so that passenger will be allowed to connect
     run('semanage port -a -t websm_port_t -p tcp {0}'
         .format(port_range), warn_only=True)
