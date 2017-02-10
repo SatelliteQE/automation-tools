@@ -114,6 +114,7 @@ def satellite6_client_setup():
         # First delete if any containers running
         execute(
             remove_all_docker_containers, only_running=False, host=docker_vm)
+        time.sleep(5)
         # Generate Clients on RHEL 7 and RHEL 6
         clients6 = execute(
             generate_satellite_docker_clients_on_rhevm,
@@ -132,6 +133,7 @@ def satellite6_client_setup():
             os.environ.get('TOOLS_URL_RHEL6'),
             os.environ.get('TOOLS_URL_RHEL7')
         ]):
+            time.sleep(10)
             vers = ['6.0', '6.1']
             print ('Syncing Tools repos of rhel7 in Satellite:')
             execute(
@@ -142,6 +144,7 @@ def satellite6_client_setup():
                 clients7.values() if from_version in vers else clients7.keys(),
                 host=sat_host
             )
+            time.sleep(10)
             print ('Syncing Tools repos of rhel6 in Satellite:')
             execute(
                 sync_tools_repos_to_upgrade,
@@ -152,10 +155,12 @@ def satellite6_client_setup():
                 host=sat_host
             )
         # Refresh subscriptions on clients
+        time.sleep(5)
         execute(
             refresh_subscriptions_on_docker_clients,
             clients6.values(),
             host=docker_vm)
+        time.sleep(5)
         execute(
             refresh_subscriptions_on_docker_clients,
             clients7.values(),
