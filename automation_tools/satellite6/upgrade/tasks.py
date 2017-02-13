@@ -300,7 +300,12 @@ def create_rhevm_instance(instance_name, template_name, datacenter='Default',
                 vm_fqdn = rhevm_client.vms.get(
                     name=instance_name).get_guest_info().get_fqdn()
                 print('\t Instance FQDN : %s' % (vm_fqdn))
-                return vm_fqdn
+                # We need value of vm_fqdn so that we can use it with CI
+                # For now, we are exporting it as a variable value
+                # and source it to use via shell script
+                file_path = "/tmp/rhev_instance.txt"
+                with open(file_path, 'w') as file:
+                    file.write('export SAT_INSTANCE_FQDN={0}'.format(vm_fqdn))
     rhevm_client.disconnect()
 
 
