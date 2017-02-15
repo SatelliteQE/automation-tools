@@ -1078,6 +1078,109 @@ def install_puppet4(puppet4_repo=None):
         run('/opt/puppetlabs/bin/puppet module install puppetlabs-strings')
 
 
+def cleanup_idm(hostname, idm_password=None):
+    """Clean up the IDM server of any previous entries.
+
+    Expects the following environment variables:
+
+    IDM_PASSWORD
+        IDM Server Password to fetch a token.
+
+    """
+    if idm_password is None:
+        idm_password = os.environ.get('IDM_PASSWORD')
+    if hostname is None:
+        print('Please provide the hostname entry to delete.')
+        sys.exit(1)
+    run('echo {0} | kinit admin'.format(idm_password))
+    run('ipa host-del {0}'.format(hostname), warn_only=True)
+
+
+def enroll_idm(idm_password=None):
+    """Enroll the Satellite6 Server to an IDM Server.
+
+    Expects the following environment variables:
+
+    IDM_PASSWORD
+        IDM Server Password to fetch a token.
+
+    """
+    # NOTE: Works only when Satellite6 and IDM domains are same and the
+    # first nameserver in /etc/resolv.conf file points to the IDM server.
+    if idm_password is None:
+        idm_password = os.environ.get('IDM_PASSWORD')
+    run('yum install -y ipa-client ipa-admintools')
+    run('ipa-client-install --password={0} --principal admin '
+        '--unattended --no-ntp'.format(idm_password))
+    result = run('id realm-proxy')
+    if result.succeeded:
+        print('Enrollment of Satellite6 Server is successfully completed.')
+
+
+def configure_idm_external_auth(idm_password=None):
+    """Configure the Satellite6 Server for External Authentication.
+
+    Expects the following environment variables:
+
+    IDM_PASSWORD
+        IDM Server Password to fetch a token.
+
+    """
+    result = run('id realm-proxy')
+    if result.failed:
+        print('Please execute enroll_idm before configuring External Auth')
+        sys.exit(1)
+    if idm_password is None:
+        idm_password = os.environ.get('IDM_PASSWORD')
+    run('echo {0} | kinit admin'.format(idm_password))
+    run('ipa service-add HTTP/$(hostname)')
+    run('satellite-installer --foreman-ipa-authentication=true')
+    run('katello-service restart')
+
+
+def configure_realm(admin_password=None, keytab_url=None, realm=None,
+                    idm_server_ip=None):
+    """Configure the Satellite6 Server for REALM Integration
+
+    Expects the following environment variables:
+
+    IDM_SERVER_IP
+        IP Address of the IDM Server.
+    VM_DOMAIN
+        The domain name of the IDM Server.
+    KEYTAB_URL
+        The URL from which to fetch the Keytab file.
+    ADMIN_PASSWORD
+        The admin password for Satellite 6.
+
+    """
+    if idm_server_ip is None:
+        idm_server_ip = os.environ.get('IDM_SERVER_IP')
+    domain = os.environ.get('VM_DOMAIN')
+    result = run('id realm-proxy')
+    if result.failed:
+        print('Please execute enroll_idm before configuring External Auth')
+        sys.exit(1)
+    if keytab_url is None:
+        keytab_url = os.environ.get('KEYTAB_URL')
+    if admin_password is None:
+        admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme')
+    if realm is None:
+        realm = domain.upper()
+    run('yum install -y wget')
+    run('wget -O /root/freeipa.keytab {0}'.format(keytab_url))
+    run('mv /root/freeipa.keytab /etc/foreman-proxy')
+    run('chown foreman-proxy:foreman-proxy /etc/foreman-proxy/freeipa.keytab')
+    run('satellite-installer --foreman-proxy-realm true '
+        '--foreman-proxy-realm-principal realm-proxy@{0} '
+        '--foreman-proxy-dhcp-nameservers {1}'.format(realm, idm_server_ip))
+    run('cp /etc/ipa/ca.crt /etc/pki/ca-trust/source/anchors/ipa.crt')
+    run('update-ca-trust enable ; update-ca-trust')
+    run('service foreman-proxy restart')
+    run('hammer -u admin -p {0} domain update --id 1 --dns-id ""'
+        .format(admin_password))
+
+
 def upstream_install(admin_password=None, run_katello_installer=True,
                      puppet4=True):
     """Task to install Foreman nightly using forklift scripts"""
@@ -1594,6 +1697,23 @@ def product_install(distribution, create_vm=False, certificate_url=None,
             sat_version=satellite_version,
             host=host
         )
+    if (
+        os.environ.get('IDM_EXTERNAL_AUTH') == 'true' or
+        os.environ.get('IDM_REALM') == 'true'
+    ):
+        sat6_hostname = os.environ.get('SERVER_HOSTNAME')
+        idm_server_ip = os.environ.get('IDM_SERVER_IP')
+        execute(
+            cleanup_idm,
+            hostname=sat6_hostname,
+            host=idm_server_ip,
+            warn_only=True
+        )
+        execute(enroll_idm, host=host)
+    if os.environ.get('IDM_EXTERNAL_AUTH') == 'true':
+        execute(configure_idm_external_auth, host=host)
+    if os.environ.get('IDM_REALM') == 'true':
+        execute(configure_realm, host=host)
 
 
 def fix_qdrouterd_listen_to_ipv6():
