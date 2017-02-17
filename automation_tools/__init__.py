@@ -1112,9 +1112,10 @@ def enroll_idm(idm_password=None):
     run('yum install -y ipa-client ipa-admintools')
     run('ipa-client-install --password={0} --principal admin '
         '--unattended --no-ntp'.format(idm_password))
-    result = run('id realm-proxy')
+    result = run('id admin')
     if result.succeeded:
-        print('Enrollment of Satellite6 Server is successfully completed.')
+        print('Enrollment of Satellite6 Server to IDM is successfully '
+              'completed.')
 
 
 def configure_idm_external_auth(idm_password=None):
@@ -1126,7 +1127,7 @@ def configure_idm_external_auth(idm_password=None):
         IDM Server Password to fetch a token.
 
     """
-    result = run('id realm-proxy')
+    result = run('id admin')
     if result.failed:
         print('Please execute enroll_idm before configuring External Auth')
         sys.exit(1)
@@ -1134,8 +1135,111 @@ def configure_idm_external_auth(idm_password=None):
         idm_password = os.environ.get('IDM_PASSWORD')
     run('echo {0} | kinit admin'.format(idm_password))
     run('ipa service-add HTTP/$(hostname)')
-    run('satellite-installer --foreman-ipa-authentication=true')
+    if os.environ.get('SATELLITE_VERSION') == '6.1':
+        run('katello-installer --foreman-ipa-authentication=true')
+    else:
+        run('satellite-installer --foreman-ipa-authentication=true')
     run('katello-service restart')
+
+
+def enroll_ad(ad_passwd=None, ad_server_ip=None, realm=None):
+    """Enroll the Satellite6 Server to an AD Server.
+
+    Expects the following environment variables:
+
+    AD_PASSWORD
+        AD Server Password to fetch a token.
+    VM_DOMAIN
+        The domain name of the AD Server.
+    AD_SERVER_IP
+        The AD Server's IP address.
+
+    """
+    # NOTE: Works only when Satellite6 and Windows AD Server domains are
+    # same and the first nameserver in /etc/resolv.conf file points to the
+    # AD server.
+    if realm is None:
+        domain = os.environ.get('VM_DOMAIN')
+        realm = domain.upper()
+    if ad_passwd is None:
+        ad_passwd = os.environ.get('AD_PASSWORD')
+    if ad_server_ip is None:
+        ad_server_ip = os.environ.get('AD_SERVER_IP')
+    run('yum install -y gssproxy nfs-utils')
+    run('yum install -y sssd adcli realmd ipa-python samba-common-tools')
+    run('chattr -i /etc/resolv.conf')
+    run('sed -i \'0,/nameserver/{{s/nameserver.*/nameserver {0}/}}\' '
+        '/etc/resolv.conf'.format(ad_server_ip))
+    run('katello-service restart')
+    run('echo {0} | realm join -v {1}'
+        .format(ad_passwd, realm))
+    run('realm list')
+    result = run('id administrator@{0}'.format(realm))
+    if result.succeeded:
+        print('Enrollment of Satellite6 Server to AD is successfully '
+              'completed.')
+
+
+def configure_ad_external_auth(ad_passwd=None, realm=None):
+    """Configure the Satellite6 Server for AD External Authentication.
+
+    Expects the following environment variables:
+
+    AD_PASSWORD
+        AD Server Password to fetch a token.
+    VM_DOMAIN
+        The domain name of the AD Server.
+
+    """
+    if realm is None:
+        domain = os.environ.get('VM_DOMAIN')
+        realm = domain.upper()
+        workgroup = realm.split('.')[0]
+    result = run('id administrator@{0}'.format(realm))
+    if result.failed:
+        print('Please execute enroll_ad before configuring External Auth')
+        sys.exit(1)
+    if ad_passwd is None:
+        ad_passwd = os.environ.get('AD_PASSWORD')
+    run('yum install -y krb5-workstation')
+    run('echo {0} | kinit administrator@{1}'.format(ad_passwd, realm))
+    run('mkdir -p /etc/ipa/')
+    ipa_default = StringIO()
+    ipa_default.write('[global]\n')
+    ipa_default.write('server = unused\n')
+    ipa_default.write('realm = {0}\n'.format(realm))
+    put(local_path=ipa_default,
+        remote_path='/etc/ipa/default.conf')
+    ipa_default.close()
+    net_keytab = StringIO()
+    net_keytab.write('[global]\n')
+    net_keytab.write('workgroup = {0}\n'.format(workgroup))
+    net_keytab.write('realm = {0}\n'.format(realm))
+    net_keytab.write('kerberos method = system keytab\n')
+    net_keytab.write('security = ads\n')
+    put(local_path=net_keytab,
+        remote_path='/etc/net-keytab.conf')
+    net_keytab.close()
+    run('echo {0} | KRB5_KTNAME=FILE:/etc/gssproxy/http.keytab '
+        'net ads keytab add HTTP -U administrator -d3 -s /etc/net-keytab.conf'
+        .format(ad_passwd))
+    run('chown root:root /etc/gssproxy/http.keytab')
+    run('touch /etc/httpd/conf/http.keytab')
+    if os.environ.get('SATELLITE_VERSION') == '6.1':
+        run('katello-installer --foreman-ipa-authentication=true')
+    else:
+        run('satellite-installer --foreman-ipa-authentication=true')
+    run('systemctl restart gssproxy.service')
+    run('systemctl enable gssproxy.service')
+    httpd_service = StringIO()
+    httpd_service.write('.include /lib/systemd/system/httpd.service\n')
+    httpd_service.write('[Service]\n')
+    httpd_service.write('Environment=GSS_USE_PROXY=1\n')
+    put(local_path=httpd_service,
+        remote_path='/etc/systemd/system/httpd.service')
+    httpd_service.close()
+    run('systemctl daemon-reload')
+    run('systemctl restart httpd.service')
 
 
 def configure_realm(admin_password=None, keytab_url=None, realm=None,
@@ -1157,7 +1261,7 @@ def configure_realm(admin_password=None, keytab_url=None, realm=None,
     if idm_server_ip is None:
         idm_server_ip = os.environ.get('IDM_SERVER_IP')
     domain = os.environ.get('VM_DOMAIN')
-    result = run('id realm-proxy')
+    result = run('id admin')
     if result.failed:
         print('Please execute enroll_idm before configuring External Auth')
         sys.exit(1)
@@ -1714,6 +1818,9 @@ def product_install(distribution, create_vm=False, certificate_url=None,
         execute(configure_idm_external_auth, host=host)
     if os.environ.get('IDM_REALM') == 'true':
         execute(configure_realm, host=host)
+    if os.environ.get('AD_EXTERNAL_AUTH') == 'true':
+        execute(enroll_ad, host=host)
+        execute(configure_ad_external_auth, host=host)
 
 
 def fix_qdrouterd_listen_to_ipv6():
