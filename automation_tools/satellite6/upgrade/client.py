@@ -1,4 +1,5 @@
 import os
+import re
 import time
 
 from automation_tools import manage_daemon
@@ -9,13 +10,25 @@ from automation_tools.satellite6.upgrade.tasks import (
     get_rhevm_client,
     wait_till_rhev_instance_status
 )
-from fabric.api import env, execute, run
-from tasks import (
+from automation_tools.satellite6.upgrade.tasks import (
     generate_satellite_docker_clients_on_rhevm,
     refresh_subscriptions_on_docker_clients,
     remove_all_docker_containers,
     sync_tools_repos_to_upgrade
 )
+from automation_tools.satellite6.upgrade.tools import logger
+from fabric.api import env, execute, run
+
+logger = logger()
+
+
+def katello_agent_version_filter(rpm_name):
+    """Helper function to filter the katello-agent version from katello-agent
+    rpm name
+
+    :param string rpm_name: The katello-agent rpm name
+    """
+    return re.search('\d(\-\d|\.\d)*', rpm_name).group()
 
 
 def personal_clients_upgrade(old_repo, clients):
@@ -27,36 +40,39 @@ def personal_clients_upgrade(old_repo, clients):
         will be updated
     """
     for client in clients:
-        print('Upgrading client on docker container: {}'.format(client))
-        print('Previous katello-agent version:')
-        execute(lambda: run('rpm -qa | grep katello-agent'), host=client)
-        print('Disabling existing client tools repo:')
+        pre = katello_agent_version_filter(execute(
+            lambda: run('rpm -q katello-agent'), host=client)[client])
         execute(disable_repos, old_repo, host=client)
-        print('Upgrading Clients:')
         execute(lambda: run('yum update -y katello-agent'), host=client)
-        print('katello-agent package after installation:')
-        execute(lambda: run('rpm -qa | grep katello-agent'), host=client)
+        post = katello_agent_version_filter(execute(
+            lambda: run('rpm -q katello-agent'), host=client)[client])
+        logger.highlight(
+            'katello-agent on {0} upgraded from {1} to {2}'.format(
+                client, pre, post))
 
 
-def docker_clients_upgrade(old_repo, container_ids):
+def docker_clients_upgrade(old_repo, clients):
     """Helper function to run upgrade on docker containers as clients
 
     :param string old_repo: The old tools repo to disable before updating
         katello-agent package
-    :param list container_ids: The list of container_ids onto which
-        katello-agent package will be updated
+    :param dict clients: The dictonary containing client_name as key and
+        container_id as value
     """
-    for client in container_ids:
-        print('Upgrading client on docker container: {}'.format(client))
-        print('Previous katello-agent version:')
-        docker_execute_command(client, 'rpm -qa | grep katello-agent')
-        print('Disabling existing client tools repo:')
+    for hostname, container in clients.items():
+        logger.info('Upgrading client {0} on docker container: {1}'.format(
+            hostname, container))
+        pre = katello_agent_version_filter(
+            docker_execute_command(container, 'rpm -q katello-agent'))
         docker_execute_command(
-            client, 'subscription-manager repos --disable {}'.format(old_repo))
-        print('Upgrading clients on Docker Containers')
-        docker_execute_command(client, 'yum update -y katello-agent', True)
-        print('katello-agent package after installation:')
-        docker_execute_command(client, 'rpm -qa | grep katello-agent')
+            container, 'subscription-manager repos --disable {}'.format(
+                old_repo))
+        docker_execute_command(container, 'yum update -y katello-agent', True)
+        pst = katello_agent_version_filter(
+            docker_execute_command(container, 'rpm -q katello-agent'))
+        logger.highlight(
+            'katello-agent on {0} upgraded from {1} to {2}'.format(
+                hostname, pre, pst))
 
 
 def satellite6_client_setup():
@@ -82,14 +98,14 @@ def satellite6_client_setup():
         clients6 = [client.strip() for client in str(clients6).split(',')]
         # Sync latest sat tools repo to clients if downstream
         if os.environ.get('TOOLS_URL_RHEL6'):
-            print ('Syncing Tools repos of rhel6 in Satellite:')
+            logger.info('Syncing Tools repos of rhel6 in Satellite:')
             execute(
                 sync_tools_repos_to_upgrade, 'rhel6', clients6, host=sat_host)
     if clients7:
         clients7 = [client.strip() for client in str(clients7).split(',')]
         # Sync latest sat tools repo to clients if downstream
         if os.environ.get('TOOLS_URL_RHEL7'):
-            print ('Syncing Tools repos of rhel7 in Satellite:')
+            logger.info('Syncing Tools repos of rhel7 in Satellite:')
             execute(
                 sync_tools_repos_to_upgrade, 'rhel7', clients7, host=sat_host)
     # Run upgrade on Docker Containers
@@ -100,17 +116,20 @@ def satellite6_client_setup():
         template_name = 'sat6-docker-upgrade-template'
         vm = rhevm_client.vms.get(name=instance_name)
         if not vm:
-            print('Docker VM is created. Creating it, please wait ....')
+            logger.info('Docker VM for generating Content Host is not created.'
+                        'Creating it, please wait..')
             create_rhevm_instance(instance_name, template_name)
             execute(manage_daemon, 'restart', 'docker', host=docker_vm)
         elif vm.get_status().get_state() == 'down':
-            print('Docker VM is not up. Turning on, please wait ....')
+            logger.info('Docker VM for generating Content Host is not up. '
+                        'Turning on, please wait ....')
             rhevm_client.vms.get(name=instance_name).start()
             wait_till_rhev_instance_status(instance_name, 'up', 5)
             execute(manage_daemon, 'restart', 'docker', host=docker_vm)
         rhevm_client.disconnect()
         time.sleep(5)
-        print('Generating clients for RHEL6 and RHEL7 ....')
+        logger.info('Generating {} clients on RHEL6 and RHEL7 on Docker. '
+                    'Please wait .....'.format(clients_count))
         # First delete if any containers running
         execute(
             remove_all_docker_containers, only_running=False, host=docker_vm)
@@ -135,7 +154,7 @@ def satellite6_client_setup():
         ]):
             time.sleep(10)
             vers = ['6.0', '6.1']
-            print ('Syncing Tools repos of rhel7 in Satellite:')
+            logger.info('Syncing Tools repos of rhel7 in Satellite..')
             execute(
                 sync_tools_repos_to_upgrade,
                 'rhel7',
@@ -145,7 +164,7 @@ def satellite6_client_setup():
                 host=sat_host
             )
             time.sleep(10)
-            print ('Syncing Tools repos of rhel6 in Satellite:')
+            logger.info('Syncing Tools repos of rhel6 in Satellite..')
             execute(
                 sync_tools_repos_to_upgrade,
                 'rhel6',
@@ -165,6 +184,7 @@ def satellite6_client_setup():
             refresh_subscriptions_on_docker_clients,
             clients7.values(),
             host=docker_vm)
+    logger.info('Clients are ready for Upgrade.')
     return clients6, clients7
 
 
@@ -176,6 +196,9 @@ def satellite6_client_upgrade(os_version, clients):
     :param list clients: The list of clients onto which the upgrade will be
         performed
     """
+    logger.highlight(
+        '\n========== CLIENT UPGRADE : {} =================\n'.format(
+            os_version.upper()))
     old_version = os.environ.get('FROM_VERSION')
     docker_vm = os.environ.get('DOCKER_VM')
     rhel_ver = os_version[-1]
@@ -187,6 +210,6 @@ def satellite6_client_upgrade(os_version, clients):
         execute(
             docker_clients_upgrade,
             old_repo,
-            clients.values(),
+            clients,
             host=docker_vm
         )

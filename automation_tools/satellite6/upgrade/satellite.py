@@ -1,6 +1,5 @@
 import os
 import sys
-import time
 
 from automation_tools.satellite6.upgrade.tools import host_pings, reboot
 from automation_tools import (
@@ -11,15 +10,19 @@ from automation_tools import (
 from automation_tools.satellite6.hammer import hammer, set_hammer_config
 from automation_tools.repository import enable_repos, disable_repos
 from automation_tools.utils import distro_info, update_packages
+from datetime import datetime
 from fabric.api import env, execute, put, run
 from automation_tools.satellite6.upgrade.tasks import (
     create_rhevm_instance,
     delete_rhevm_instance
 )
+from automation_tools.satellite6.upgrade.tools import logger
 if sys.version_info[0] is 2:
     from StringIO import StringIO  # (import-error) pylint:disable=F0401
 else:  # pylint:disable=F0401,E0611
     from io import StringIO
+
+logger = logger()
 
 
 def satellite6_setup(os_version):
@@ -40,14 +43,14 @@ def satellite6_setup(os_version):
             if var not in os.environ]
         # Check if image name and Hostname in jenkins are set
         if missing_vars:
-            print('The following environment variable(s) must be set in jenkin'
-                  'environment: {0}.'.format(', '.join(missing_vars)))
+            logger.warning('The following environment variable(s) must be set '
+                           'in jenkin environment: {0}.'.format(
+                                ', '.join(missing_vars)))
             sys.exit(1)
         sat_image = os.environ.get('RHEV_SAT_IMAGE')
         sat_host = os.environ.get('RHEV_SAT_HOST')
         sat_instance = 'upgrade_satellite_auto_{0}'.format(os_version)
         execute(delete_rhevm_instance, sat_instance)
-        print('Turning on Satellite Instance ....')
         execute(create_rhevm_instance, sat_instance, sat_image)
         if not host_pings(sat_host):
             sys.exit(1)
@@ -56,6 +59,7 @@ def satellite6_setup(os_version):
         execute(lambda: run('katello-service restart'), host=sat_host)
     # Set satellite hostname in fabric environment
     env['satellite_host'] = sat_host
+    logger.info('Satellite {} is ready for Upgrade!'.format(sat_host))
     return sat_host
 
 
@@ -71,18 +75,19 @@ def satellite6_upgrade():
         Satellite version to upgrade to and enable repos while upgrading.
         e.g '6.1','6.2'
     """
+    logger.highlight('\n========== SATELLITE UPGRADE =================\n')
     to_version = os.environ.get('TO_VERSION')
     rhev_sat_host = os.environ.get('RHEV_SAT_HOST')
     base_url = os.environ.get('BASE_URL')
     if to_version not in ['6.1', '6.2']:
-        print('Wrong Satellite Version Provided to upgrade to. '
-              'Provide one of 6.1, 6.2')
+        logger.warning('Wrong Satellite Version Provided to upgrade to. '
+                       'Provide one of 6.1, 6.2')
         sys.exit(1)
     # Setting yum stdout log level to be less verbose
     set_yum_debug_level()
     setup_satellite_firewall()
     run('rm -rf /etc/yum.repos.d/rhel-{optional,released}.repo')
-    print('Wait till Packages update ... ')
+    logger.info('Updating system packages ... ')
     update_packages(quiet=True)
     # Rebooting the system to see possible errors
     if rhev_sat_host:
@@ -122,10 +127,12 @@ def satellite6_upgrade():
         run('service-wait mongod start')
     run('yum clean all', warn_only=True)
     # Updating the packages again after setting sat6 repo
-    print('Wait till packages update ... ')
-    print('YUM UPDATE started at: {0}'.format(time.ctime()))
+    logger.info('Updating satellite packages ... ')
+    preyum_time = datetime.now().replace(microsecond=0)
     update_packages(quiet=False)
-    print('YUM UPDATE finished at: {0}'.format(time.ctime()))
+    postyum_time = datetime.now().replace(microsecond=0)
+    logger.highlight('Time taken for satellite packages update - {}'.format(
+        str(postyum_time-preyum_time)))
     # Rebooting the system again for possible errors
     # Only for RHEV based satellite and not for personal one
     if rhev_sat_host:
@@ -136,16 +143,15 @@ def satellite6_upgrade():
             # stop all the services before upgrade
             run('katello-service stop')
             run('service-wait mongod start')
-    # Verifying impact of BZ #1357655 on upgrade
-    if rhev_sat_host:
-        run('katello-installer --help', quiet=True)
     # Running Upgrade
-    print('SATELLITE UPGRADE started at: {0}'.format(time.ctime()))
+    preup_time = datetime.now().replace(microsecond=0)
     if to_version == '6.1':
         run('katello-installer --upgrade')
     else:
         run('satellite-installer --scenario satellite --upgrade')
-    print('SATELLITE UPGRADE finished at: {0}'.format(time.ctime()))
+    postup_time = datetime.now().replace(microsecond=0)
+    logger.highlight('Time taken for Satellite Upgrade - {}'.format(
+        str(postup_time-preup_time)))
     # Test the Upgrade is successful
     set_hammer_config()
     hammer('ping')
@@ -162,11 +168,12 @@ def satellite6_zstream_upgrade():
     TO_VERSION
         Next satellite version to which satellite will be upgraded
     """
+    logger.highlight('\n========== SATELLITE UPGRADE =================\n')
     from_version = os.environ.get('FROM_VERSION')
     to_version = os.environ.get('TO_VERSION')
     if not from_version == to_version:
-        print ('Error! zStream Upgrade on Satellite cannot be performed as '
-               'FROM and TO versions are not same!')
+        logger.warning('zStream Upgrade on Satellite cannot be performed as '
+                       'FROM and TO versions are not same!')
         sys.exit(1)
     base_url = os.environ.get('BASE_URL')
     # Setting yum stdout log level to be less verbose
@@ -206,10 +213,12 @@ def satellite6_zstream_upgrade():
         run('service-wait mongod start')
     run('yum clean all', warn_only=True)
     # Updating the packages again after setting sat6 repo
-    print('Wait till packages update ... ')
-    print('YUM UPDATE started at: {0}'.format(time.ctime()))
+    logger.info('Updating system and satellite packages... ')
+    preyum_time = datetime.now().replace(microsecond=0)
     update_packages(quiet=False)
-    print('YUM UPDATE finished at: {0}'.format(time.ctime()))
+    postyum_time = datetime.now().replace(microsecond=0)
+    logger.highlight('Time taken for system and satellite packages update - '
+                     '{}'.format(str(postyum_time-preyum_time)))
     # Rebooting the system to check the possible issues if kernal is updated
     if os.environ.get('RHEV_SAT_HOST'):
         reboot(120)
@@ -220,12 +229,14 @@ def satellite6_zstream_upgrade():
             run('katello-service stop')
             run('service-wait mongod start')
     # Running Upgrade
-    print('SATELLITE UPGRADE started at: {0}'.format(time.ctime()))
+    preup_time = datetime.now().replace(microsecond=0)
     if to_version == '6.1':
         run('katello-installer --upgrade')
     else:
         run('satellite-installer --scenario satellite --upgrade')
-    print('SATELLITE UPGRADE finished at: {0}'.format(time.ctime()))
+    postup_time = datetime.now().replace(microsecond=0)
+    logger.highlight('Time taken for Satellite Upgrade - {}'.format(
+        str(postup_time-preup_time)))
     # Test the Upgrade is successful
     set_hammer_config()
     hammer('ping')

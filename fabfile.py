@@ -87,7 +87,7 @@ from automation_tools.satellite6.upgrade.tasks import (
     delete_rhevm_instance,
     docker_execute_command,
     generate_satellite_docker_clients_on_rhevm,
-    get_sat_version,
+    get_sat_cap_version,
     refresh_subscriptions_on_docker_clients,
     remove_all_docker_containers,
     sync_capsule_repos_to_upgrade,
