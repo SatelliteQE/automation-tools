@@ -197,7 +197,7 @@ def satellite6_client_upgrade(os_version, clients):
         performed
     """
     logger.highlight(
-        '\n========== CLIENT UPGRADE : {} =================\n'.format(
+        '\n========== {} CLIENTS UPGRADE =================\n'.format(
             os_version.upper()))
     old_version = os.environ.get('FROM_VERSION')
     docker_vm = os.environ.get('DOCKER_VM')

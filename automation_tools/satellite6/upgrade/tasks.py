@@ -695,7 +695,7 @@ def _extract_sat_cap_version(command):
         if result:
             version = result.group('version')
             return version, cmd_result
-    return 'Unavailable', cmd_result
+    return None, cmd_result
 
 
 def get_sat_cap_version(product):
@@ -717,8 +717,8 @@ def get_sat_cap_version(product):
         (_6_2_VERSION_COMMAND, _LT_6_2_VERSION_COMMAND)
     )
     for version, cmd_result in results:
-        if version != 'Unavailable':
+        if version:
             return version
-    logger.error('Error in detecting installed version due to:\n{}'.format(
+    logger.warning('Unable to detect installed version due to:\n{}'.format(
         cmd_result
     ))

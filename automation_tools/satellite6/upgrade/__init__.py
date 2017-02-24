@@ -179,14 +179,14 @@ def product_upgrade(product):
             product, os.environ.get('OS'))
         try:
             with LogAnalyzer(sat_host):
-                current = str(execute(
-                    get_sat_cap_version, 'sat', host=sat_host)[sat_host])
+                current = execute(
+                    get_sat_cap_version, 'sat', host=sat_host)[sat_host]
                 if from_version != to_version:
                     execute(satellite6_upgrade, host=sat_host)
                 else:
                     execute(satellite6_zstream_upgrade, host=sat_host)
-                upgraded = str(execute(
-                    get_sat_cap_version, 'sat', host=sat_host)[sat_host])
+                upgraded = execute(
+                    get_sat_cap_version, 'sat', host=sat_host)[sat_host]
                 if LooseVersion(upgraded) > LooseVersion(current):
                     logger.highlight(
                         'The Satellite is upgraded from {0} to {1}'.format(
@@ -202,18 +202,18 @@ def product_upgrade(product):
                     for cap_host in cap_hosts:
                         try:
                             with LogAnalyzer(cap_host):
-                                current = str(execute(
+                                current = execute(
                                     get_sat_cap_version, 'cap', host=cap_host
-                                    )[cap_host])
+                                    )[cap_host]
                                 if from_version != to_version:
                                     execute(satellite6_capsule_upgrade,
                                             cap_host, host=cap_host)
                                 elif from_version == to_version:
                                     execute(satellite6_capsule_zstream_upgrade,
                                             host=cap_host)
-                                upgraded = str(execute(
+                                upgraded = execute(
                                     get_sat_cap_version, 'cap', host=cap_host
-                                    )[cap_host])
+                                    )[cap_host]
                                 if current:
                                     if LooseVersion(upgraded) > LooseVersion(
                                             current):
