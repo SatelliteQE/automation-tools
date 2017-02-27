@@ -1078,6 +1078,54 @@ def install_puppet4(puppet4_repo=None):
         run('/opt/puppetlabs/bin/puppet module install puppetlabs-strings')
 
 
+def configure_osp(admin_password=None, forward_zone=None, reverse_zone=None,
+                  template_url=None):
+    """Configure the named service for OSP Compute Resource.
+
+    Expects the following environment variables:
+
+    OSP_REVERSE_ZONE
+        Reverse zone values Example: "179.29.10 178.28.10 177.27.10".
+
+    OSP_FORWARD_ZONE
+        Forward zone value Example: "lab.hyd.redhat.com".
+
+    OSP_FINISH_TEMPLATE_URL
+        The Satellite6 kickstart finish template.
+
+    ADMIN_PASSWORD
+        The Satellite6 Admin password.
+
+    """
+    if reverse_zone is None:
+        reverse_zone = os.environ.get('OSP_REVERSE_ZONE')
+    if forward_zone is None:
+        forward_zone = os.environ.get('OSP_FORWARD_ZONE')
+    if template_url is None:
+        template_url = os.environ.get('OSP_FINISH_TEMPLATE_URL')
+    if admin_password is None:
+        admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme')
+    run('cp /etc/zones.conf /root/zones-pre_osp.conf')
+    run('for i in {0}; do satellite-installer '
+        '--foreman-proxy-dns-reverse $i.in-addr.arpa ; '
+        'sed -n 1,7p /etc/zones.conf >> /root/zones_cons.conf ; done'
+        .format(reverse_zone))
+    run('satellite-installer --foreman-proxy-dns-zone {0}'
+        .format(forward_zone))
+    run('sed -n 8,14p /etc/zones.conf >> /root/zones_cons.conf')
+    run('cat /root/zones_cons.conf > /etc/zones.conf')
+    run('cat /root/zones-pre_osp.conf >> /etc/zones.conf')
+    run('hammer -u admin -p changeme template clone '
+        '--name \'Satellite Kickstart Default Finish\' '
+        '--new-name \'Satellite Kickstart Default Finish OSP\'')
+    run('wget -O /root/Satellite_Kickstart_Default_Finish_OSP.txt {0}'
+        .format(template_url))
+    run('hammer -u admin -p {0} template update --name '
+        '\'Satellite Kickstart Default Finish OSP\' --type finish '
+        '--file /root/Satellite_Kickstart_Default_Finish_OSP.txt'
+        .format(admin_password))
+
+
 def cleanup_idm(hostname, idm_password=None):
     """Clean up the IDM server of any previous entries.
 
