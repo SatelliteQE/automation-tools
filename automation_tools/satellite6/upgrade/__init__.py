@@ -227,7 +227,7 @@ def product_upgrade(product):
                                             'next version. Now its {}'.format(
                                                 upgraded))
                                 else:
-                                    logger.hightlight(
+                                    logger.highlight(
                                         'Unable to fetch previous version but '
                                         'after upgrade capsule is {}.'.format(
                                             upgraded))
