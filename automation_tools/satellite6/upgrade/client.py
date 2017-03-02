@@ -174,12 +174,12 @@ def satellite6_client_setup():
                 host=sat_host
             )
         # Refresh subscriptions on clients
-        time.sleep(5)
+        time.sleep(30)
         execute(
             refresh_subscriptions_on_docker_clients,
             clients6.values(),
             host=docker_vm)
-        time.sleep(5)
+        time.sleep(30)
         execute(
             refresh_subscriptions_on_docker_clients,
             clients7.values(),
