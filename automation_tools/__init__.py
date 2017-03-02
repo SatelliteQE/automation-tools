@@ -1754,8 +1754,7 @@ def product_install(distribution, create_vm=False, certificate_url=None,
         execute(
             cleanup_idm,
             hostname=sat6_hostname,
-            host=idm_server_ip,
-            warn_only=True
+            host=idm_server_ip
         )
         execute(enroll_idm, host=host)
     if os.environ.get('IDM_EXTERNAL_AUTH') == 'true':
