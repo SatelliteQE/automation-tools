@@ -1329,8 +1329,6 @@ def configure_realm(admin_password=None, keytab_url=None, realm=None,
     run('cp /etc/ipa/ca.crt /etc/pki/ca-trust/source/anchors/ipa.crt')
     run('update-ca-trust enable ; update-ca-trust')
     run('service foreman-proxy restart')
-    run('hammer -u admin -p {0} domain update --id 1 --dns-id ""'
-        .format(admin_password))
 
 
 def upstream_install(admin_password=None, run_katello_installer=True,
