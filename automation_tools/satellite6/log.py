@@ -9,7 +9,6 @@ from fabric.api import execute, run
 
 ERROR_TOKENS = (
     'ERROR',
-    'SEVERE',
     'EXCEPTION',
     r'returned 1 instead of one of \[0\]',
     'Could not find the inverse association for repository',
