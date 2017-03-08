@@ -182,7 +182,6 @@ REPORT_WITHOUT_ERROR = '''### Analyzing /var/log/candlepin/candlepin.log:
 No errors found'''
 
 CONTENT_WITH_ERROR = '''c75ff8b-2ee0-4a6a-a94e-, org=] ERROR  org.
-SEVERE: The web application [/gutterball] registered the JDBC driver
 NO problem on this line
 Exception in thread "Resource Destroyer in BasicResourcePool.close()"
 javax.persistence.PersistenceException: unexpected error when rollbacking
@@ -203,22 +202,21 @@ undefined method `[]' for nil:NilClass (NoMethodError)'''.encode('utf-8')
 REPORT_WITH_ERROR = '''### Analyzing /var/log/candlepin/candlepin.log:
 ## Errors found:
 1: c75ff8b-2ee0-4a6a-a94e-, org=] ERROR  org.
-2: SEVERE: The web application [/gutterball] registered the JDBC driver
-4: Exception in thread "Resource Destroyer in BasicResourcePool.close()"
-5: javax.persistence.PersistenceException: unexpected error when rollbacking
-6: Could not find the inverse association for repository
-7: PG::Error: ERROR: update or delete on table
-8: NoMethodError: undefined method
-9: usr/sbin/foreman-rake db:migrate returned 1 instead of one of [0]
-10: /usr/sbin/foreman-rake db:seed returned 1 instead of one of [0]
-11: [E] undefined method `finished' for nil:NilClass (NoMethodError)
-12: [ProxyAPI::ProxyException]: Unable to detect
-13: (ActiveModel::MissingAttributeError)
-14: ActionView::Template::Error (undefined method
-15: undefined method `cp_config' for
-16: An error has occurred, this and all later migrations canceled
-17: undefined method `import_data' for nil:NilClass (NoMethodError)
-18: undefined method `[]' for nil:NilClass (NoMethodError)'''
+3: Exception in thread "Resource Destroyer in BasicResourcePool.close()"
+4: javax.persistence.PersistenceException: unexpected error when rollbacking
+5: Could not find the inverse association for repository
+6: PG::Error: ERROR: update or delete on table
+7: NoMethodError: undefined method
+8: usr/sbin/foreman-rake db:migrate returned 1 instead of one of [0]
+9: /usr/sbin/foreman-rake db:seed returned 1 instead of one of [0]
+10: [E] undefined method `finished' for nil:NilClass (NoMethodError)
+11: [ProxyAPI::ProxyException]: Unable to detect
+12: (ActiveModel::MissingAttributeError)
+13: ActionView::Template::Error (undefined method
+14: undefined method `cp_config' for
+15: An error has occurred, this and all later migrations canceled
+16: undefined method `import_data' for nil:NilClass (NoMethodError)
+17: undefined method `[]' for nil:NilClass (NoMethodError)'''
 
 CONTENT_WITH_SPECIAL_CHAR = 'éçã'.encode('utf-8')
 
