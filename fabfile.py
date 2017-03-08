@@ -102,3 +102,6 @@ from automation_tools.satellite6.upgrade.tools import (
     host_pings,
     reboot
 )
+from automation_tools.satellite6.upgrade.tests.existence import (
+    set_datastore
+)

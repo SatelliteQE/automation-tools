@@ -3,6 +3,7 @@
 Many commands are affected by environment variables. Unless stated otherwise,
 all environment variables are required.
 """
+import csv
 import novaclient
 import os
 import re
@@ -722,3 +723,32 @@ def get_sat_cap_version(product):
     logger.warning('Unable to detect installed version due to:\n{}'.format(
         cmd_result
     ))
+
+
+def csv_reader(component, subcommand):
+    """
+    Reads all component entities data using hammer csv output and returns the
+    dict representation of all the entities.
+
+    Representation: {component_name:
+    [{comp1_name:comp1, comp1_id:1}, {comp2_name:comp2, comp2_ip:192.168.0.1}]
+    }
+    e.g:
+    {'host':[{name:host1.ab.com, id:10}, {name:host2.xz.com, ip:192.168.0.1}]}
+
+    :param string component: Satellite component name. e.g host, capsule
+    :param string subcommand: subcommand for above component. e.g list, info
+    :returns dict: The dict repr of hammer csv output of given command
+    """
+    comp_dict = {}
+    entity_list = []
+    sat_host = env.get('satellite_host')
+    set_hammer_config()
+    data = execute(
+        hammer, '{0} {1}'.format(component, subcommand), 'csv', host=sat_host
+        )[sat_host]
+    csv_read = csv.DictReader(str(data.encode('utf-8')).lower().split('\n'))
+    for row in csv_read:
+        entity_list.append(row)
+    comp_dict[component] = entity_list
+    return comp_dict

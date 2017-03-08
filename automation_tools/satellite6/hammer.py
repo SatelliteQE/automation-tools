@@ -69,35 +69,51 @@ def set_hammer_config(user=None, password=None):
 
 
 @task
-def hammer(command):
-    """Run hammer -u <admin_user> -p <admin_password> --output json <command>.
+def hammer(command, output='json'):
+    """Run hammer -u <admin_user> -p <admin_password> --output <output> <command>.
 
     This method has a dependency on set_hammer_config function.
 
-    :param str command: The hammer subcommand to run.
-    :return: Return a JSON decoded object containing the result of the command.
-        The returned object will exhibit ``failed`` and ``succeeded`` boolean
-        attributes specifying whether the command failed or succeeded, and will
-        also include the return code as the ``return_code`` attribute.
+    :param str command: The hammer subcommand to run
+    :param str output: The command output type which hammer supports,
+        by default json
+    :return: if output is json, then returns a JSON decoded object containing
+        the result of the command. The returned object will exhibit ``failed``
+        and ``succeeded`` boolean attributes specifying whether the command
+        failed or succeeded, and will also include the return code as the
+        ``return_code`` attribute.
+        Else, returns a string of given output type representation of hammer
+        command output.
     """
+    output = output.lower()
     command_result = run(
-        'hammer --username {0} --password {1} --output json {2}'
-        .format(env.get('hammer_user'), env.get('hammer_password'), command),
+        'hammer --username {0} --password {1} --output {2} {3}'
+        .format(
+            env.get('hammer_user'),
+            env.get('hammer_password'),
+            output,
+            command),
         quiet=True
     )
-    try:
-        data = json.loads(command_result)
-    except ValueError:
-        data = command_result
-    result = _lower_dict_keys(data)
-    if isinstance(result, list):
-        result = _AttributeList(result)
-    elif isinstance(result, dict):
-        result = _AttributeDict(result)
-    result.succeeded = command_result.succeeded
-    result.failed = command_result.failed
-    result.return_code = command_result.return_code
-    return result
+    if output == 'json':
+        try:
+            data = json.loads(command_result)
+        except ValueError:
+            data = command_result
+        result = _lower_dict_keys(data)
+        if isinstance(result, list):
+            result = _AttributeList(result)
+        elif isinstance(result, dict):
+            result = _AttributeDict(result)
+        result.succeeded = command_result.succeeded
+        result.failed = command_result.failed
+        result.return_code = command_result.return_code
+        return result
+    elif output in ['base', 'table', 'silent', 'csv', 'yaml', 'json']:
+        return command_result
+    else:
+        raise ValueError('Invalid output type \'{}\' has provided to get '
+                         'hammer output.'.format(output))
 
 
 @task
