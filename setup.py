@@ -28,6 +28,7 @@ setup(
         'python-bugzilla==1.2.2',
         'python-novaclient',
         'requests',
+        'unittest2',
     ],
     license='GNU GPL v3.0',
     classifiers=(
