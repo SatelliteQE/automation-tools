@@ -1865,7 +1865,7 @@ def product_install(distribution, create_vm=False, certificate_url=None,
             host=host
         )
     if (
-        os.environ.get('IDM_EXTERNAL_AUTH') == 'true' or
+        os.environ.get('EXTERNAL_AUTH') == 'IDM' or
         os.environ.get('IDM_REALM') == 'true'
     ):
         sat6_hostname = os.environ.get('SERVER_HOSTNAME')
@@ -1876,11 +1876,11 @@ def product_install(distribution, create_vm=False, certificate_url=None,
             host=idm_server_ip
         )
         execute(enroll_idm, host=host)
-    if os.environ.get('IDM_EXTERNAL_AUTH') == 'true':
+    if os.environ.get('EXTERNAL_AUTH') == 'IDM':
         execute(configure_idm_external_auth, host=host)
     if os.environ.get('IDM_REALM') == 'true':
         execute(configure_realm, host=host)
-    if os.environ.get('AD_EXTERNAL_AUTH') == 'true':
+    if os.environ.get('EXTERNAL_AUTH') == 'AD':
         execute(enroll_ad, host=host)
         execute(configure_ad_external_auth, host=host)
 
