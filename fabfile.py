@@ -102,3 +102,6 @@ from automation_tools.satellite6.upgrade.tools import (
     host_pings,
     reboot
 )
+from automation_tools.satellite6.upgrade.template import (
+    validate_and_create
+)
