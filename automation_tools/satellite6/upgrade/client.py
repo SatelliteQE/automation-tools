@@ -163,7 +163,7 @@ def satellite6_client_setup():
                 sync_tools_repos_to_upgrade,
                 'rhel6',
                 # Containers_ids are not requied from sat version > 6.1 to
-                # attach the subscriprion to client
+                # attach the subscription to client
                 clients6.values() if from_version in vers else clients6.keys(),
                 host=sat_host
             )
