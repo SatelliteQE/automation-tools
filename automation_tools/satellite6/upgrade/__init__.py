@@ -23,7 +23,8 @@ from automation_tools.satellite6.upgrade.satellite import (
     satellite6_zstream_upgrade
 )
 from automation_tools.satellite6.upgrade.tasks import (
-    get_sat_cap_version
+    get_sat_cap_version,
+    post_upgrade_test_tasks,
 )
 from automation_tools.satellite6.upgrade.tools import logger
 from distutils.version import LooseVersion
@@ -198,6 +199,8 @@ def product_upgrade(product):
                 # Generate foreman debug on satellite after upgrade
                 execute(foreman_debug, 'satellite_{}'.format(sat_host),
                         host=sat_host)
+                # Execute tasks as post upgrade tier1 tests are dependent
+                post_upgrade_test_tasks(sat_host)
                 if product == 'capsule' or product == 'longrun':
                     for cap_host in cap_hosts:
                         try:

@@ -9,6 +9,10 @@ import os
 import re
 import sys
 import time
+from automation_tools import (
+    setup_alternate_capsule_ports,
+    setup_fake_manifest_certificate,
+)
 from automation_tools.satellite6.hammer import (
     attach_subscription_to_host_from_satellite,
     get_attribute_value,
@@ -723,6 +727,22 @@ def get_sat_cap_version(product):
     logger.warning('Unable to detect installed version due to:\n{}'.format(
         cmd_result
     ))
+
+
+def post_upgrade_test_tasks(sat_host):
+    """Run set of tasks for post upgrade tests
+
+    :param string sat_host: Hostname to run the tasks on
+    """
+    # Execute tasks as post upgrade tests are dependent
+    certificate_url = os.environ.get('FAKE_MANIFEST_CERT_URL')
+    if certificate_url is not None:
+        execute(
+            setup_fake_manifest_certificate,
+            certificate_url,
+            host=sat_host
+        )
+    execute(setup_alternate_capsule_ports, host=sat_host)
 
 
 def csv_reader(component, subcommand):
