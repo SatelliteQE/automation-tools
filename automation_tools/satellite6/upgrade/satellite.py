@@ -1,6 +1,7 @@
 import os
 import sys
 
+from automation_tools.satellite6.upgrade.tests.existence import set_datastore
 from automation_tools.satellite6.upgrade.tools import host_pings, reboot
 from automation_tools import (
     enable_ostree,
@@ -61,6 +62,9 @@ def satellite6_setup(os_version):
     # Set satellite hostname in fabric environment
     env['satellite_host'] = sat_host
     logger.info('Satellite {} is ready for Upgrade!'.format(sat_host))
+    if os.environ.get('RUN_EXISTANCE_TESTS'):
+        logger.info('Setting up preupgrade datastore for existance tests')
+        set_datastore('preupgrade')
     return sat_host
 
 
@@ -160,6 +164,9 @@ def satellite6_upgrade():
     # Enable ostree feature only for rhel7 and sat6.2
     if to_version == '6.2' and major_ver == '7':
         enable_ostree(sat_version='6.2')
+    if os.environ.get('RUN_EXISTANCE_TESTS'):
+        logger.info('Setting up postupgrade datastore for existance tests..')
+        set_datastore('postupgrade')
 
 
 def satellite6_zstream_upgrade():
@@ -245,3 +252,6 @@ def satellite6_zstream_upgrade():
     set_hammer_config()
     hammer('ping')
     run('katello-service status', warn_only=True)
+    if os.environ.get('RUN_EXISTANCE_TESTS'):
+        logger.info('Setting up postupgrade datastore for existance tests')
+        set_datastore('postupgrade')
