@@ -33,6 +33,29 @@ components = {
 }
 
 
+# Attributes where 'id' as key to fetch component property data
+attribute_keys = dict.fromkeys(
+    [
+        'activation-key',
+        'capsule',
+        'compute-resource',
+        'domain',
+        'host',
+        'hostgroup',
+        'organization',
+        'os',
+        'role',
+        'subnet',
+        'user'
+    ],
+    'id'
+ )
+# Attributes with different or specific keys to fetch properties data
+# e.g for content-view there is content view id' and not 'id'
+attribute_keys['content-view'] = 'content view id'
+attribute_keys['settings'] = 'name'
+
+
 def set_datastore(datastore):
     """
     Creates a file with all the satellite components data in json format
@@ -150,14 +173,6 @@ def find_datastore(datastore, component, attribute, search_key=None):
                     'Unable to find search_key \'{0}\' in component \'{1}\' '
                     'to get \'{2}\' value.'.format(
                         search_key, component, attribute))
-
-
-# Attributes where 'id' as key to fetch component property data
-attribute_keys = dict.fromkeys(
-    components['org_not_required']+['activation-key'], 'id')
-# Attributes with different or specific keys to fetch properties data
-# e.g for content-view there is content view id' and not 'id'
-attribute_keys['content-view'] = 'content view id'
 
 
 def compare_postupgrade(component, attribute):

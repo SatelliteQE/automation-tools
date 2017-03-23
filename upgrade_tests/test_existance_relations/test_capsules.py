@@ -33,3 +33,17 @@ def test_positive_capsules_by_name(pre, post):
     :assert: All capsules should be retained post upgrade
     """
     assert pre == post
+
+
+@pytest.mark.parametrize(
+    "pre,post",
+    compare_postupgrade('capsule', 'url')
+)
+def test_positive_capsules_by_url(pre, post):
+    """Test all capsules are existing after upgrade by their urls
+
+    :id: 1e5b2826-6394-4d36-aa7b-36dfc6411dd7
+
+    :assert: Capsule urls of all capsules should be retained post upgrade
+    """
+    assert pre == post

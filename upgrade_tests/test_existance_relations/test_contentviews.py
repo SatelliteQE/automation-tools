@@ -34,3 +34,31 @@ def test_positive_cvs_by_label(pre, post):
     :assert: All CVs should be retained post upgrade
     """
     assert pre == post
+
+
+@pytest.mark.parametrize(
+    "pre,post",
+    compare_postupgrade('content-view', 'composite')
+)
+def test_positive_cvs_by_composite_views(pre, post):
+    """Test composite CV's are existing after upgrade
+
+    :id: 554632f2-0e5b-44c8-9a80-5463302af22f
+
+    :assert: All composite CVs should be retained post upgrade
+    """
+    assert pre == post
+
+
+@pytest.mark.parametrize(
+    "pre,post",
+    compare_postupgrade('content-view', 'name')
+)
+def test_positive_cvs_by_name(pre, post):
+    """Test all CVs are existing after upgrade by their name
+
+    :id: 7ad53fb0-f05c-4eea-bd6c-db6c35ea8841
+
+    :assert: All CVs should be retained post upgrade by their name
+    """
+    assert pre == post
