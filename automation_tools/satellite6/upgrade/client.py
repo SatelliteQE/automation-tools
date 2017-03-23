@@ -141,12 +141,16 @@ def satellite6_client_setup():
             int(clients_count)/2,
             host=docker_vm
         )[docker_vm]
+        # Adding sleep to freed up yum lock taken by above client generate task
+        time.sleep(30)
         clients7 = execute(
             generate_satellite_docker_clients_on_rhevm,
             'rhel7',
             int(clients_count)/2,
             host=docker_vm
         )[docker_vm]
+        # Adding sleep to freed up yum lock taken by above client generate task
+        time.sleep(30)
         # Sync latest sat tools repo to clients if downstream
         if all([
             os.environ.get('TOOLS_URL_RHEL6'),
