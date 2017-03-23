@@ -29,3 +29,44 @@ def test_positive_hosts_by_mac(pre, post):
         post upgrade
     """
     assert pre == post
+
+
+@pytest.mark.parametrize("pre,post", compare_postupgrade('host', 'host group'))
+def test_positive_hosts_by_hostgroup(pre, post):
+    """Test hostgroup associations of all hosts post upgrade
+
+    :id: 75d861ad-d8b5-4051-a584-b06ac63fd444
+
+    :assert: HostGroup of each host should be associated to its respective host
+        post upgrade
+    """
+    assert pre == post
+
+
+@pytest.mark.parametrize(
+    "pre,post",
+    compare_postupgrade('host', 'operating system')
+)
+def test_positive_hosts_by_operating_system(pre, post):
+    """Test OS associations of all hosts post upgrade
+
+    :id: 13c93f4b-0a46-4c74-aefa-136484bd8999
+
+    :assert: OS of each host should be associated to its respective host
+        post upgrade
+    """
+    assert pre == post
+
+
+@pytest.mark.parametrize(
+    "pre,post",
+    compare_postupgrade('host', 'name')
+)
+def test_positive_hosts_by_name(pre, post):
+    """Test all hosts are retained post upgrade by their name
+
+    :id: 2421fe0d-370d-4191-af36-1565f7c088bd
+
+    :assert: All hosts should be retained post upgrade by their names
+    """
+    assert pre == post
