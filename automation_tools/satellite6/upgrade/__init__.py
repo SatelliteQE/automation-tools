@@ -88,7 +88,8 @@ def setup_products_for_upgrade(product, os_version):
     return sat_host, cap_hosts, clients6, clients7
 
 
-def product_upgrade(product):
+def product_upgrade(
+        product, sat_host, cap_hosts, clients6=None, clients7=None):
     """Task which upgrades the product.
 
     Product is satellite or capsule or client or longrun.
@@ -98,6 +99,14 @@ def product_upgrade(product):
     If product is longrun then upgrade satellite, capsule and client
 
     :param string product: product name wanted to upgrade.
+    :param string sat_host: sat_host is satellite hostname.
+    :param string cap_hosts: cap_hosts is the capsule host's hostname.
+    :param string clients6: rhel 6 clients to be upgraded,
+        optional in case of docker clients.
+        If not given, the clients will be generated on docker.
+    :param string clients7: rhel 7 clients to be upgraded,
+        optional in case of docker clients.
+        If not given, the clients will be generated on docker.
 
     Environment Variables necessary to proceed Upgrade:
     -----------------------------------------------------
@@ -176,8 +185,6 @@ def product_upgrade(product):
         to_version = os.environ.get('TO_VERSION')
         logger.info('Performing UPGRADE FROM {0} TO {1}'.format(
             from_version, to_version))
-        sat_host, cap_hosts, clients6, clients7 = setup_products_for_upgrade(
-            product, os.environ.get('OS'))
         try:
             with LogAnalyzer(sat_host):
                 current = execute(
