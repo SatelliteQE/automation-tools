@@ -13,22 +13,42 @@ from automation_tools.satellite6.upgrade.tasks import csv_reader
 components = {
     'org_not_required':
     [
-        'organization',
-        'host',
+        'architecture',
         'capsule',
-        'role',
         'compute-resource',
-        'user',
-        'subnet',
-        'settings',
-        'os',
+        'discovery',
+        'discovery_rule',
+        'domain',
+        'environment',
+        'filter',
+        'host',
         'hostgroup',
-        'domain'
+        'medium',
+        'organization',
+        'os',
+        'partition-table',
+        'puppet-class',
+        'puppet-module',
+        'role',
+        'sc-param',
+        'settings',
+        'smart-variable',
+        'subnet',
+        'user',
+        'template',
+        'user-group'
     ],
     'org_required':
     [
+        'activation-key',
         'content-view',
-        'activation-key'
+        'content-host',
+        'gpg',
+        'lifecycle-environment',
+        'product',
+        'repository',
+        'subscription',
+        'sync-plan'
     ]
 }
 
@@ -37,16 +57,36 @@ components = {
 attribute_keys = dict.fromkeys(
     [
         'activation-key',
+        'architecture',
         'capsule',
+        'content-host',
         'compute-resource',
+        'discovery',
+        'discovery_rule',
         'domain',
+        'environment',
+        'filter',
+        'gpg',
         'host',
         'hostgroup',
+        'lifecycle-environment',
+        'medium',
         'organization',
         'os',
+        'partition-table',
+        'product',
+        'puppet-class',
+        'puppet-module',
+        'repository',
         'role',
+        'sc-param',
+        'smart-variable',
         'subnet',
-        'user'
+        'subscription',
+        'sync-plan',
+        'template',
+        'user',
+        'user-group'
     ],
     'id'
  )
