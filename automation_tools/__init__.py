@@ -1358,6 +1358,34 @@ def configure_realm(admin_password=None, keytab_url=None, realm=None,
     run('service foreman-proxy restart')
 
 
+def apply_hotfix():
+    """Apply a hotfix for the Satellite6 Server
+
+    Expects the following environment variables:
+
+    HOTFIX
+        Specifies the choice for the hotfix, the default or custom.
+    HTTP_SERVER_HOSTNAME
+        Specify the hostname of the HTTP Server.
+    """
+    os_version = distro_info()[1]
+    http_server = os.environ.get('HTTP_SERVER_HOSTNAME')
+    hotfix = os.environ.get('HOTFIX')
+    if hotfix == 'DEFAULT':
+        run('katello-service stop')
+        run('wget -O /etc/yum.repos.d/hotfix.repo '
+            '{0}/pub/hotfix/hotfix_rhel{1}.repo'
+            .format(http_server, os_version))
+        run('yum -y update')
+        run('satellite-installer --upgrade')
+    elif hotfix == 'CUSTOM':
+        run('wget -0 /root/hotfix.sh '
+            '{0}/pub/hotfix/hotfix_rhel{1}.sh'
+            .format(http_server, os_version))
+        run('chmod +x /root/hotfix.sh')
+        run('/root/hotfix.sh')
+
+
 def upstream_install(admin_password=None, run_katello_installer=True,
                      puppet4=True):
     """Task to install Foreman nightly using forklift scripts"""
@@ -1883,6 +1911,8 @@ def product_install(distribution, create_vm=False, certificate_url=None,
     if os.environ.get('EXTERNAL_AUTH') == 'AD':
         execute(enroll_ad, host=host)
         execute(configure_ad_external_auth, host=host)
+    if os.environ.get('HOTFIX') != 'NO_HOTFIX':
+        execute(apply_hotfix, host=host)
 
 
 def fix_qdrouterd_listen_to_ipv6():
