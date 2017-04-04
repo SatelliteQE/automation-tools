@@ -56,6 +56,8 @@ def logger():
     """
     logging.setLoggerClass(MyLogger)
     log = logging.getLogger('upgrade_logging')
+    paramiko_logger = logging.getLogger("paramiko.transport")
+    paramiko_logger.disabled = True
     if not log.handlers:
         # Log files
         logfile_path = os.path.abspath('full_upgrade')
