@@ -348,7 +348,7 @@ def setup_default_capsule(interface=None, run_katello_installer=True):
         proxy = 'capsule'
     else:
         proxy = 'foreman-proxy'
-    if os.environ.get('SATELLITE_VERSION') in ('6.0', '6.1', '6.2', '6.3'):
+    if os.environ.get('SATELLITE_VERSION') != 'upstream-nightly':
         proxypuppet = 'capsule'
     else:
         proxypuppet = 'foreman-proxy'
@@ -689,14 +689,14 @@ def setup_foreman_discovery(sat_version):
         run('rm -rf {0}'.format(template_file))
         return
 
-    if sat_version == 'nightly':
+    if sat_version == 'upstream-nightly':
         run('yum install -y {0}'.format(' '.join(packages)), warn_only=True)
-        # Fetch the nightly FDI from upstream
+        # Fetch the upstream-nightly FDI from upstream
         image_url = 'http://downloads.theforeman.org/discovery/nightly/fdi-image-latest.tar'  # noqa
         run('wget {0} + -O - | tar x --overwrite -C /var/lib/tftpboot/boot'
             .format(image_url))
 
-    if sat_version == '6.3':
+    if sat_version in ('6.3', 'downstream-nightly'):
         # In 6.3, installer should install all required packages except FDI
         run('rpm -q {0}'.format(' '.join(packages)))
         run('yum install -y foreman-discovery-image')
@@ -736,15 +736,17 @@ def enable_ostree(sat_version='6.3'):
     """
     os_version = distro_info()[1]
     if os_version >= 7:
-        if sat_version == 'nightly':
+        if sat_version == 'upstream-nightly':
             create_custom_repos(centos_atomic='http://buildlogs.centos.org/'
                                 'centos/7/atomic/x86_64/Packages/')
         run('{0}-installer --scenario {1} {2} --katello-enable-ostree=true'
             .format(
-                'foreman' if sat_version == 'nightly' else 'satellite',
-                'katello' if sat_version == 'nightly' else 'satellite',
-                '--disable-system-checks' if sat_version == '6.3' else ''))
-        if sat_version == 'nightly':
+                'foreman' if sat_version == 'upstream-nightly' else 'satellite', # noqa
+                'katello' if sat_version == 'upstream-nightly' else 'satellite', # noqa
+                '--disable-system-checks' if sat_version in (
+                    '6.3', 'downstream-nightly'
+                ) else ''))
+        if sat_version == 'upstream-nightly':
             delete_custom_repos('centos_atomic')
     else:
         print('ostree plugin is supported only on rhel7+')
@@ -1750,7 +1752,7 @@ def product_install(distribution, create_vm=False, certificate_url=None,
     # Check hostname and start ntpd
     execute(install_prerequisites, host=host)
     # Sat6.3+: If defined, create Puppet4 repo for Satellite p4 installation
-    if satellite_version == '6.3':
+    if satellite_version in ('6.3', 'downstream-nightly'):
         puppet4_repo = os.environ.get('PUPPET4_REPO')
         if puppet4_repo:
             execute(install_puppet4, puppet4_repo=puppet4_repo, host=host)
@@ -1846,13 +1848,13 @@ def product_install(distribution, create_vm=False, certificate_url=None,
         # if we have ssh key to libvirt machine we can setup access to it
         if os.environ.get('LIBVIRT_KEY_URL') is not None:
             execute(setup_libvirt_key, host=host)
-        if satellite_version not in ('6.0', 'nightly'):
+        if satellite_version not in ('6.0', 'upstream-nightly'):
             execute(install_puppet_scap_client, host=host)
         if satellite_version == '6.1':
             execute(setup_oscap, host=host)
-        if satellite_version not in ('6.0', '6.1', 'nightly'):
+        if satellite_version not in ('6.0', '6.1', 'upstream-nightly'):
             execute(oscap_content, host=host)
-        # ostree plugin is for Sat6.2+ and nightly (rhel7 only)
+        # ostree plugin is for Sat6.2+ and upstream-nightly (rhel7 only)
         if satellite_version not in ('6.0', '6.1'):
             execute(enable_ostree, sat_version=satellite_version, host=host)
         # setup_foreman_discovery
@@ -2461,7 +2463,8 @@ def katello_installer(debug=False, distribution=None, verbose=True,
     if distribution == 'sam-upstream':
         installer = 'sam'
         sat_version = ''
-    if sat_version in ('6.2', '6.3') and distribution != 'satellite6-upstream':
+    if (sat_version in ('6.2', '6.3', 'downstream-nightly') and
+            distribution != 'satellite6-upstream'):
         proxy = 'foreman-proxy'
         installer = 'satellite'
         scenario = 'satellite'
@@ -2481,7 +2484,9 @@ def katello_installer(debug=False, distribution=None, verbose=True,
     run('{0}-installer {1} {2} {3} {4} {5}'.format(
         installer,
         '--scenario {0}'
-        .format(scenario) if sat_version in ('6.2', '6.3', 'nightly') else '',
+        .format(scenario) if sat_version in (
+            '6.2', '6.3', 'upstream-nightly', 'downstream-nightly'
+        ) else '',
         '-d' if debug else '',
         '-v' if verbose else '',
         ' '.join([
