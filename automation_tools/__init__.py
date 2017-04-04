@@ -659,7 +659,6 @@ def setup_foreman_discovery(sat_version):
     The following environment variables affect this task:
 
     * `PXE_DEFAULT_TEMPLATE_URL`
-    * `PXE_DEFAULT_TEMPLATE_URL_FOR_70`
     * `PXELINUX_DISCOVERY_SNIPPET_URL`
 
     :param str sat_version: should contain satellite version e.g. 6.1, 6.2
@@ -676,12 +675,22 @@ def setup_foreman_discovery(sat_version):
         run('yum install -y foreman-discovery-image')
         for daemon in ('foreman', 'httpd', 'foreman-proxy'):
             manage_daemon('restart', daemon)
-        template_url = os.environ.get('PXE_DEFAULT_TEMPLATE_URL')
         template_file = run('mktemp')
         hostname = run('hostname -f', quiet=True).strip()
-        run('wget -O {0} {1}'.format(template_file, template_url))
-        run('sed -i -e "s/SatelliteCapsule_HOST/{0}/" {1}'
-            .format(hostname, template_file))
+        if sat_version == '6.1':
+            template_url = os.environ.get('PXE_DEFAULT_TEMPLATE_URL')
+            run('wget -O {0} {1}'.format(template_file, template_url))
+        else:
+            # Dump the template
+            run('hammer -u admin -p {0} template dump --name '
+                '"PXELinux global default" > {1}'.format(
+                    admin_password, template_file))
+        run('sed -i -e "s/^ONTIMEOUT\s\+local/ONTIMEOUT discovery/" {0}'
+            .format(template_file))
+        run('sed -i -e "s/^TIMEOUT\s\+[0-9]\+/TIMEOUT 5/"'
+            ' {0}'.format(template_file))
+        run('sed -i -e "s/SATELLITE_CAPSULE_URL/{0}/i"'
+            ' {1}'.format(hostname, template_file))
         # Update the template
         run('hammer -u admin -p {0} template update --name '
             '"PXELinux global default" --file {1}'
@@ -711,9 +720,7 @@ def setup_foreman_discovery(sat_version):
     run('hammer -u admin -p {0} template update '
         '--name "pxelinux_discovery" --type "snippet" --locked "false"'
         .format(admin_password))
-    # Fetch the updated template where ONTIMEOUT set to 'discovery'
-    # Note that this template is for discovery7.0
-    template_url = os.environ.get('PXE_DEFAULT_TEMPLATE_URL_FOR_70')
+
     # Fetch the updated discovery snippet where URL includes proxy port
     snippet_url = os.environ.get('PXELINUX_DISCOVERY_SNIPPET_URL')
     snippet_file = run('mktemp')
@@ -724,7 +731,14 @@ def setup_foreman_discovery(sat_version):
         .format(admin_password, snippet_file))
     run('rm -rf {0}'.format(snippet_file))
     template_file = run('mktemp')
-    run('wget -O {0} {1}'.format(template_file, template_url))
+    # Dump the template
+    run('hammer -u admin -p {0} template dump --name '
+        '"PXELinux global default" > {1}'.format(
+            admin_password, template_file))
+    run('sed -i -e "s/^ONTIMEOUT\s\+local/ONTIMEOUT discovery/" {0}'
+        .format(template_file))
+    run('sed -i -e "s/^TIMEOUT\s\+[0-9]\+/TIMEOUT 5/"'
+        ' {0}'.format(template_file))
     # Update the template
     run('hammer -u admin -p {0} template update --name '
         '"PXELinux global default" --type "PXELinux" --file {1}'
