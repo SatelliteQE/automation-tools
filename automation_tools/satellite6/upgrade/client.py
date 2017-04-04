@@ -40,15 +40,12 @@ def personal_clients_upgrade(old_repo, clients):
         will be updated
     """
     for client in clients:
-        pre = katello_agent_version_filter(execute(
-            lambda: run('rpm -q katello-agent'), host=client)[client])
         execute(disable_repos, old_repo, host=client)
         execute(lambda: run('yum update -y katello-agent'), host=client)
         post = katello_agent_version_filter(execute(
             lambda: run('rpm -q katello-agent'), host=client)[client])
         logger.highlight(
-            'katello-agent on {0} upgraded from {1} to {2}'.format(
-                client, pre, post))
+            'katello-agent on {0} upgraded to {1}'.format(client, post))
 
 
 def docker_clients_upgrade(old_repo, clients):
@@ -62,8 +59,6 @@ def docker_clients_upgrade(old_repo, clients):
     for hostname, container in clients.items():
         logger.info('Upgrading client {0} on docker container: {1}'.format(
             hostname, container))
-        pre = katello_agent_version_filter(
-            docker_execute_command(container, 'rpm -q katello-agent'))
         docker_execute_command(
             container, 'subscription-manager repos --disable {}'.format(
                 old_repo))
@@ -71,8 +66,7 @@ def docker_clients_upgrade(old_repo, clients):
         pst = katello_agent_version_filter(
             docker_execute_command(container, 'rpm -q katello-agent'))
         logger.highlight(
-            'katello-agent on {0} upgraded from {1} to {2}'.format(
-                hostname, pre, pst))
+            'katello-agent on {0} upgraded to {1}'.format(hostname, pst))
 
 
 def satellite6_client_setup():
