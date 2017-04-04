@@ -743,6 +743,10 @@ def post_upgrade_test_tasks(sat_host):
             host=sat_host
         )
     execute(setup_alternate_capsule_ports, host=sat_host)
+    # Update the Default Organization name, which was updated in 6.2
+    execute(hammer, 'organization update --name "Default_Organization" '
+            '--new-name "Default Organization" ',
+            host=sat_host)
 
 
 def csv_reader(component, subcommand):
