@@ -707,6 +707,10 @@ def setup_foreman_discovery(sat_version):
     run('hammer -u admin -p {0} template update '
         '--name "PXELinux global default" --locked "false"'
         .format(admin_password))
+    # Unlock the 'pxelinux_discovery' snippet
+    run('hammer -u admin -p {0} template update '
+        '--name "pxelinux_discovery" --type "snippet" --locked "false"'
+        .format(admin_password))
     # Fetch the updated template where ONTIMEOUT set to 'discovery'
     # Note that this template is for discovery7.0
     template_url = os.environ.get('PXE_DEFAULT_TEMPLATE_URL_FOR_70')
