@@ -348,7 +348,7 @@ def setup_default_capsule(interface=None, run_katello_installer=True):
         proxy = 'capsule'
     else:
         proxy = 'foreman-proxy'
-    if os.environ.get('SATELLITE_VERSION') != 'upstream-nightly':
+    if os.environ.get('SATELLITE_VERSION') in ('6.0', '6.1', '6.2', '6.3'):
         proxypuppet = 'capsule'
     else:
         proxypuppet = 'foreman-proxy'
