@@ -45,7 +45,7 @@ def check_necessary_env_variables_for_upgrade(product):
     """
     failure = []
     # The upgrade product
-    products = ['satellite', 'capsule', 'client', 'longrun']
+    products = ['satellite', 'capsule', 'client', 'longrun', 'n-1']
     if product not in products:
         failure.append('Product name should be one of {0}.'.format(
             ', '.join(products)))
@@ -79,9 +79,10 @@ def setup_products_for_upgrade(product, os_version):
     sat_host = cap_hosts = clients6 = clients7 = None
     logger.info('Setting up Satellite ....')
     sat_host = satellite6_setup(os_version)
-    if product == 'capsule' or product == 'longrun':
+    if product == 'capsule' or product == 'n-1' or product == 'longrun':
         logger.info('Setting up Capsule ....')
-        cap_hosts = satellite6_capsule_setup(sat_host, os_version)
+        cap_hosts = satellite6_capsule_setup(
+            sat_host, os_version, False if product == 'n-1' else True)
     if product == 'client' or product == 'longrun':
         logger.info('Setting up Clients ....')
         clients6, clients7 = satellite6_client_setup()
@@ -96,6 +97,8 @@ def product_upgrade(product):
     If product is capsule then upgrade satellite and capsule
     If product is client then upgrade satellite and client
     If product is longrun then upgrade satellite, capsule and client
+    If product is n-1 then upgrades only satellite by keeping capsule at last
+    z-stream released version
 
     :param string product: product name wanted to upgrade.
 
