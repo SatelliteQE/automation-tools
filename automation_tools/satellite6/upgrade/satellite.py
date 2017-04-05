@@ -7,7 +7,8 @@ from automation_tools import (
     enable_ostree,
     set_yum_debug_level,
     setup_satellite_firewall,
-    subscribe
+    subscribe,
+    install_prerequisites
 )
 from automation_tools.satellite6.hammer import hammer, set_hammer_config
 from automation_tools.repository import enable_repos, disable_repos
@@ -56,6 +57,9 @@ def satellite6_setup(os_version):
         execute(create_rhevm_instance, sat_instance, sat_image)
         if not host_pings(sat_host):
             sys.exit(1)
+        # start's/enables/install's ntp
+        # Check that hostname and localhost resolve correctly
+        execute(install_prerequisites, host=sat_host)
         # Subscribe the instance to CDN
         execute(subscribe, host=sat_host)
         execute(lambda: run('katello-service restart'), host=sat_host)
