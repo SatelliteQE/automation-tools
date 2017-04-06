@@ -2588,6 +2588,15 @@ def download_manifest(url=None, consumer=None):
     if consumer is None:
             consumer = os.environ.get('CONSUMER')
     manifest_file = run('mktemp --suffix=.zip')
+
+    # we do this as we would otherwise potentially download a manifest which
+    # has new metadata (such as new content sets/repos) but does not have the
+    # required Entitlement certificates to actually access the content.
+    certs_put = ('curl -sk -X PUT -H "Authorization:Basic {0}"'
+                 ' {1}/subscription/consumers/{2}/certificates'
+                 '?lazy_regen=false').format(base64string, url, consumer)
+    run(certs_put)
+
     command = ('curl -sk -H "Authorization:Basic {0}"'
                ' {1}/subscription/consumers/{2}/export/').format(
         base64string, url, consumer
