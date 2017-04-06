@@ -1,13 +1,28 @@
 #!/bin/bash
+if [ "$1" == "-h" ] ; then
+    echo "      Usage: `basename $0` [-h]"
+    echo "          *******Example*******"
+    echo "      Enter the Operating System version. (Ex: 6 or 7)"
+    echo "      6"
+    echo "      Enter the url of the Operating System."
+    echo "      http://xxxxxx.com/Server/x86_64/os/"
+    echo "      Enter the base image name.(Ex: rhel68 or rhel73)"
+    echo "      rhel68"
+    echo "      Enter the password for the base image."
+    echo "      password"
+    echo "      Enter the Authorized keys url for the base image. (Hosted authorized_keys file with jenkins key)"
+    echo "      http://xxxxx.com/xxx/authorized_keys"
+    exit 0
+fi
 echo "Enter the Operating System version. (Ex: 6 or 7)"
 read os_version
 echo "Enter the url of the Operating System."
 read os_url
-echo "Enter the base image name."
+echo "Enter the base image name.(Ex: rhel68 or rhel73)"
 read base_image
 echo "Enter the password for the base image."
 read pass
-echo "Enter the Authorized keys url for the base image."
+echo "Enter the Authorized keys url for the base image. (Hosted authorized_keys file with jenkins key)"
 read auth_url
 
 if [ $os_version -eq 6 ] ; then 
