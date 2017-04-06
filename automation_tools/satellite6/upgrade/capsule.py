@@ -20,13 +20,15 @@ from automation_tools.satellite6.upgrade.tools import (
 logger = logger()
 
 
-def satellite6_capsule_setup(sat_host, os_version):
+def satellite6_capsule_setup(sat_host, os_version, upgradable_capsule=True):
     """Setup all per-requisites for user provided capsule or auto created
     capsule on rhevm for capsule upgrade.
 
     :param string sat_host: Satellite hostname to which the capsule registered
     :param string os_version: The OS version onto which the capsule installed
         e.g: rhel6, rhel7
+    :param bool upgradable_capsule: Whether to setup capsule to be able to
+        upgrade in future
     """
     # For User Defined Capsule
     if os.environ.get('CAPSULE_HOSTNAMES'):
@@ -57,13 +59,15 @@ def satellite6_capsule_setup(sat_host, os_version):
         execute(lambda: run('katello-service restart'), host=cap_hosts)
     env['capsule_hosts'] = cap_hosts
     if ',' in cap_hosts:
-        cap_hosts = cap_hosts.split(',')
+        cap_hosts = [cap.strip() for cap in cap_hosts.split(',')]
     else:
         cap_hosts = [cap_hosts]
     copy_ssh_key(sat_host, cap_hosts)
-    execute(sync_capsule_repos_to_upgrade, cap_hosts, host=sat_host)
-    for cap_host in cap_hosts:
-        logger.info('Capsule {} is ready for Upgrade'.format(cap_host))
+    # Dont run capsule upgrade requirements for n-1 capsule
+    if upgradable_capsule:
+        execute(sync_capsule_repos_to_upgrade, cap_hosts, host=sat_host)
+        for cap_host in cap_hosts:
+            logger.info('Capsule {} is ready for Upgrade'.format(cap_host))
     return cap_hosts
 
 
