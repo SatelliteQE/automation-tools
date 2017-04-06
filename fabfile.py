@@ -75,7 +75,8 @@ from automation_tools.utils import (
     update_packages
 )
 from automation_tools.satellite6.upgrade import (
-    product_upgrade
+    product_upgrade,
+    setup_products_for_upgrade
 )
 from automation_tools.satellite6.upgrade.satellite import (
     satellite6_setup,
