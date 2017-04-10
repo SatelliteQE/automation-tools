@@ -358,18 +358,16 @@ def setup_default_capsule(interface=None, run_katello_installer=True):
         '{0}-register-in-foreman'.format(proxy): 'true',
     }
 
-    if 'DHCP_RANGE' in os.environ:
-        installer_options[
-            '{0}-dhcp-range'.format(proxy)
-        ] = os.environ.get('DHCP_RANGE')
+    installer_options[
+        '{0}-dhcp-range'.format(proxy)
+    ] = os.environ.get('DHCP_RANGE', '192.168.100.10 192.168.100.254')
 
-    if 'GATEWAY' in os.environ:
-        gateway = os.environ.get('GATEWAY')
-        installer_options['{0}-dhcp-gateway'.format(proxy)] = gateway
-        zone = gateway.rpartition('.')[0]
-        reversed_zone = '.'.join(reversed(zone.split('.')))
-        dns_reverse_zone = '{0}.in-addr.arpa'.format(reversed_zone)
-        installer_options['{0}-dns-reverse'.format(proxy)] = dns_reverse_zone
+    gateway = os.environ.get('GATEWAY', '192.168.100.1')
+    installer_options['{0}-dhcp-gateway'.format(proxy)] = gateway
+    zone = gateway.rpartition('.')[0]
+    reversed_zone = '.'.join(reversed(zone.split('.')))
+    dns_reverse_zone = '{0}.in-addr.arpa'.format(reversed_zone)
+    installer_options['{0}-dns-reverse'.format(proxy)] = dns_reverse_zone
 
     if run_katello_installer:
         katello_installer(**installer_options)
