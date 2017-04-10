@@ -552,10 +552,14 @@ def refresh_subscriptions_on_docker_clients(container_ids):
         for container_id in container_ids:
             docker_execute_command(
                 container_id, 'subscription-manager refresh')
+            # Kill the yum process if its locked with previous task
+            kill_process_on_docker_container(container_id, 'yum')
             docker_execute_command(container_id, 'yum clean all')
     else:
         docker_execute_command(container_ids, 'subscription-manager refresh')
-        docker_execute_command(container_ids, 'yum clean all')
+        # Kill the yum process if its locked with previous task
+        kill_process_on_docker_container(container_id, 'yum')
+        docker_execute_command(container_id, 'yum clean all')
 
 
 def sync_tools_repos_to_upgrade(client_os, hosts):
@@ -801,3 +805,28 @@ def get_setup_data():
     with open('product_setup') as pref:
         data = pickle.load(pref)
     return data
+
+
+def kill_process_on_docker_container(container_id, process_name):
+    """Helper method to kill the process running on docker container
+
+    It first kills the process forcefully and then removes its pid file
+    from /var/run directory if exists.
+
+    :param container_id: The container id onto which the process exists
+    :param process_name: The process name on a container to be killed
+    """
+    # Kill the process
+    docker_execute_command(
+        container_id, 'kill -a -9 {}'.format(process_name), quiet=True)
+    # Remove the process pid file
+    pid_loc = '/var/run/{}.pid'.format(process_name)
+    if docker_execute_command(
+        container_id,
+        '[ -f {} ]; echo $?'.format(pid_loc)
+    ) == '0':
+        docker_execute_command(
+            container_id,
+            'rm -rf {}'.format(pid_loc),
+            quiet=True
+        )
