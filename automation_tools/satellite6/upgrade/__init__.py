@@ -25,6 +25,8 @@ from automation_tools.satellite6.upgrade.satellite import (
 from automation_tools.satellite6.upgrade.tasks import (
     get_sat_cap_version,
     post_upgrade_test_tasks,
+    create_setup_dict,
+    get_setup_data
 )
 from automation_tools.satellite6.upgrade.tools import logger
 from distutils.version import LooseVersion
@@ -86,11 +88,17 @@ def setup_products_for_upgrade(product, os_version):
     if product == 'client' or product == 'longrun':
         logger.info('Setting up Clients ....')
         clients6, clients7 = satellite6_client_setup()
+    setups_dict = {
+        'sat_host': sat_host,
+        'capsule_hosts': cap_hosts,
+        'clients6': clients6,
+        'clients7': clients7
+    }
+    create_setup_dict(setups_dict)
     return sat_host, cap_hosts, clients6, clients7
 
 
-def product_upgrade(
-        product, sat_host, cap_hosts, clients6=None, clients7=None):
+def product_upgrade(product):
     """Task which upgrades the product.
 
     Product is satellite or capsule or client or longrun.
@@ -102,14 +110,6 @@ def product_upgrade(
     z-stream released version
 
     :param string product: product name wanted to upgrade.
-    :param string sat_host: sat_host is satellite hostname.
-    :param string cap_hosts: cap_hosts is the capsule host's hostname.
-    :param string clients6: rhel 6 clients to be upgraded,
-        optional in case of docker clients.
-        If not given, the clients will be generated on docker.
-    :param string clients7: rhel 7 clients to be upgraded,
-        optional in case of docker clients.
-        If not given, the clients will be generated on docker.
 
     Environment Variables necessary to proceed Upgrade:
     -----------------------------------------------------
@@ -188,6 +188,9 @@ def product_upgrade(
         to_version = os.environ.get('TO_VERSION')
         logger.info('Performing UPGRADE FROM {0} TO {1}'.format(
             from_version, to_version))
+        # Get the setup dict returned by setup_products_for_upgrade
+        setup_dict = get_setup_data()
+        sat_host = setup_dict['sat_host']
         try:
             with LogAnalyzer(sat_host):
                 current = execute(
@@ -212,6 +215,7 @@ def product_upgrade(
                 # Execute tasks as post upgrade tier1 tests are dependent
                 post_upgrade_test_tasks(sat_host)
                 if product == 'capsule' or product == 'longrun':
+                    cap_hosts = setup_dict['capsule_hosts']
                     for cap_host in cap_hosts:
                         try:
                             with LogAnalyzer(cap_host):
@@ -256,6 +260,8 @@ def product_upgrade(
                                 host=cap_host)
                             raise
                 if product == 'client' or product == 'longrun':
+                    clients6 = setup_dict['clients6']
+                    clients7 = setup_dict['clients7']
                     satellite6_client_upgrade('rhel6', clients6)
                     satellite6_client_upgrade('rhel7', clients7)
         except Exception:
