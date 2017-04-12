@@ -9,6 +9,7 @@ import os
 import re
 import sys
 import time
+import pickle
 from automation_tools import (
     setup_alternate_capsule_ports,
     setup_fake_manifest_certificate,
@@ -776,3 +777,27 @@ def csv_reader(component, subcommand):
         entity_list.append(row)
     comp_dict[component] = entity_list
     return comp_dict
+
+
+def create_setup_dict(setups_dict):
+    """Creates a file to save the return values from setup_products_for_upgrade
+     task
+
+    :param string setups_dict: Dictionary of all return value of
+    setup_products_for_upgrade
+    """
+    with open('product_setup', 'wb') as pref:
+        pickle.dump(setups_dict, pref)
+
+
+def get_setup_data():
+    """Open's the file to return the values from
+    setup_products_for_upgrade to product_upgrade task
+    task
+
+    :returns dict: The dict of all the returns values of
+    setup_products_for_upgrade that were saved in the product_setup file
+    """
+    with open('product_setup') as pref:
+        data = pickle.load(pref)
+    return data
