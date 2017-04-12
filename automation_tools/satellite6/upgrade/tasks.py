@@ -558,8 +558,8 @@ def refresh_subscriptions_on_docker_clients(container_ids):
     else:
         docker_execute_command(container_ids, 'subscription-manager refresh')
         # Kill the yum process if its locked with previous task
-        kill_process_on_docker_container(container_id, 'yum')
-        docker_execute_command(container_id, 'yum clean all')
+        kill_process_on_docker_container(container_ids, 'yum')
+        docker_execute_command(container_ids, 'yum clean all')
 
 
 def sync_tools_repos_to_upgrade(client_os, hosts):
