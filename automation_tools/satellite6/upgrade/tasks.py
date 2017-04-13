@@ -819,14 +819,3 @@ def kill_process_on_docker_container(container_id, process_name):
     # Kill the process
     docker_execute_command(
         container_id, 'kill -a -9 {}'.format(process_name), quiet=True)
-    # Remove the process pid file
-    pid_loc = '/var/run/{}.pid'.format(process_name)
-    if docker_execute_command(
-        container_id,
-        '[ -f {} ]; echo $?'.format(pid_loc)
-    ) == '0':
-        docker_execute_command(
-            container_id,
-            'rm -rf {}'.format(pid_loc),
-            quiet=True
-        )
