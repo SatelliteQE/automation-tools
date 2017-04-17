@@ -1,3 +1,7 @@
+TESTIMONY_TOKENS="bz, caseautomation, casecomponent, caseimportance, caselevel, caseposneg, expectedresults, id, requirement, setup, subtype1, steps, testtype, upstream"
+TESTIMONY_MINIMUM_TOKENS="id, requirement, caseautomation, caselevel, casecomponent, testtype, caseimportance, upstream"
+TESTIMONY_OPTIONS=--tokens=$(TESTIMONY_TOKENS) --minimum-tokens=$(TESTIMONY_MINIMUM_TOKENS)
+
 # Commands --------------------------------------------------------------------
 
 help:
@@ -8,6 +12,8 @@ help:
 	@echo "  can-i-push?                to check if local changes are suitable to push"
 	@echo "  install-commit-hook        to install pre-commit hook to check if changes are suitable to push"
 	@echo "  gitflake8                  to check flake8 styling only for modified files"
+	@echo "  lint                       to check code style"
+	@echo "  test-docstrings            to check minimum required test docstrings"
 
 docs:
 	@cd docs; $(MAKE) html
@@ -34,6 +40,13 @@ install-commit-hook:
 	$(info "Installing git pre-commit hook...")
 	@touch .git/hooks/pre-commit
 	@grep -q '^make can-i-push?' .git/hooks/pre-commit || echo "make can-i-push?" >> .git/hooks/pre-commit
+
+lint:
+	flake8 automation_tools upgrade_tests
+
+test-docstrings:
+	testimony $(TESTIMONY_OPTIONS) validate upgrade_tests
+
 
 # Special Targets -------------------------------------------------------------
 
