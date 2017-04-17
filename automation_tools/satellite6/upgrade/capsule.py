@@ -71,11 +71,13 @@ def satellite6_capsule_setup(sat_host, os_version, upgradable_capsule=True):
     return cap_hosts
 
 
-def satellite6_capsule_upgrade(cap_host):
+def satellite6_capsule_upgrade(cap_host, sat_host):
     """Upgrades capsule from existing version to latest version.
 
     :param string cap_host: Capsule hostname onto which the capsule upgrade
     will run
+    :param string sat_host : Satellite hostname from which capsule certs are to
+    be generated
 
     The following environment variables affect this command:
 
@@ -91,7 +93,6 @@ def satellite6_capsule_upgrade(cap_host):
 
     """
     logger.highlight('\n========== CAPSULE UPGRADE =================\n')
-    sat_host = env.get('satellite_host')
     from_version = os.environ.get('FROM_VERSION')
     to_version = os.environ.get('TO_VERSION')
     set_yum_debug_level()
