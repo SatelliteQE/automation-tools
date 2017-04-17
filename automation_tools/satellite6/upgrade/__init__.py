@@ -30,7 +30,7 @@ from automation_tools.satellite6.upgrade.tasks import (
 )
 from automation_tools.satellite6.upgrade.tools import logger
 from distutils.version import LooseVersion
-from fabric.api import execute
+from fabric.api import env, execute
 
 
 # =============================================================================
@@ -191,6 +191,7 @@ def product_upgrade(product):
         # Get the setup dict returned by setup_products_for_upgrade
         setup_dict = get_setup_data()
         sat_host = setup_dict['sat_host']
+        env['satellite_host'] = sat_host
         try:
             with LogAnalyzer(sat_host):
                 current = execute(
