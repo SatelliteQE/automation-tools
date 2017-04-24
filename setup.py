@@ -16,7 +16,7 @@ setup(
     author=u'Elyézer Rezende',
     author_email='erezende@redhat.com',
     url='https://github.com/SatelliteQE/automation-tools',
-    packages=['automation_tools'],
+    packages=['automation_tools', 'automation_tools/satellite6'],
     package_data={'': ['LICENSE']},
     package_dir={'automation_tools': 'automation_tools'},
     include_package_data=True,
