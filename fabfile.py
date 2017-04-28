@@ -43,6 +43,7 @@ from automation_tools import (  # flake8: noqa
     setup_firewall,
     setup_foreman_discovery,
     setup_capsule_firewall,
+    setup_code_coverage,
     setup_satellite_firewall,
     setup_libvirt_key,
     setup_proxy,
