@@ -628,6 +628,60 @@ def setup_abrt():
     run('abrt-auto-reporting enabled')
 
 
+def setup_code_coverage():
+    """Task to setup code coverage on sat6."""
+    os_version = distro_info()[1]
+
+    coveragerc_file = StringIO()
+    coveragerc_file.write('[run]\n')
+    coveragerc_file.write('source=\n')
+    coveragerc_file.write('    pulp\n')
+    coveragerc_file.write('    pulp_deb=\n')
+    coveragerc_file.write('    pulp_docker\n')
+    coveragerc_file.write('    pulp_openstack\n')
+    coveragerc_file.write('    pulp_ostree\n')
+    coveragerc_file.write('    pulp_puppet\n')
+    coveragerc_file.write('    pulp_python\n')
+    coveragerc_file.write('    pulp_rpm\n')
+    coveragerc_file.write('\n')
+    coveragerc_file.write('data_file=/etc/coverage/.coverage\n')
+    coveragerc_file.write('\n')
+    coveragerc_file.write('parallel=true\n')
+    coveragerc_file.write('\n')
+    coveragerc_file.write('concurrency=\n')
+    coveragerc_file.write('    multiprocessing\n')
+    coveragerc_file.write('    thread\n')
+    coveragerc_file.write('\n')
+    coveragerc_file.write('[xml]\n')
+    coveragerc_file.write('output=/etc/coverage/coverage.xml\n')
+    put(local_path=coveragerc_file,
+        remote_path='/etc/coverage/.coveragerc')
+    coveragerc_file.close()
+
+    sitecustomize_file = StringIO()
+    sitecustomize_file.write('import os\n')
+    sitecustomize_file.write('os.environ[\'COVERAGE_PROCESS_START\']')
+    sitecustomize_file.write(' = \'/etc/coverage/.coveragerc\'\n')
+    sitecustomize_file.write('# Import coverage after editing environment\n')
+    sitecustomize_file.write('import coverage\n')
+    sitecustomize_file.write('coverage.process_startup()\n')
+    put(local_path=sitecustomize_file,
+        remote_path='/usr/lib/python2.7/site-packages/sitecustomize.py')
+    sitecustomize_file.close()
+
+    # Install EPEL packages for the installation
+    run('yum -y localinstall https://dl.fedoraproject.org'
+        '/pub/epel/epel-release-latest-{0}.noarch.rpm'
+        .format(os_version))
+    run('yum -y install python-pip')
+    run('pip install -U coverage')
+    # Delete EPEL repo files
+    delete_custom_repos('epel*')
+    run('mkdir -p /etc/coverage')
+    run('chcon -R -u system_u -t httpd_sys_rw_content_t /etc/coverage')
+    run('chmod -R 777 /etc/coverage ; chown -R apache.apache /etc/coverage')
+
+
 def setup_oscap():
     """Task to setup oscap on foreman."""
     # Install required packages for the installation
@@ -1910,6 +1964,7 @@ def product_install(distribution, create_vm=False, certificate_url=None,
             sat_version=satellite_version,
             host=host
         )
+    execute(setup_code_coverage, host=host)
     if (
         os.environ.get('EXTERNAL_AUTH') == 'IDM' or
         os.environ.get('IDM_REALM') == 'true'
