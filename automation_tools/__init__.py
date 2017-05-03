@@ -632,6 +632,7 @@ def setup_code_coverage():
     """Task to setup code coverage on sat6."""
     os_version = distro_info()[1]
 
+    run('mkdir -p /etc/coverage')
     coveragerc_file = StringIO()
     coveragerc_file.write('[run]\n')
     coveragerc_file.write('source=\n')
@@ -677,7 +678,6 @@ def setup_code_coverage():
     run('pip install -U coverage')
     # Delete EPEL repo files
     delete_custom_repos('epel*')
-    run('mkdir -p /etc/coverage')
     run('chcon -R -u system_u -t httpd_sys_rw_content_t /etc/coverage')
     run('chmod -R 777 /etc/coverage ; chown -R apache.apache /etc/coverage')
 
