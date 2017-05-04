@@ -427,3 +427,19 @@ def hammer_determine_cv_and_env_from_ak(ak_name, organization_id):
             'Wrong Activation key provided for determining CV and Env')
     return get_attribute_value(data, ak_name, 'content view'), \
         get_attribute_value(data, ak_name, 'lifecycle environment')
+
+
+def get_latest_cv_version(cv_name):
+    """Calculates the latest CV version to be published
+
+    :param string cv_name : Name of the CV for which version is to be
+        calculated
+    :return int : Calculated version to be created for CV
+    """
+    cv_version_data = hammer(
+        'content-view version list --content-view {} '
+        '--organization-id 1'.format(cv_name))
+    latest_cv_ver = sorted([float(data['name'].split(
+        '{} '.format(cv_name))[1]) for data in cv_version_data]).pop()
+    return get_attribute_value(cv_version_data, '{0} {1}'.format(
+        cv_name, latest_cv_ver), 'id')
