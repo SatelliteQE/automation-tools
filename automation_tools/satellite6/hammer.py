@@ -30,12 +30,12 @@ def _lower_dict_keys(d):
 
 
 def get_attribute_value(hammer_result, search_key, attribute):
-    """Gets the attribute value from hammer_reult using the search key
+    """Gets the attribute value from hammer_result using the search key
 
     e.g. Run hammer() def for 'capsule list' and get hammer_result then
     search capsules 'id' attribute by 'capsule name' search key.
 
-    :param list/dict hammer_result: hammer result from hammer() defination
+    :param list/dict hammer_result: hammer result from hammer() definition
     :param str attribute: The attribute name of which value to be fetched
     :param str search_key: The search_key whose attribute to be fetched
     :return Returns a string/list/dict as attribute value
@@ -61,11 +61,13 @@ def get_attribute_value(hammer_result, search_key, attribute):
         raise TypeError('hammer data is not one of type list/dict.')
 
 
-def set_hammer_config(user=None, password=None):
+def set_hammer_config(user=None, password=None, host=None, os_user='root'):
     """Sets the hammer admin username and password fabric env. variables to run
     hammer commands"""
     env['hammer_user'] = 'admin' if not user else user
     env['hammer_password'] = 'changeme' if not password else password
+    env.host_string = host
+    env.user = os_user
 
 
 @task
@@ -427,3 +429,53 @@ def hammer_determine_cv_and_env_from_ak(ak_name, organization_id):
             'Wrong Activation key provided for determining CV and Env')
     return get_attribute_value(data, ak_name, 'content view'), \
         get_attribute_value(data, ak_name, 'lifecycle environment')
+
+
+def hammer_create_lifecycle_env(name, org_id, prior_id):
+    """Creates a lifecycle environment
+
+    :param string name: Lifecycle name
+    :param int org_id : Organization id
+    :param int prior_id: Prior lifecycle's ID
+    """
+    return hammer(
+        'lifecycle-environment create --name "{0}" '
+        '--organization-id {1} '
+        '--prior-id "{2}"'.format(
+            name, org_id, prior_id))
+
+
+def hammer_info_via_name(entity, name, org_id):
+    """Get information regarding the entities
+
+    :param string entity: Name of the entity. eg. product,capsule,hosts
+    :param string name: Specific name of the entity.
+    :param int org_id: Organization id
+    """
+    return hammer('"{0}" info --name "{1}" --organization-id {2}'.format(
+                     entity, name, org_id))
+
+
+def hammer_remove_cv_version(cv_version_id, cv_name, org_id):
+    """Removes the CV version of the specified CV
+
+    :param int cv_version_id : CV Version to be removed.
+    :param string cv_name: CV name which is to be used
+    :param int org_id: Organization id
+    """
+    return hammer('content-view remove --content-view-version-ids {0}'
+                  ' --name "{1}" --organization-id {2}'.format(
+                    cv_version_id, cv_name, org_id))
+
+
+def hammer_get_entity_id(entity, name, org_id):
+    """Get ID of the specified entity
+
+    :param string entity: Name of the entity. eg. product,capsule,hosts
+    :param string name: Specific name of the entity.
+    :param int org_id: Organization id
+
+    :return int : The ID of the specified entity
+    """
+    result = hammer_info_via_name(entity, name, org_id)
+    return get_attribute_value(result, name, 'id')
