@@ -260,8 +260,8 @@ def setup_default_docker():
         disable_repos('rhel-{0}-server-extras-rpms'.format(os_version))
     else:
         run('yum install -y docker-io', warn_only=True)
-        # Delete EPEL repo files
-        delete_custom_repos('epel*')
+        # Uninstall EPEL package rather than delete just the epel.repo file.
+        run('yum remove -y epel-release.noarch')
 
     run('groupadd docker', warn_only=True)
     run('usermod -aG docker foreman')
@@ -675,13 +675,13 @@ def setup_code_coverage():
     sitecustomize_file.close()
 
     # Install EPEL packages for the installation
-    run('yum -y localinstall https://dl.fedoraproject.org'
+    run('yum -y install https://dl.fedoraproject.org'
         '/pub/epel/epel-release-latest-{0}.noarch.rpm'
         .format(os_version))
     run('yum -y install python-pip')
     run('pip install -U coverage')
-    # Delete EPEL repo files
-    delete_custom_repos('epel*')
+    # Uninstall EPEL package rather than delete just the epel.repo file.
+    run('yum remove -y epel-release.noarch')
     run('chcon -R -u system_u -t httpd_sys_rw_content_t /etc/coverage')
     run('chmod -R 777 /etc/coverage ; chown -R apache.apache /etc/coverage')
 
