@@ -666,8 +666,12 @@ def setup_code_coverage():
     sitecustomize_file.write('# Import coverage after editing environment\n')
     sitecustomize_file.write('import coverage\n')
     sitecustomize_file.write('coverage.process_startup()\n')
-    put(local_path=sitecustomize_file,
-        remote_path='/usr/lib/python2.7/site-packages/sitecustomize.py')
+    if os_version == '7':
+        put(local_path=sitecustomize_file,
+            remote_path='/usr/lib/python2.7/site-packages/sitecustomize.py')
+    else:
+        put(local_path=sitecustomize_file,
+            remote_path='/usr/lib/python2.6/site-packages/sitecustomize.py')
     sitecustomize_file.close()
 
     # Install EPEL packages for the installation
