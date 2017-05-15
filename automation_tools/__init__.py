@@ -1847,6 +1847,12 @@ def product_install(distribution, create_vm=False, certificate_url=None,
                 cdn_version=sat_cdn_version,
                 host=host)
 
+    # Disable BaseOS if using custom image for vault_requests.
+    if os.environ.get('IMAGE'):
+        os_version = distro_info()[1]
+        execute(disable_repos,
+                'rhel-{0}-server-rpms'.format(os_version),
+                host=host)
     # Setting yum stdout log level to be less verbose
     execute(set_yum_debug_level, host=host)
     # Install some basic packages
