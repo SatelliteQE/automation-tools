@@ -666,7 +666,7 @@ def setup_code_coverage():
     sitecustomize_file.write('# Import coverage after editing environment\n')
     sitecustomize_file.write('import coverage\n')
     sitecustomize_file.write('coverage.process_startup()\n')
-    if os_version == '7':
+    if os_version == 7:
         put(local_path=sitecustomize_file,
             remote_path='/usr/lib/python2.7/site-packages/sitecustomize.py')
     else:
