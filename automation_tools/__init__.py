@@ -324,22 +324,8 @@ def setup_default_capsule(interface=None, run_katello_installer=True):
         sys.exit(1)
 
     if interface is None:
-        run('yum install -y libvirt')
-        manage_daemon('enable', 'libvirtd')
-        manage_daemon('start', 'libvirtd')
-        run('puppet module install -i /tmp sat6qe/katellovirt')
-        with cd('/tmp/katellovirt/'):
-            run('grep -v virbr manifests/libvirt.pp > tempfile')
-            run('mv -f tempfile manifests/libvirt.pp')
-        run('puppet apply -v -e "include katellovirt" --modulepath /tmp')
-
-        # Fetch virtual bridge information.
-        interface = run(
-            'ip link show | grep virbr | awk \'{print $2}\' | head -n1'
-        )
-        # Remove any additional visual character like `:` on RHEL7
-        interface = search(r'(virbr\d+)', interface).group(1)
-
+        # Setup libvirt and fetch virtual bridge information
+        interface = setup_default_libvirt()
         if len(interface) == 0:
             print('Was not possible to fetch interface information')
             sys.exit(1)
@@ -384,6 +370,51 @@ def setup_default_capsule(interface=None, run_katello_installer=True):
         katello_installer(**installer_options)
     else:
         return installer_options
+
+
+def setup_default_libvirt(bridge=None):
+    """Task to setup a the default capsule for Satellite
+
+    :param str interface: Network interface name to be used
+    """
+    run('yum install -y libvirt libvirt-daemon-kvm virt-install qemu-kvm')
+    run('lsmod | grep kvm_')
+    run('sed -i \'s/^#*\s*LIBVIRTD_ARGS=.*/LIBVIRTD_ARGS=--listen/\''
+        ' /etc/sysconfig/libvirtd')
+    run('sed -i \'s/^#*\s*listen_tls\s*=.*/listen_tls = 0/\''
+        ' /etc/libvirt/libvirtd.conf')
+    run('sed -i \'s/^#*\s*listen_tcp\s*=.*/listen_tcp = 1/\''
+        ' /etc/libvirt/libvirtd.conf')
+    run('sed -i \'s/^#*\s*auth_tcp\s*=.*/auth_tcp = "none"/\''
+        ' /etc/libvirt/libvirtd.conf')
+    manage_daemon('enable', 'libvirtd')
+    manage_daemon('restart', 'libvirtd')
+
+    if 'default' in run('virsh net-list'):
+        run('virsh net-destroy default')
+        run('virsh net-undefine default')
+
+    # Setup foreman libvirt network
+    if 'foreman' not in run('virsh net-list --all'):
+        run('virsh net-define <(echo "\n'
+            '<network>\n'
+            '  <name>foreman</name>\n'
+            '  <forward mode=\'nat\'>\n'
+            '    <nat>\n'
+            '      <port start=\'1024\' end=\'65535\'/>\n'
+            '    </nat>\n'
+            '  </forward>\n' +
+            ('  <bridge name=\'{}\' stp=\'on\' delay=\'0\'/>\n'.format(bridge)
+                if bridge else '') +
+            '  <ip address=\'192.168.100.1\' netmask=\'255.255.255.0\'>\n'
+            '  </ip>\n'
+            '</network>")')
+        run('virsh net-start foreman')
+    run('virsh net-autostart foreman')
+
+    # Fetch virtual bridge information
+    interface = run('virsh net-info foreman | awk \'/Bridge:/{printf$2}\'')
+    return interface
 
 
 def setup_email_notification(smtp=None):
