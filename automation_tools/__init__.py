@@ -826,6 +826,20 @@ def enable_ostree(sat_version='6.3'):
         print('ostree plugin is supported only on rhel7+')
 
 
+def disable_baseos_repo():
+    """Disable BaseOS Repo if using custom image for vault_requests.
+
+
+    Expects the following environment variables:
+
+    IMAGE
+        The custom image name to be used for vault_requests.
+    """
+    if os.environ.get('IMAGE'):
+        os_version = distro_info()[1]
+        disable_repos('rhel-{0}-server-rpms'.format(os_version))
+
+
 def setup_libvirt_key():
     """Task to setup key pairs and verify host for secure communication between
     Satellite server and libvirt hypervisor (qemu+ssh).
@@ -1848,11 +1862,7 @@ def product_install(distribution, create_vm=False, certificate_url=None,
                 host=host)
 
     # Disable BaseOS if using custom image for vault_requests.
-    if os.environ.get('IMAGE'):
-        os_version = distro_info()[1]
-        execute(disable_repos,
-                'rhel-{0}-server-rpms'.format(os_version),
-                host=host)
+    execute(disable_baseos_repo, host=host)
     # Setting yum stdout log level to be less verbose
     execute(set_yum_debug_level, host=host)
     # Install some basic packages
