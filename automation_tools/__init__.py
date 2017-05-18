@@ -859,7 +859,11 @@ def setup_libvirt_key():
     if key_url is None or libvirt_host is None:
         print('You must specify the Libvirt key URL and the Libvirt hostname')
         sys.exit(1)
-    # Deploy priv ssh key under root and foreman account
+    # Move existing root user ssh keys, to avoid the ssh key pair mismatch.
+    # As only ssh private key is being placed under /root/.ssh/ dir.
+    run('mkdir -p /root/.ssh/bkp')
+    run('mv /root/.ssh/id_rsa* /root/.ssh/bkp', warn_only=True)
+    # Deploy private ssh key under root and foreman account
     run('wget -O {0} {1}'.format(root_key_file, key_url))
     run('chmod 600 {0}'.format(root_key_file))
     sudo('wget -O {0} {1}'.format(foreman_key_file, key_url), user='foreman')
