@@ -1775,8 +1775,9 @@ def product_install(distribution, create_vm=False, certificate_url=None,
     ``PUPPET4_REPO`` env var can be defined to setup a Puppet4 repository
     prior Satellite installation
 
-    ``OS_UPGRADE_REPO`` env var can be defined to setup a custom repository
-    before OS upgrade, it can be OS candidate repo when tesing OS compatibility
+    ``OS_UPGRADE_REPOS`` env var can be defined to setup a custom repository or
+    repositories (space-separated list) before OS upgrade, typically OS-
+    candidate repo when tesing OS compatibility.
 
     Every call to a task after the definition ``host = env.get('vm_ip',
     env['host'])`` must be run by using ``execute`` and passing ``host=host``.
@@ -1879,9 +1880,15 @@ def product_install(distribution, create_vm=False, certificate_url=None,
         if puppet4_repo:
             execute(install_puppet4, puppet4_repo=puppet4_repo, host=host)
     # If defined, create custom repo with RHEL candidate for OS upgrade
-    if os.environ.get('OS_UPGRADE_REPO'):
-        os_upgrade_repo = os.environ.get('OS_UPGRADE_REPO')
-        execute(create_custom_repos, rhel_candidate=os_upgrade_repo, host=host)
+    # OS_UPGRADE_REPOS can be space-separated list of multiple custom repo urls
+    if os.environ.get('OS_UPGRADE_REPOS'):
+        custom_repos = os.environ.get('OS_UPGRADE_REPOS').split()
+        # this comprehension creates a dict { 'reponame': 'repourl_1, ...}
+        custom_repos_dict = {
+            'custom_repo_{}'.format(k+1): v
+            for (k, v) in zip(range(len(custom_repos)), custom_repos)
+        }
+        execute(create_custom_repos, custom_repos_dict, host=host)
     # Update the machine
     execute(update_packages, host=host, warn_only=True)
 
