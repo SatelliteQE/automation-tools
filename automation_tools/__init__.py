@@ -1995,7 +1995,9 @@ def product_install(distribution, create_vm=False, certificate_url=None,
             sat_version=satellite_version,
             host=host
         )
-    execute(setup_code_coverage, host=host)
+    # Setup code_coverage only for the provisoning jobs.
+    if 'base' in target_image:
+        execute(setup_code_coverage, host=host)
     if (
         os.environ.get('EXTERNAL_AUTH') == 'IDM' or
         os.environ.get('IDM_REALM') == 'true'
