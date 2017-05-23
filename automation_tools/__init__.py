@@ -1955,6 +1955,13 @@ def product_install(distribution, create_vm=False, certificate_url=None,
         **installer_options
     )
 
+    # With SSL verification in hammer the installer should set hostname itself
+    if satellite_version == 'downstream-nightly' and bz_bug_is_open('1454706'):
+        execute(lambda: run(
+            'sed -i "s|/localhost/|/\$(hostname)/|"'
+            ' /etc/hammer/cli.modules.d/foreman.yml'
+        ), host=host)
+
     # Temporary workaround to solve pulp message bus connection issue
     # only for 6.1 and above
     if (sat_cdn_version not in ('6.0', '6.1', '6.2')):
