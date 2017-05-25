@@ -76,35 +76,3 @@ from automation_tools.utils import (
     distro_info,
     update_packages
 )
-from automation_tools.satellite6.upgrade import (
-    product_upgrade,
-    setup_products_for_upgrade
-)
-from automation_tools.satellite6.upgrade.satellite import (
-    satellite6_setup,
-    satellite6_upgrade,
-    satellite6_zstream_upgrade
-)
-from automation_tools.satellite6.upgrade.tasks import (
-    create_openstack_instance,
-    create_rhevm_instance,
-    delete_openstack_instance,
-    delete_rhevm_instance,
-    docker_execute_command,
-    generate_satellite_docker_clients_on_rhevm,
-    get_sat_cap_version,
-    refresh_subscriptions_on_docker_clients,
-    remove_all_docker_containers,
-    sync_capsule_repos_to_upgrade,
-    sync_tools_repos_to_upgrade,
-    wait_till_rhev_instance_status
-)
-from automation_tools.satellite6.upgrade.tools import (
-    copy_ssh_key,
-    get_hostname_from_ip,
-    host_pings,
-    reboot
-)
-from automation_tools.satellite6.upgrade.tests.existence import (
-    set_datastore
-)
