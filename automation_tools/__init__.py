@@ -1891,7 +1891,7 @@ def product_install(distribution, create_vm=False, certificate_url=None,
             'custom_repo_{}'.format(k+1): v
             for (k, v) in zip(range(len(custom_repos)), custom_repos)
         }
-        execute(create_custom_repos, custom_repos_dict, host=host)
+        execute(create_custom_repos, host=host, **custom_repos_dict)
     # Update the machine
     execute(update_packages, host=host, warn_only=True)
 
