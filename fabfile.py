@@ -8,6 +8,7 @@ from automation_tools import (  # flake8: noqa
     configure_ad_external_auth,
     configure_idm_external_auth,
     configure_realm,
+    configure_sonarqube,
     create_personal_git_repo,
     download_manifest,
     downstream_install,
