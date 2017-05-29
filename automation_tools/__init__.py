@@ -689,6 +689,43 @@ def setup_code_coverage():
     run('chmod -R 777 /etc/coverage ; chown -R apache.apache /etc/coverage')
 
 
+def configure_sonarqube():
+    """Task to configure SonarQube.
+
+    The following environment variables affect this task:
+
+        * `HTTP_SERVER_HOSTNAME`
+        * `SONAR_SERVER_URL`
+        * `SATELLITE_VERSION`
+        * `BUILD_LABEL`
+    """
+    http_server = os.environ.get('HTTP_SERVER_HOSTNAME')
+    sonar_server = os.environ.get('SONAR_SERVER_URL')
+    satellite_version = os.environ.get('SATELLITE_VERSION')
+    build_label = os.environ.get('BUILD_LABEL')
+    # Sonar Scanner requires Java1.8 to be able to upload content to SonarQube
+    run('yum -y install java-1.8.0-openjdk')
+
+    # Download and Install Sonar-Scanner 2.6
+    run('wget {0}/pub/sonar-scanner-2.6-SNAPSHOT.zip'.format(http_server))
+    run('unzip sonar-scanner-2.6-SNAPSHOT.zip')
+    run('pushd sonar-scanner-2.6-SNAPSHOT/bin/')
+
+    # Run the Sonar-Scanner to actually upload the results to SonarQube.
+    run('./sonar-scanner -X -e -Dsonar.host.url={0} '
+        '-Dsonar.language=py -Dsonar.ws.timeout=180 '
+        '-Dsonar.projectVersion={1} '
+        '"-Dsonar.projectName=Satellite{2} Pulp Python Analysis" '
+        '"-Dsonar.python.coverage.reportPath=/etc/coverage/coverage.xml" '
+        '"-Dsonar.projectKey=Satellite{2}_pulp_python_full_analysis" '
+        '-Dsonar.projectBaseDir=/usr/lib/python2.7/site-packages/ '
+        '-Dsonar.sources=pulp,pulp_docker,pulp_katello,pulp_ostree,pulp_puppet'
+        ',pulp_rpm "-Dsonar.exclusions=pulp_docker/plugins/distributors/'
+        'distributor_export.py,pulp_rpm/extensions/*.py"'
+        .format(sonar_server, build_label, satellite_version))
+    run('popd')
+
+
 def setup_oscap():
     """Task to setup oscap on foreman."""
     # Install required packages for the installation
