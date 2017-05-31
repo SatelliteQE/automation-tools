@@ -5,6 +5,7 @@ copied from robottelo's robotello/decorators/__init__.py
 """
 import bugzilla
 import logging
+import pytest
 import requests
 
 from six.moves.xmlrpc_client import Fault
@@ -35,6 +36,10 @@ _redmine = {
 
 class BugFetchError(Exception):
     """Indicates an error occurred while fetching information about a bug."""
+
+
+class BugTypeError(Exception):
+    """Indicates that an incorrect bug type was specified."""
 
 
 def _get_bugzilla_bug(bug_id):
@@ -181,3 +186,27 @@ def rm_bug_is_open(bug_id):
     if status_id is None or status_id in _redmine_closed_issue_statuses():
         return False
     return True
+
+
+def skip_if_bug_open(bug_type, bug_id):
+    """A decorator to skip a test due to bugzilla or redmine issue
+
+    :param str bug_type: Either 'bugzilla' or 'redmine'.
+    :param int bug_id: The ID of the bug to check when the decorator is run.
+
+    """
+    if bug_type not in ('bugzilla', 'redmine'):
+        raise BugTypeError(
+            '"{0}" is not a recognized bug type. Did you mean '
+            '"bugzilla" or "redmine"?'.format(bug_type)
+        )
+    if bug_type == 'bugzilla':
+        return pytest.mark.skipif(
+            bz_bug_is_open(bug_id),
+            reason='Skipping test due to open Bugzilla bug #{0}'.format(bug_id)
+        )
+    if bug_type == 'redmine':
+        return pytest.mark.skipif(
+            rm_bug_is_open(bug_id),
+            reason='Skipping test due to open Redmine bug #{0}.'.format(bug_id)
+        )
