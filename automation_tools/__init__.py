@@ -709,11 +709,10 @@ def configure_sonarqube():
     # Download and Install Sonar-Scanner 2.6
     run('wget {0}/pub/sonar-scanner-2.6-SNAPSHOT.zip'.format(http_server))
     run('unzip sonar-scanner-2.6-SNAPSHOT.zip')
-    run('pushd sonar-scanner-2.6-SNAPSHOT/bin/')
 
     # Run the Sonar-Scanner to actually upload the results to SonarQube.
-    run('./sonar-scanner -X -e -Dsonar.host.url={0} '
-        '-Dsonar.language=py -Dsonar.ws.timeout=180 '
+    run('sonar-scanner-2.6-SNAPSHOT/bin/sonar-scanner -X -e '
+        '-Dsonar.host.url={0} -Dsonar.language=py -Dsonar.ws.timeout=180 '
         '-Dsonar.projectVersion={1} '
         '"-Dsonar.projectName=Satellite{2} Pulp Python Analysis" '
         '"-Dsonar.python.coverage.reportPath=/etc/coverage/coverage.xml" '
@@ -723,7 +722,6 @@ def configure_sonarqube():
         ',pulp_rpm "-Dsonar.exclusions=pulp_docker/plugins/distributors/'
         'distributor_export.py,pulp_rpm/extensions/*.py"'
         .format(sonar_server, build_label, satellite_version))
-    run('popd')
 
 
 def setup_oscap():
