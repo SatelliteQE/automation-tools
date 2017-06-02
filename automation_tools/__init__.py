@@ -348,10 +348,6 @@ def setup_default_capsule(interface=None, run_katello_installer=True):
         proxy = 'capsule'
     else:
         proxy = 'foreman-proxy'
-    if os.environ.get('SATELLITE_VERSION') in ('6.0', '6.1', '6.2', '6.3'):
-        proxypuppet = 'capsule'
-    else:
-        proxypuppet = 'foreman-proxy'
 
     installer_options = {
         '{0}-dns'.format(proxy): 'true',
@@ -362,10 +358,16 @@ def setup_default_capsule(interface=None, run_katello_installer=True):
         '{0}-dhcp-interface'.format(proxy): interface,
         '{0}-tftp'.format(proxy): 'true',
         '{0}-tftp-servername'.format(proxy): hostname,
-        '{0}-puppet'.format(proxypuppet): 'true',
-        '{0}-puppetca'.format(proxy): 'true',
         '{0}-register-in-foreman'.format(proxy): 'true',
     }
+
+    # Handles enabling puppet support
+    if not os.environ.get('SATELLITE_VERSION') == '6.3':
+        installer_options['{0}-puppetca'.format(proxy)] = 'true'
+        if os.environ.get('SATELLITE_VERSION') in ('6.0', '6.1', '6.2'):
+            installer_options['capsule-puppet'] = 'true'
+        else:
+            installer_options['foreman-proxy-puppet'] = 'true'
 
     installer_options[
         '{0}-dhcp-range'.format(proxy)
