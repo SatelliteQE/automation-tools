@@ -791,7 +791,6 @@ def setup_foreman_discovery(sat_version):
         run('hammer -u admin -p {0} template update --name '
             '"PXELinux global default" --file {1}'
             .format(admin_password, template_file))
-        run('rm -rf {0}'.format(template_file))
         return
 
     if sat_version == 'upstream-nightly':
@@ -825,7 +824,6 @@ def setup_foreman_discovery(sat_version):
     run('hammer -u admin -p {0} template update --name '
         '"pxelinux_discovery" --type "snippet" --file {1}'
         .format(admin_password, snippet_file))
-    run('rm -rf {0}'.format(snippet_file))
     template_file = run('mktemp')
     # Dump the template
     run('hammer -u admin -p {0} template dump --name '
@@ -839,7 +837,6 @@ def setup_foreman_discovery(sat_version):
     run('hammer -u admin -p {0} template update --name '
         '"PXELinux global default" --type "PXELinux" --file {1}'
         .format(admin_password, template_file))
-    run('rm -rf {0}'.format(template_file))
 
 
 def enable_ostree(sat_version='6.3'):
