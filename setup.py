@@ -23,7 +23,6 @@ setup(
     install_requires=[
         'Fabric',
         'lxml',
-        'paramiko==2.1.2',
         'pycurl',
         'pytest',
         'python-bugzilla==1.2.2',
