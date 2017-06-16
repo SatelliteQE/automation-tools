@@ -855,8 +855,8 @@ def enable_ostree(sat_version='6.3'):
                                 'centos/7/atomic/x86_64/Packages/')
         run('{0}-installer --scenario {1} {2} --katello-enable-ostree=true'
             .format(
-                'foreman' if sat_version == 'upstream-nightly' else 'satellite', # noqa
-                'katello' if sat_version == 'upstream-nightly' else 'satellite', # noqa
+                'foreman' if sat_version == 'upstream-nightly' else 'satellite',  # noqa
+                'katello' if sat_version == 'upstream-nightly' else 'satellite',  # noqa
                 '--disable-system-checks' if sat_version in (
                     '6.3', 'downstream-nightly'
                 ) else ''))
@@ -2084,12 +2084,13 @@ def partition_disk():
     synchronization of larger repositories.
 
     """
-    run('umount /home')
-    run('lvremove -f /dev/mapper/*home')
-    run("sed -i '/\/home/d' /etc/fstab")
-    run('lvresize -f -l +100%FREE /dev/mapper/*root')
-    run('if uname -r | grep -q el6; then resize2fs -f /dev/mapper/*root; '
-        'else xfs_growfs / && mount / -o inode64,remount; fi')
+    if run('stat --format=%m /home') == '/home':
+        run('umount /home')
+        run('lvremove -f /dev/mapper/*home')
+        run("sed -i '/\/home/d' /etc/fstab")
+        run('lvresize -f -l +100%FREE /dev/mapper/*root')
+        run('if uname -r | grep -q el6; then resize2fs -f /dev/mapper/*root; '
+            'else xfs_growfs / && mount / -o inode64,remount; fi')
 
 
 def fix_hostname(entry_domain=None, host_ip=None):
