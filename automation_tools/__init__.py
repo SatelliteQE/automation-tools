@@ -378,7 +378,7 @@ def setup_default_libvirt(bridge=None):
     :param str interface: Network interface name to be used
     """
     run('yum install -y libvirt libvirt-daemon-kvm virt-install qemu-kvm')
-    run('lsmod | grep kvm_')
+    run('lsmod | grep kvm_', warn_only=True)
     run('sed -i \'s/^#*\s*LIBVIRTD_ARGS=.*/LIBVIRTD_ARGS=--listen/\''
         ' /etc/sysconfig/libvirtd')
     run('sed -i \'s/^#*\s*listen_tls\s*=.*/listen_tls = 0/\''
