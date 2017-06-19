@@ -324,8 +324,6 @@ def setup_default_capsule(interface=None, run_katello_installer=True):
         sys.exit(1)
 
     if interface is None:
-        # Setup libvirt and fetch virtual bridge information
-        interface = setup_default_libvirt()
         if len(interface) == 0:
             print('Was not possible to fetch interface information')
             sys.exit(1)
@@ -378,7 +376,7 @@ def setup_default_libvirt(bridge=None):
     :param str interface: Network interface name to be used
     """
     run('yum install -y libvirt libvirt-daemon-kvm virt-install qemu-kvm')
-    run('lsmod | grep kvm_')
+    run('lsmod | grep kvm_', warn_only=True)
     run('sed -i \'s/^#*\s*LIBVIRTD_ARGS=.*/LIBVIRTD_ARGS=--listen/\''
         ' /etc/sysconfig/libvirtd')
     run('sed -i \'s/^#*\s*listen_tls\s*=.*/listen_tls = 0/\''
@@ -1965,6 +1963,8 @@ def product_install(distribution, create_vm=False, certificate_url=None,
 
     execute(setenforce, selinux_mode, host=host)
 
+    execute(setup_satellite_firewall, host=host)
+
     if distribution in ('satellite6-downstream', 'satellite6-iso'):
         execute(java_workaround, host=host)
 
@@ -1979,27 +1979,21 @@ def product_install(distribution, create_vm=False, certificate_url=None,
     # executes with 'interface=eth0' for Satellite6-automation.
     # When using Satellite6-installer one can specify custom interface.
     if os.environ.get('BRIDGE') or os.environ.get('INTERFACE'):
-        # execute returns a dictionary mapping host strings to the given
-        # task's return value
-        installer_options.update(execute(
-            setup_default_capsule,
-            host=host,
-            # If an INTERFACE is specified it will be used otherwise would
-            # default to eth0 interface. Helpful for configuring DHCP and
-            # DNS capsule services.
-            interface=os.environ.get('INTERFACE') or 'eth0',
-            run_katello_installer=False
-        )[host])
+        # For Client provisioning using Internal Capsule within Lab only
+        execute(setup_firewall, {'udp': (67,)}, flush=False, host=host)
+        # If an INTERFACE is specified it will be used otherwise would
+        # default to eth0 interface. Helpful for configuring DHCP and
+        # DNS capsule services.
+        interface = os.environ.get('INTERFACE', 'eth0')
     else:
-        # execute returns a dictionary mapping host strings to the given
-        # task's return value.
-        installer_options.update(execute(
-            setup_default_capsule, host=host, run_katello_installer=False
-        )[host])
-
-    # Firewall should be setup after setup_default_capsule clean the puppet
-    # module it installs clean already created rules
-    execute(setup_satellite_firewall, host=host)
+        # Setup libvirt and fetch virtual bridge information
+        interface = execute(setup_default_libvirt, host=host)[host]
+    # execute returns a dictionary mapping host strings to the given
+    # task's return value
+    installer_options.update(execute(
+        setup_default_capsule,
+        host=host, interface=interface, run_katello_installer=False
+    )[host])
 
     if distribution.startswith('satellite6'):
         if os.environ.get('PROXY_INFO'):
