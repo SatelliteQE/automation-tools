@@ -2115,7 +2115,7 @@ def partition_disk():
     synchronization of larger repositories.
 
     """
-    if run('stat --format=%m /home') == '/home':
+    if run('df -P /home | awk \'END{print $NF}\'') == '/home':
         run('umount /home')
         run('lvremove -f /dev/mapper/*home')
         run("sed -i '/\/home/d' /etc/fstab")
