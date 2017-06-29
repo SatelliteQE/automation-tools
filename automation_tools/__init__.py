@@ -2040,7 +2040,6 @@ def product_install(distribution, create_vm=False, certificate_url=None,
             certificate_url,
             host=host
         )
-    execute(fix_qdrouterd_listen_to_ipv6, host=host)
     execute(setup_alternate_capsule_ports, host=host)
 
     if distribution.startswith('satellite6'):
@@ -2067,6 +2066,8 @@ def product_install(distribution, create_vm=False, certificate_url=None,
             sat_version=satellite_version,
             host=host
         )
+    execute(fix_qdrouterd_listen_to_ipv6, host=host)
+
     # Setup code_coverage only for the provisoning jobs.
     if 'TARGET_IMAGE' in os.environ and 'base' in target_image:
         execute(setup_code_coverage, host=host)
