@@ -1286,34 +1286,46 @@ def configure_osp(admin_password=None, forward_zone=None, reverse_zone=None,
     ADMIN_PASSWORD
         The Satellite6 Admin password.
 
+    SATELLITE_VERSION
+        Version of the satellite that is installed.(Eg. 6.2,6.3)
+
     """
+    satellite_version = os.environ.get('SATELLITE_VERSION')
+    if satellite_version == '6.1' and satellite_version == '6.2':
+        zone_file = '/etc/zones.conf'
+    else:
+        zone_file = '/etc/named/zones.conf'
     if reverse_zone is None:
         reverse_zone = os.environ.get('OSP_REVERSE_ZONE')
     if forward_zone is None:
         forward_zone = os.environ.get('OSP_FORWARD_ZONE')
-    if template_url is None:
-        template_url = os.environ.get('OSP_FINISH_TEMPLATE_URL')
     if admin_password is None:
         admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme')
-    run('cp /etc/zones.conf /root/zones-pre_osp.conf')
+    if template_url is None:
+        template_url = os.environ.get('OSP_FINISH_TEMPLATE_URL')
+    run('rm -f /root/zones_cons.conf', warn_only=True)
+    run('rm -f /root/zones-pre_osp.conf', warn_only=True)
+    run('cp {0} /root/zones-pre_osp.conf'.format(zone_file))
     run('for i in {0}; do satellite-installer '
         '--foreman-proxy-dns-reverse $i.in-addr.arpa ; '
-        'sed -n 1,7p /etc/zones.conf >> /root/zones_cons.conf ; done'
-        .format(reverse_zone))
+        'sed -n 1,7p {1} >> /root/zones_cons.conf ; done'
+        .format(reverse_zone, zone_file))
     run('satellite-installer --foreman-proxy-dns-zone {0}'
         .format(forward_zone))
-    run('sed -n 8,14p /etc/zones.conf >> /root/zones_cons.conf')
-    run('cat /root/zones_cons.conf > /etc/zones.conf')
-    run('cat /root/zones-pre_osp.conf >> /etc/zones.conf')
-    run('hammer -u admin -p changeme template clone '
-        '--name \'Satellite Kickstart Default Finish\' '
-        '--new-name \'Satellite Kickstart Default Finish OSP\'')
-    run('wget -O /root/Satellite_Kickstart_Default_Finish_OSP.txt {0}'
-        .format(template_url))
-    run('hammer -u admin -p {0} template update --name '
-        '\'Satellite Kickstart Default Finish OSP\' --type finish '
-        '--file /root/Satellite_Kickstart_Default_Finish_OSP.txt'
-        .format(admin_password))
+    run('sed -n 8,14p {0} >> /root/zones_cons.conf'.format(zone_file))
+    run('cat /root/zones_cons.conf > {0}'.format(zone_file))
+    run('cat /root/zones-pre_osp.conf >> {0}'.format(zone_file))
+    run('service named restart')
+    if satellite_version != '6.3':
+        run('hammer -u admin -p changeme template clone '
+            '--name \'Satellite Kickstart Default Finish\' '
+            '--new-name \'Satellite Kickstart Default Finish OSP\'')
+        run('wget -O /root/Satellite_Kickstart_Default_Finish_OSP.txt {0}'
+            .format(template_url))
+        run('hammer -u admin -p {0} template update --name '
+            '\'Satellite Kickstart Default Finish OSP\' --type finish '
+            '--file /root/Satellite_Kickstart_Default_Finish_OSP.txt'
+            .format(admin_password))
 
 
 def cleanup_idm(hostname, idm_password=None):

@@ -5,6 +5,7 @@ from automation_tools import (  # flake8: noqa
     clean_rhsm,
     cleanup_idm,
     client_registration_test,
+    configure_osp,
     configure_ad_external_auth,
     configure_idm_external_auth,
     configure_realm,
