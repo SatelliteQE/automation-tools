@@ -16,8 +16,8 @@ from urlparse import urlsplit
 
 from automation_tools.bz import bz_bug_is_open
 from automation_tools.repository import (
-    create_custom_repos, delete_custom_repos, enable_satellite_repos,
-    disable_repos
+    create_custom_repos, delete_custom_repos, enable_repos,
+    enable_satellite_repos, disable_repos
 )
 from automation_tools.utils import distro_info, update_packages
 from fabric.api import cd, env, execute, get, local, put, run, settings, sudo
@@ -1567,19 +1567,23 @@ def upstream_install(admin_password=None, run_katello_installer=True,
     if admin_password is None:
         admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme')
 
+    enable_repos('rhel-*-server-extras-rpms', 'rhel-*-server-optional-rpms')
     # Install required packages for the installation
-    run('yum install -y git ruby')
+    if not run('rpm -qa epel-release'):
+        run('rpm -iv http://dl.fedoraproject.org/pub/epel/'
+            'epel-release-latest-7.noarch.rpm')
+    run('yum -y install ansible git')
     run('rm -rf forklift')
-    run('git clone -q https://github.com/Katello/forklift.git')
+    run('git clone -q https://github.com/theforeman/forklift.git')
 
     with cd('forklift'):
-        # https://github.com/Katello/forklift/pull/369 removed setup.rb
-        # checkout right before until we'll know how to proceed the new way
-        run('git checkout -q 336783394283fd15bf6ef29aee5a24917f99dfad')
         # For now, puppet-four is configured by default. Toggle option
         # will be added later.
-        run('./setup.rb --skip-installer {0}'.format(
-            '--puppet-four' if puppet4 else ''))
+        run('ansible-playbook -c local -i,$(hostname) '
+            '-e katello_version=nightly {0} '
+            '-e foreman_installer_skip_installer=True '
+            'playbooks/katello.yml'.format(
+                '-e puppet_repositories_version=4' if puppet4 else ''))
 
     # Install support for various compute resources in upstream
     compute_resources = [
