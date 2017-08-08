@@ -1255,19 +1255,6 @@ def install_prerequisites():
     manage_daemon('start', 'ntpd', warn_only=True)
 
 
-def install_puppet4(puppet4_repo=None):
-    """Task to install puppet4 prior Satellite installation"""
-    # Remove any puppet3 server to avoid conflicts
-    run('yum -y remove puppet-server', warn_only=True)
-    create_custom_repos(puppet4_repo=puppet4_repo)
-    # Install puppet4 (puppetserver is pulled in by installer)
-    run('yum -y install puppet-agent')
-    # Workaround for BZ #1381081 (Kafo::ParserError)
-    if bz_bug_is_open('1381081'):
-        run('/opt/puppetlabs/puppet/bin/gem install -q yard')
-        run('/opt/puppetlabs/bin/puppet module install puppetlabs-strings')
-
-
 def configure_osp(admin_password=None, forward_zone=None, reverse_zone=None,
                   template_url=None):
     """Configure the named service for OSP Compute Resource.
@@ -1963,7 +1950,10 @@ def product_install(distribution, create_vm=False, certificate_url=None,
     if satellite_version in ('6.3', 'downstream-nightly'):
         puppet4_repo = os.environ.get('PUPPET4_REPO')
         if puppet4_repo:
-            execute(install_puppet4, puppet4_repo=puppet4_repo, host=host)
+            # Just enable puppet4 repo, no need to install puppet4 since
+            # puppet-agent is pulled in by rpm deps
+            # puppetserver is pulled in by installer
+            execute(create_custom_repos, puppet4_repo=puppet4_repo, host=host)
     # If defined, create custom repo with RHEL candidate for OS upgrade
     # OS_UPGRADE_REPOS can be space-separated list of multiple custom repo urls
     if os.environ.get('OS_UPGRADE_REPOS'):
