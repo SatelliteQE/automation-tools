@@ -2160,6 +2160,8 @@ def iso_download(iso_url=None):
         print('Please provide a valid URL for the ISO image.')
         sys.exit(1)
 
+    run('yum install -y wget', warn_only=True)
+
     if not iso_url.endswith('.iso'):
         # The following operations will be done remotely because maybe the
         # machine which is running the task could not have access to the ISO
