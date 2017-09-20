@@ -37,7 +37,12 @@ avahi-tools
 avahi
 %end
 
-%post --logfile /dev/console
+%post --logfile /var/log/baseimage-postinstall.log
+
+ssh-keygen -t rsa -N "" -f /root/.ssh/id_dsa
+curl -sS -o /root/.ssh/authorized_keys AUTH_KEYS_URL
+restorecon -rv /root/.ssh/authorized_keys
+sysctl -w net.ipv6.conf.all.disable_ipv6=1 >> /etc/sysctl.conf
 
 cat <<EOL > /etc/yum.repos.d/rhel6.repo
 [rhel6]
@@ -47,15 +52,17 @@ enabled=0
 gpgcheck=0
 EOL
 
-echo "[ ! -f /var/log/configure_rhel6-base_image.log ] && touch /var/log/configure_rhel6-base_image.log" >> /etc/rc.local
-echo "[ -f /root/setup_configured ] && echo exiting && exit >> /var/log/configure_rhel6-base_image.log 2>&1" >> /etc/rc.local 
-echo "/etc/init.d/ntpd stop >> /var/log/configure_rhel6-base_image.log 2>&1" >> /etc/rc.local
-echo "ntpdate clock.redhat.com >> /var/log/configure_rhel6-base_image.log 2>&1" >> /etc/rc.local
-echo "iptables -F ; service iptables save ; chkconfig iptables off >> /var/log/configure_rhel6-base_image.log 2>&1" >> /etc/rc.local
-echo "service avahi-daemon start ; chkconfig avahi-daemon on  >> /var/log/configure_rhel6-base_image.log 2>&1" >> /etc/rc.local
-echo "ssh-keygen -t rsa -N \"\" -f /root/.ssh/id_dsa >> /var/log/configure_rhel6-base_image.log 2>&1" >> /etc/rc.local
-echo "wget -O ~/.ssh/authorized_keys AUTH_KEYS_URL >> /var/log/configure_rhel6-base_image.log 2>&1" >> /etc/rc.local
-echo "touch /root/setup_configured >> /var/log/configure_rhel6-base_image.log 2>&1" >> /etc/rc.local
+chmod +x /etc/rc.local 
+cat << EOF >> /etc/rc.local
+(
+    [ -f /root/setup_configured ] && echo exiting && exit
+    iptables -I INPUT -d 224.0.0.251/32 -p udp -m udp --dport 5353 -m conntrack --ctstate NEW -j ACCEPT
+    service iptables save
+    ntpdate clock.redhat.com
+    rm -f /etc/udev/rules.d/70-persistent-net.rules
+    touch /root/setup_configured
+) 2>&1 | tee -a /var/log/baseimage-firstboot.log
+EOF
 
 %end
 
