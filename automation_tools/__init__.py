@@ -1610,7 +1610,6 @@ def setup_capsule(satellite_fqdn=None, capsule_fqdn=None, capsule_org=None,
     # Clean up
     unsubscribe()
 
-
     # Clean up and install with basic packages.
     clean_rhsm()
 

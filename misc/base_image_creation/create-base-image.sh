@@ -24,6 +24,8 @@ echo "Enter the password for the base image."
 read pass
 echo "Enter the Authorized keys url for the base image. (Hosted authorized_keys file with jenkins key)"
 read auth_url
+echo "Do you want to disable IPv6 in base image? (Y/n)"
+read disable_ipv6
 
 if [ $os_version -eq 6 ] ; then 
     cp ks_rhel6_template /root/base-image.ks
@@ -36,6 +38,10 @@ fi
 
 if [[ $base_image == *"beta"* ]] ; then
     sed -i "s/enabled=0/enabled=1/g" /root/base-image.ks
+fi
+
+if [[ $disable_ipv6 =~ ^(n|N|no|No)$ ]] ; then
+    sed -i "/disable_ipv6/d" /root/base-image.ks
 fi
 
 # | is used as $os_url also could contain '/'.
@@ -59,6 +65,8 @@ virt-install --connect=qemu:///system \
     --hvm \
     --location=$os_url \
     --cpu host \
+    --graphics vnc,listen=0.0.0.0 \
+    --clock offset=localtime \
     --force
 
 # The argument `--cpu host` enables nested virtualization and is required to setup sat6 vms with provisioning support.
