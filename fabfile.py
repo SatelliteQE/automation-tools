@@ -36,6 +36,7 @@ from automation_tools import (  # flake8: noqa
     set_yum_debug_level,
     setup_abrt,
     setup_alternate_capsule_ports,
+    setup_avahi_discovery,
     setup_ddns,
     setup_default_capsule,
     setup_default_docker,

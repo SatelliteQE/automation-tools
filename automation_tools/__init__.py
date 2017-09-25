@@ -232,6 +232,24 @@ def setup_proxy(run_katello_installer=True):
         return installer_options
 
 
+def setup_avahi_discovery():
+    """Task to setup avahi discovery used to discover VMs deployed to a VLAN
+       by 'ping vm.local' run at Satellite
+    """
+    os_version = distro_info()[1]
+    run('yum -y install https://dl.fedoraproject.org/pub/epel/'
+        'epel-release-latest-{0}.noarch.rpm'.format(os_version))
+    run('yum -y install nss-mdns')  # also pulls in avahi
+    run('rpm -e epel-release')
+    if os_version >= 7:
+        run('firewall-cmd --add-service mdns --permanent')
+        run('firewall-cmd --reload')
+    else:
+        run('iptables -I INPUT -d 224.0.0.251/32 -p udp -m udp --dport 5353'
+            ' -m conntrack --ctstate NEW -j ACCEPT')
+    run('service avahi-daemon restart')
+
+
 def setup_default_docker():
     """Task to configure system to support Docker as a valid
     Compute Resource for provisioning containers.
@@ -1970,6 +1988,8 @@ def product_install(distribution, create_vm=False, certificate_url=None,
     execute(setenforce, selinux_mode, host=host)
 
     execute(setup_satellite_firewall, host=host)
+
+    execute(setup_avahi_discovery, host=host)
 
     if distribution in ('satellite6-downstream', 'satellite6-iso'):
         execute(java_workaround, host=host)
