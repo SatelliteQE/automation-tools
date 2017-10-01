@@ -752,6 +752,8 @@ def configure_sonarqube():
     sonar_server = os.environ.get('SONAR_SERVER_URL')
     satellite_version = os.environ.get('SATELLITE_VERSION')
     build_label = os.environ.get('BUILD_LABEL')
+    sonar_login = os.environ.get('SONAR_LOGIN')
+    sonar_password = os.environ.get('SONAR_PASSWORD')
     # Sonar Scanner requires Java1.8 to be able to upload content to SonarQube
     run('yum -y install java-1.8.0-openjdk')
 
@@ -769,8 +771,11 @@ def configure_sonarqube():
         '-Dsonar.projectBaseDir=/usr/lib/python2.7/site-packages/ '
         '-Dsonar.sources=pulp,pulp_docker,pulp_katello,pulp_ostree,pulp_puppet'
         ',pulp_rpm "-Dsonar.exclusions=pulp_docker/plugins/distributors/'
-        'distributor_export.py,pulp_rpm/extensions/*.py"'
-        .format(sonar_server, build_label, satellite_version))
+        'distributor_export.py,pulp_rpm/extensions/*.py" '
+        '"-Dsonar.login={3}" "-Dsonar.password={4}"'
+        .format(
+            sonar_server, build_label, satellite_version,
+            sonar_login, sonar_password))
 
 
 def setup_oscap():
