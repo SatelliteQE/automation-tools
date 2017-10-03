@@ -27,6 +27,7 @@ setup(
         'pytest',
         'python-bugzilla==1.2.2',
         'requests',
+        'robozilla',
         'unittest2',
     ],
     license='GNU GPL v3.0',
