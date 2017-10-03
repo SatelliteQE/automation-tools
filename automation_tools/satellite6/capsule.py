@@ -15,6 +15,7 @@ from hammer import (
     hammer_repository_synchronize,
     set_hammer_config
 )
+from robozilla.decorators import bz_bug_is_open
 
 
 class ImproperlyConfigured(Exception):
@@ -206,7 +207,11 @@ def generate_capsule_certs(capsule_hostname, force=False):
         fqdn_opt = '--foreman-proxy-fqdn'
     else:
         fqdn_opt = '--capsule-fqdn'
-    cert_path = '{0}-certs.tar'.format(capsule_hostname)
+    if bz_bug_is_open(1466688):
+        # Absolute path bug
+        cert_path = '~/{0}-certs.tar'.format(capsule_hostname)
+    else:
+        cert_path = '{0}-certs.tar'.format(capsule_hostname)
     result = run('[ -f {0} ]'.format(cert_path), quiet=True)
     if result.failed or force:
         run('capsule-certs-generate -v {0} {1} '
