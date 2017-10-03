@@ -1,6 +1,7 @@
 """Tasks for helping automating the provisioning of Satellite 6 Capsules"""
 from __future__ import print_function
 import json
+import os
 
 from fabric.api import env, get, put, run, settings, task
 from hammer import (
@@ -201,11 +202,15 @@ def generate_capsule_certs(capsule_hostname, force=False):
     :param bool force: Force creation of the capsule cert even if it is
         already created.
     """
+    if os.environ.get('SATELLITE_VERSION') == '6.3':
+        fqdn_opt = '--foreman-proxy-fqdn'
+    else:
+        fqdn_opt = '--capsule-fqdn'
     cert_path = '{0}-certs.tar'.format(capsule_hostname)
     result = run('[ -f {0} ]'.format(cert_path), quiet=True)
     if result.failed or force:
-        run('capsule-certs-generate -v --capsule-fqdn {0} '
-            '--certs-tar {1}'.format(capsule_hostname, cert_path))
+        run('capsule-certs-generate -v {0} {1} '
+            '--certs-tar {2}'.format(fqdn_opt, capsule_hostname, cert_path))
     return cert_path
 
 
