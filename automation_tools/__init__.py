@@ -433,6 +433,39 @@ def setup_default_libvirt(bridge=None):
     return interface
 
 
+def setup_default_subnet():
+    """Postinstall task to setup default subnet within Satellite
+
+    Expects the following environment variables:
+
+    SUBNET
+        The network address that Internal Capsule resides in
+    NETMASK
+        The netmask of the subnet
+    GATEWAY
+        The gateway in the subnet
+    DHCP_RANGE
+        The range in the subnet operated by DHCP Capsule
+    """
+    dhcp_range = os.environ.get(
+        'DHCP_RANGE', '192.168.100.10 192.168.100.254').split()
+    options = {
+        'password': os.environ.get('ADMIN_PASSWORD', 'changeme'),
+        'network':  os.environ.get('SUBNET', '192.168.100.0'),
+        'mask':     os.environ.get('NETMASK', '255.255.255.0'),
+        'gateway':  os.environ.get('GATEWAY', '192.168.100.1'),
+        'from':     dhcp_range[0], 'to': dhcp_range[1],
+    }
+    command = (
+        'hammer -u admin -p {password} subnet create --name "Default Subnet" '
+        '--network {network} --mask {mask} '
+        '--gateway {gateway} --dns-primary {gateway} '
+        '--ipam DHCP --from {from} --to {to} '
+        '--dhcp-id 1 --dns-id 1 --tftp-id 1 --discovery-id 1'
+    ).format(**options)
+    run(command)
+
+
 def setup_email_notification(smtp=None):
     """Configures system to handle email notification.
 
@@ -2097,6 +2130,7 @@ def product_install(distribution, create_vm=False, certificate_url=None,
             sat_version=satellite_version,
             host=host
         )
+    execute(setup_default_subnet, host=host)
     execute(fix_qdrouterd_listen_to_ipv6, host=host)
 
     # Setup code_coverage only for the provisoning jobs.
