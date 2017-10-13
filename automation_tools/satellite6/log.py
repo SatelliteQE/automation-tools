@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
+from functools import partial
 from itertools import cycle
+from time import strftime
 
 import os
-import re
 from fabric.api import execute, run
 
 ERROR_TOKENS = (
@@ -45,13 +46,13 @@ class LogAnalyzer(object):
 
     """
 
-    def __init__(self, host):
+    def __init__(self, host, log_files=LOG_FILES):
         """Initializes context manager with Satellite hostname
 
         :param host: str the hostname
         """
         self.host = host
-        self.log_state = dict(zip(LOG_FILES, cycle([0])))
+        self.log_state = dict(zip(log_files, cycle([0])))
 
     def __enter__(self):
         """
@@ -67,17 +68,30 @@ class LogAnalyzer(object):
         """
         print('#### Analyzing logs of host %s' % self.host)
         self._update_log_files_state()
+        now = partial(strftime, '%H:%M:%S.%s')
 
-        def fetch_appended_log_lines():
+        def fetch_appended_log_error_lines():
+            grep_expressions = ' '.join(
+                r'-e "{}"'.format(token) for token in ERROR_TOKENS)
+            cmd_template = 'tail -n {lines} {file} | grep {expressions} {file}'
             for log_file, lines_appended in self.log_state.items():
                 if lines_appended > 0:
-                    content = run(
-                        'tail -n {} {}'.format(lines_appended, log_file),
-                        quiet=True
+                    cmd = cmd_template.format(
+                        lines=lines_appended,
+                        file=log_file,
+                        expressions=grep_expressions
                     )
-                    analyze(self.host, log_file, content)
+                    _print_wrapper('### Analyzing %s:' % log_file)
+                    _print_wrapper('{} - Running {}'.format(now(), cmd))
+                    content = run(cmd, quiet=True)
+                    _print_wrapper('{} - errors fetched'.format(now()))
+                    if not content:
+                        _print_wrapper('### No errors found')
+                    else:
+                        _print_wrapper('## Errors found:')
+                        _print_wrapper(content)
 
-        execute(fetch_appended_log_lines, host=self.host)
+        execute(fetch_appended_log_error_lines, host=self.host)
 
     def _update_log_files_state(self):
         """Update log_dct with adding delta from current number of lines of
@@ -123,38 +137,9 @@ def _save_full_log(host, log_file_path, content):
         _print_wrapper('## Full upgrade logs saved on %s' % file_path)
 
 
-def analyze(host, log_file, content):
-    """Analyzes appended content from a log file. For now it is only
-    checking for ERROR status on regular log files.
-
-    :param host: str with host name
-    :param log_file: str log file path on host
-    :param content: str with log file content
-    """
-
-    def print_lines(lines_enumeration):
-        """print lines with numbers"""
-        no_line_flag = True
-        for i, line in lines_enumeration:
-            _print_wrapper('{}: {}'.format(i, line))
-            no_line_flag = False
-        if no_line_flag:
-            _print_wrapper('No errors found')
-
-    _print_wrapper('### Analyzing %s:' % log_file)
-    _print_wrapper('## Errors found:')
-    content_lines = content.decode('utf-8').split('\n')
-    regex = '|'.join(map(lambda token: '.*%s.*' % token, ERROR_TOKENS))
-    error_re = re.compile(regex, re.IGNORECASE)
-
-    lines_with_error_enum = filter(
-        lambda tpl: error_re.match(tpl[1]),
-        enumerate(content_lines, start=1))
-
-    print_lines(lines_with_error_enum)
-    _save_full_log(host, log_file, content)
-
-
 def _print_wrapper(s):
     """Just a wrapper to make mocking easier on tests"""
-    print(s.encode('utf-8'))
+    if isinstance(s, unicode):
+        print(s.encode('utf-8'))
+    else:
+        print(s)

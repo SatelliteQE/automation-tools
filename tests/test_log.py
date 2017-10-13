@@ -3,7 +3,7 @@ from __future__ import unicode_literals
 
 import pytest
 
-from automation_tools.satellite6.log import LogAnalyzer, analyze
+from automation_tools.satellite6.log import LogAnalyzer
 
 
 @pytest.fixture(autouse=True)
@@ -97,7 +97,7 @@ def test_log_analyzer_exit(mocker):
     analyzer.log_state.update(log_with_lines_appended)
     analyzer.log_state.update(log_without_lines_appended)
 
-    # Defining contest which will be returned for files with lines appended
+    # Defining context which will be returned for files with lines appended
     log_files_content = {
         '/var/log/candlepin/candlepin.log': 'foo',
         '/var/log/messages': 'bar',
@@ -114,8 +114,6 @@ def test_log_analyzer_exit(mocker):
     run_mock = mocker.patch('automation_tools.satellite6.log.run')
     run_mock.side_effect = tail_side_effect
 
-    analyze_mock = mocker.patch('automation_tools.satellite6.log.analyze')
-
     analyzer.__exit__(None, None, None)
 
     analyzer._update_log_files_state.assert_called_once_with()  # noqa
@@ -123,12 +121,16 @@ def test_log_analyzer_exit(mocker):
     assert run_mock.call_count == len(log_with_lines_appended)
 
     for log_file, lines_appended in log_with_lines_appended.items():
+        cmd = (
+            'tail -n {lines} {file} | grep -e "ERROR" '
+            '-e "EXCEPTION" '
+            '-e "returned 1 instead of one of \\[0\\]" '
+            '-e "Could not find the inverse association for repository" '
+            '-e "undefined method" '
+            '{file}'
+        )
         run_mock.assert_any_call(
-            'tail -n {} {}'.format(lines_appended, log_file), quiet=True)
-
-    assert analyze_mock.call_count == len(log_with_lines_appended)
-    for log_file, content in log_files_content.items():
-        analyze_mock.assert_any_call(analyzer.host, log_file, content)
+            cmd.format(lines=lines_appended, file=log_file), quiet=True)
 
 
 def test_log_analyzer_file_not_available(run_with_error):
@@ -168,77 +170,3 @@ def print_mock(mocker):
 def save_log_mock(mocker):
     """Mock _print_wrapper function"""
     return mocker.patch('automation_tools.satellite6.log._save_full_log')
-
-
-CONTENT_WITHOUT_ERROR = '''2016-11-23 05:41:54 [app] [I] Processing by Api::
-2016-11-23 05:41:54 [app] [I] Parameters: {"report"=>"[FILTERED]", "apiv"=>
-2016-11-23 05:41:54 [app] [I] processing report for
-2016-11-23 05:41:54 [app] [I] Imported report for
-2016-11-23 05:41:55 [app] [I] Rendered api/v2/reports/create.json (5.5ms)
-2016-11-23 05:41:55 [app] [I] Completed 201 Created in 61ms'''.encode('utf-8')
-
-REPORT_WITHOUT_ERROR = '''### Analyzing /var/log/candlepin/candlepin.log:
-## Errors found:
-No errors found'''
-
-CONTENT_WITH_ERROR = '''c75ff8b-2ee0-4a6a-a94e-, org=] ERROR  org.
-NO problem on this line
-Exception in thread "Resource Destroyer in BasicResourcePool.close()"
-javax.persistence.PersistenceException: unexpected error when rollbacking
-Could not find the inverse association for repository
-PG::Error: ERROR: update or delete on table
-NoMethodError: undefined method
-usr/sbin/foreman-rake db:migrate returned 1 instead of one of [0]
-/usr/sbin/foreman-rake db:seed returned 1 instead of one of [0]
-[E] undefined method `finished' for nil:NilClass (NoMethodError)
-[ProxyAPI::ProxyException]: Unable to detect
-(ActiveModel::MissingAttributeError)
-ActionView::Template::Error (undefined method
-undefined method `cp_config' for
-An error has occurred, this and all later migrations canceled
-undefined method `import_data' for nil:NilClass (NoMethodError)
-undefined method `[]' for nil:NilClass (NoMethodError)'''.encode('utf-8')
-
-REPORT_WITH_ERROR = '''### Analyzing /var/log/candlepin/candlepin.log:
-## Errors found:
-1: c75ff8b-2ee0-4a6a-a94e-, org=] ERROR  org.
-3: Exception in thread "Resource Destroyer in BasicResourcePool.close()"
-4: javax.persistence.PersistenceException: unexpected error when rollbacking
-5: Could not find the inverse association for repository
-6: PG::Error: ERROR: update or delete on table
-7: NoMethodError: undefined method
-8: usr/sbin/foreman-rake db:migrate returned 1 instead of one of [0]
-9: /usr/sbin/foreman-rake db:seed returned 1 instead of one of [0]
-10: [E] undefined method `finished' for nil:NilClass (NoMethodError)
-11: [ProxyAPI::ProxyException]: Unable to detect
-12: (ActiveModel::MissingAttributeError)
-13: ActionView::Template::Error (undefined method
-14: undefined method `cp_config' for
-15: An error has occurred, this and all later migrations canceled
-16: undefined method `import_data' for nil:NilClass (NoMethodError)
-17: undefined method `[]' for nil:NilClass (NoMethodError)'''
-
-CONTENT_WITH_SPECIAL_CHAR = 'éçã'.encode('utf-8')
-
-REPORT_WITH_SPECIAL_CHAR = '''### Analyzing /var/log/candlepin/candlepin.log:
-## Errors found:
-No errors found'''
-test_data = [
-    (CONTENT_WITHOUT_ERROR, REPORT_WITHOUT_ERROR),
-    (CONTENT_WITH_ERROR, REPORT_WITH_ERROR),
-    (CONTENT_WITH_SPECIAL_CHAR, REPORT_WITH_SPECIAL_CHAR)]
-
-ids = ['without error', 'with error', 'special char']
-
-
-@pytest.mark.parametrize("content,report", test_data, ids=ids)
-def test_analyse(content, report, print_mock, save_log_mock):
-    """Test analyse find no errors on file content"""
-    log_file = '/var/log/candlepin/candlepin.log'
-    host = 'foo.bar.com'
-    analyze(host, log_file, content)
-    args = [
-        positional_args[0] for positional_args, _ in print_mock.call_args_list
-    ]
-    assert '\n'.join(args) == report
-    save_log_mock.assert_called_once_with(host, log_file, content)
