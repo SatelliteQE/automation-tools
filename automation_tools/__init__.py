@@ -433,7 +433,7 @@ def setup_default_libvirt(bridge=None):
     return interface
 
 
-def setup_default_subnet():
+def setup_default_subnet(sat_version):
     """Postinstall task to setup default subnet within Satellite
 
     Expects the following environment variables:
@@ -446,6 +446,8 @@ def setup_default_subnet():
         The gateway in the subnet
     DHCP_RANGE
         The range in the subnet operated by DHCP Capsule
+
+    :param str sat_version: contains Satellite version (e.g. 6.2, 6.3)
     """
     dhcp_range = os.environ.get(
         'DHCP_RANGE', '192.168.100.10 192.168.100.254').split()
@@ -461,7 +463,8 @@ def setup_default_subnet():
         '--network {network} --mask {mask} '
         '--gateway {gateway} --dns-primary {gateway} '
         '--ipam DHCP --from {from} --to {to} '
-        '--dhcp-id 1 --dns-id 1 --tftp-id 1 --discovery-id 1'
+        '--dhcp-id 1 --dns-id 1 --tftp-id 1 ' +
+        ('--discovery-id 1' if sat_version > '6.2' else '')
     ).format(**options)
     run(command)
 
@@ -2130,7 +2133,7 @@ def product_install(distribution, create_vm=False, certificate_url=None,
             sat_version=satellite_version,
             host=host
         )
-    execute(setup_default_subnet, host=host)
+    execute(setup_default_subnet, sat_version=satellite_version, host=host)
     execute(fix_qdrouterd_listen_to_ipv6, host=host)
 
     # Setup code_coverage only for the provisoning jobs.
