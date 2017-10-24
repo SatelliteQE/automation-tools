@@ -203,10 +203,6 @@ def generate_capsule_certs(capsule_hostname, force=False):
     :param bool force: Force creation of the capsule cert even if it is
         already created.
     """
-    if os.environ.get('SATELLITE_VERSION') == '6.3':
-        fqdn_opt = '--foreman-proxy-fqdn'
-    else:
-        fqdn_opt = '--capsule-fqdn'
     if bz_bug_is_open(1466688):
         # Absolute path bug
         cert_path = '~/{0}-certs.tar'.format(capsule_hostname)
@@ -214,8 +210,16 @@ def generate_capsule_certs(capsule_hostname, force=False):
         cert_path = '{0}-certs.tar'.format(capsule_hostname)
     result = run('[ -f {0} ]'.format(cert_path), quiet=True)
     if result.failed or force:
-        run('capsule-certs-generate -v {0} {1} '
-            '--certs-tar {2}'.format(fqdn_opt, capsule_hostname, cert_path))
+        if os.environ.get('SATELLITE_VERSION') == '6.3':
+            run('capsule-certs-generate -v --foreman-proxy-fqdn {0} '
+                '--certs-tar {1} --certs-update-all'.format(capsule_hostname,
+                                                            cert_path
+                                                            ))
+        else:
+            run('capsule-certs-generate -v --capsule-fqdn {0} '
+                '--certs-tar {1}'.format(capsule_hostname,
+                                         cert_path
+                                         ))
     return cert_path
 
 
