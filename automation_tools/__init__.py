@@ -428,6 +428,18 @@ def setup_default_libvirt(bridge=None):
         run('virsh net-start foreman')
     run('virsh net-autostart foreman')
 
+    os_version = distro_info()[1]
+    if os_version >= 7:
+        run('firewall-cmd --add-service vnc-server --permanent')
+        run('firewall-cmd --service=vnc-server --add-port=5901-5999/tcp '
+            '--permanent')
+        run('firewall-cmd --reload')
+    else:
+        run('iptables -I INPUT -m state --state NEW -p tcp --dport 5901:5999 '
+            '-j ACCEPT')
+        # To make the changes persistent across reboots
+        manage_daemon('save', 'iptables')
+
     # Fetch virtual bridge information
     interface = run('virsh net-info foreman | awk \'/Bridge:/{printf$2}\'')
     return interface
