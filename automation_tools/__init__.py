@@ -476,7 +476,7 @@ def setup_default_subnet(sat_version):
         '--gateway {gateway} --dns-primary {gateway} '
         '--ipam DHCP --from {from} --to {to} '
         '--dhcp-id 1 --dns-id 1 --tftp-id 1 ' +
-        ('--discovery-id 1' if sat_version > '6.2' else '')
+        ('--discovery-id 1' if sat_version not in ('6.1', '6.2') else '')
     ).format(**options)
     run(command)
 
@@ -895,6 +895,8 @@ def setup_foreman_discovery(sat_version):
         return
 
     if sat_version == 'upstream-nightly':
+        run('foreman-installer --enable-foreman-plugin-discovery '
+            '--enable-foreman-proxy-plugin-discovery')
         run('yum install -y {0}'.format(' '.join(packages)), warn_only=True)
         # Fetch the upstream-nightly FDI from upstream
         image_url = 'http://downloads.theforeman.org/discovery/nightly/fdi-image-latest.tar'  # noqa
