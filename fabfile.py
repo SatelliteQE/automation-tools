@@ -78,5 +78,6 @@ from automation_tools.satellite5 import (
 )
 from automation_tools.utils import (
     distro_info,
+    get_discovery_image,
     update_packages
 )
