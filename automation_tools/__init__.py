@@ -725,8 +725,8 @@ def setup_abrt():
     run('abrt-auto-reporting enabled')
 
 
-def setup_code_coverage():
-    """Task to setup code coverage on sat6."""
+def setup_python_code_coverage():
+    """Task to setup python code coverage on Satellite 6."""
     os_version = distro_info()[1]
     # This has to be inside the function so that it runs actually on Sat6.
     if os_version == 6:
@@ -769,9 +769,6 @@ def setup_code_coverage():
     if os_version == 7:
         put(local_path=sitecustomize_file,
             remote_path='/usr/lib/python2.7/site-packages/sitecustomize.py')
-    else:
-        put(local_path=sitecustomize_file,
-            remote_path='/usr/lib/python2.6/site-packages/sitecustomize.py')
     sitecustomize_file.close()
 
     # Install EPEL packages for the installation
@@ -786,6 +783,108 @@ def setup_code_coverage():
     run('chmod -R 777 /etc/coverage ; chown -R apache.apache /etc/coverage')
 
 
+def setup_ruby_code_coverage():
+    """Task to setup ruby code coverage on Satellite 6."""
+
+    os_version = distro_info()[1]
+    # This has to be inside the function so that it runs actually on Sat6.
+    if os_version == 6:
+        return
+
+    # Install ruby-devel package from the rhel optional installation
+    # Enable required repository
+    run('subscription-manager repos --enable rhel-{0}-server-optional-rpms'
+        .format(os_version))
+    run('yum -y install ruby-devel')
+    # Install gcc package so that we can install the ruby gems.
+    run('yum -y install gcc')
+    # Installing simplecov and simplecov-rcov rubygems for system folder.
+    run('gem install simplecov ; gem install simplecov-rcov')
+    # Installing simplecov and simplecov-rcov rubygems for scl - tfm.
+    run('scl enable tfm \'gem install simplecov\'')
+    # Installing simplecov and simplecov-rcov rubygems for scl - tfm.
+    run('scl enable tfm \'gem install simplecov-rcov\'')
+    # Installing for dependencies.
+    run('scl enable tfm \'gem install docile\'')
+    run('scl enable tfm \'gem install json\'', quiet=True)
+
+    run('echo "export RUBY_SYS_COVERAGE_CONFIG=/etc/coverage/ruby/sys/'
+        'config_sys.yml" >> ~/.bashrc')
+    run('echo "export RUBY_TFM_COVERAGE_CONFIG=/etc/coverage/ruby/tfm/'
+        'config_tfm.yml" >> ~/.bashrc')
+
+
+# This function sets up the ruby code coverage around satellite-installer and
+# the proxy. This mostly deals with system rubygems.
+def setup_rubysys_code_coverage():
+    """Task to setup ruby code coverage for system file on Satellite 6.
+
+    The following environment variables affect this task:
+
+        * `RUBY_SYS_COVERAGE_URL`
+    """
+
+    run('mkdir -p /etc/coverage/ruby/sys/')
+    coverageruby_file = StringIO()
+    coverageruby_file.write(u'---\n')
+    coverageruby_file.write(u'project_folder_name :')
+    coverageruby_file.write(u' \'/usr/share/gems/gems/\'\n')
+    coverageruby_file.write(u'report_directory :')
+    coverageruby_file.write(u' \'/etc/coverage/ruby/sys/reports/\'\n')
+    coverageruby_file.write(u'analysis_name : \'ruby_subprocess_coverage\'\n')
+    coverageruby_file.write(u'...\n')
+    put(local_path=coverageruby_file,
+        remote_path='/etc/coverage/ruby/sys/config_sys.yml')
+    coverageruby_file.close()
+
+    coverage_sys_url = os.getenv('RUBY_SYS_COVERAGE_URL')
+    coverage_sys_file = '/root/coverage_sys.rb'
+    coverage_sys_rubygems = '/usr/share/rubygems/rubygems.rb'
+    if not coverage_sys_url:
+        print('You need to provide the SYS Coverage Url.')
+        sys.exit(1)
+
+    run('wget -O {0} {1}'.format(coverage_sys_file, coverage_sys_url))
+    run('cat {0} >> {1}'.format(coverage_sys_file, coverage_sys_rubygems))
+
+
+# This function sets up the ruby code coverage around foreman and katello(tfm).
+# This mostly deals with tfm rubygems from RedHat software collections (scl).
+def setup_rubytfm_code_coverage():
+    """Task to setup ruby code coverage for tfm files on Satellite 6.
+
+    The following environment variables affect this task:
+
+        * `RUBY_TFM_COVERAGE_URL`
+    """
+
+    run('mkdir -p /etc/coverage/ruby/tfm/')
+    coverageruby_file = StringIO()
+    coverageruby_file.write(u'---\n')
+    coverageruby_file.write(u'project_folder_name :')
+    coverageruby_file.write(u' \'/opt/theforeman/tfm')
+    coverageruby_file.write(u'/root/usr/share/gems/gems/\'\n')
+    coverageruby_file.write(u'report_directory :')
+    coverageruby_file.write(u' \'/etc/coverage/ruby/tfm/reports/\'\n')
+    coverageruby_file.write(u'analysis_name : \'ruby_subprocess_coverage\'\n')
+    coverageruby_file.write(u'...\n')
+    put(local_path=coverageruby_file,
+        remote_path='/etc/coverage/ruby/tfm/config_tfm.yml')
+    coverageruby_file.close()
+
+    coverage_tfm_url = os.getenv('RUBY_TFM_COVERAGE_URL')
+    coverage_tfm_file = '/root/coverage_tfm.rb'
+    coverage_tfm_rubygems = (
+                          '/opt/rh/rh-ruby23/root'
+                          '/usr/share/rubygems/rubygems.rb')
+    if not coverage_tfm_url:
+        print('You need to provide the TFM Coverage Url.')
+        sys.exit(1)
+
+    run('wget -O {0} {1}'.format(coverage_tfm_file, coverage_tfm_url))
+    run('cat {0} >> {1}'.format(coverage_tfm_file, coverage_tfm_rubygems))
+
+
 def configure_sonarqube():
     """Task to configure SonarQube.
 
@@ -795,6 +894,8 @@ def configure_sonarqube():
         * `SONAR_SERVER_URL`
         * `SATELLITE_VERSION`
         * `BUILD_LABEL`
+        * `SONAR_LOGIN`
+        * `SONAR_PASSWORD`
     """
     http_server = os.environ.get('HTTP_SERVER_HOSTNAME')
     sonar_server = os.environ.get('SONAR_SERVER_URL')
@@ -2150,9 +2251,13 @@ def product_install(distribution, create_vm=False, certificate_url=None,
     execute(setup_default_subnet, sat_version=satellite_version, host=host)
     execute(fix_qdrouterd_listen_to_ipv6, host=host)
 
-    # Setup code_coverage only for the provisoning jobs.
     if 'TARGET_IMAGE' in os.environ and 'base' in target_image:
-        execute(setup_code_coverage, host=host)
+        # Setup Python Code Coverage only for the provisoning jobs.
+        execute(setup_python_code_coverage, host=host)
+
+        # Setup Ruby Code Coverage only for the provisioning jobs.
+        execute(setup_ruby_code_coverage, host=host)
+
     if (
         os.environ.get('EXTERNAL_AUTH') == 'IDM' or
         os.environ.get('IDM_REALM') == 'true'
