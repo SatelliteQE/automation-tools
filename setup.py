@@ -21,6 +21,7 @@ setup(
     package_dir={'automation_tools': 'automation_tools'},
     include_package_data=True,
     install_requires=[
+        'BeautifulSoup',
         'Fabric3',
         'lxml',
         'pycurl',
