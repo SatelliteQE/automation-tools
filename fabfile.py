@@ -77,6 +77,7 @@ from automation_tools.satellite5 import (
     satellite5_product_install,
 )
 from automation_tools.utils import (
+    compare_builds,
     distro_info,
     get_discovery_image,
     update_packages

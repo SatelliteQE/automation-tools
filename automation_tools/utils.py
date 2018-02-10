@@ -110,3 +110,85 @@ def get_discovery_image():
     finally:
         run('rm /tmp/foreman-discovery-image* /tmp/discovery-remaster '
             '/tmp/usr -rvf')
+
+
+def get_packages_name(html):
+    soup = BeautifulSoup(html)
+    anchors = soup.findAll('a')
+    links = []
+    for a in anchors:
+        links.append(a['href'])
+    links = filter(lambda k: 'rpm' in k, links)
+    return links
+
+
+def get_packages(url, package_name):
+    run('wget -P packages/ ' + url + package_name)
+
+
+def compare_builds(url1, url2):
+    """ Task to to compare packages in two different release engineering builds
+     and verify rpm signature.
+    :return: Check Package Versions in both builds are same and all packages
+     under RCM_COMPOSE_URL are signed!
+    """
+    signature = os.getenv('SIGNATURE')
+    flag = flag1 = flag2 = 0
+    list1 = get_packages_name(urllib2.urlopen(url1).read())
+    list1.sort()
+    list2 = get_packages_name(urllib2.urlopen(url2).read())
+    list2.sort()
+    try:
+        run('mkdir packages')
+        for pkg in range(len(list2)):
+            get_packages(url2, list2[pkg])
+        for pkg in range(len(list2)):
+            if 'NOT OK' not in run('rpm -K packages/' + list1[pkg]):
+                flag1 = flag1 + 1
+                if signature in run(
+                                        'rpm -qpi packages/' +
+                                        list2[pkg] + '| grep "Signature" '
+                ):
+                    flag2 = flag2 + 1
+                else:
+                    print('signature ' + signature + ' not matched for '
+                          + list2[pkg])
+            else:
+                print(list2[pkg] + 'package is not signed')
+    finally:
+        run('rm packages -rf')
+
+    print("========================= Overall Report ======================")
+
+    print(
+        "There are " + str(len(list1)) + " packages in " + url1 + " and "
+        + str(len(list2)) + " packages in " + url2
+    )
+
+    for pkg in range(len(list1)):
+        if list1[pkg] == list2[pkg]:
+            flag = flag + 1
+        else:
+            print(
+                "The version of package " + list1[pkg] +
+                " from build1 is not similar to version of package " + list2[
+                    pkg]
+                + " from build2."
+            )
+
+    if flag == len(list1) - 1:
+        print("Versions in both builds are same")
+    else:
+        print(str((len(list1)) - flag) + " packages version found mismatched!")
+
+    if flag1 == len(list1):
+        print("All packages are signed!")
+    else:
+        print(str(len(list1) - flag1) + 'packages are not signed!!')
+
+    if flag2 == len(list1):
+        print("Signature matched for all packages!!")
+    else:
+        print('Signature ' + signature + ' for ' + str(len(list1) - flag2) +
+              ' packages not matched!!')
+    print("================================================================")
