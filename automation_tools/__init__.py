@@ -1206,13 +1206,16 @@ def vm_create():
         address from corporate network.
     BRIDGE2
         Specify another bridge to second NIC for the provisioned VM.
+    NAT
+        the name of NATed network with static IP adressing on custom
+        hypervisors where Sat6 VM can be operated too. Typically "foreman"
     IPADDR
         The static IP address from the VLAN which needs to be provided when
-        using VLAN Bridge.
+        using VLAN Bridge or NAT network.
     NETMASK
-        The static netmask of the VLAN when using VLAN Bridge
+        The static netmask of the VLAN when using VLAN Bridge or NAT network
     GATEWAY
-        The static gateway of the VLAN when using VLAN Bridge
+        The static gateway of the VLAN when using VLAN Bridge or NAT network
 
     If the Bridge being used is br0 then a DHCP IP is used and the VM will have
     the TARGET_IMAGE.VM_DOMAIN hostname, but make sure to have setup DDNS entry
@@ -1239,6 +1242,7 @@ def vm_create():
         'cpu_feature': os.environ.get('CPU_FEATURE'),
         'bridge': os.environ.get('BRIDGE'),
         'bridge2': os.environ.get('BRIDGE2'),
+        'nat': os.environ.get('NAT'),
         'ip_addr': os.environ.get('IPADDR'),
         'netmask': os.environ.get('NETMASK'),
         'gateway': os.environ.get('GATEWAY'),
@@ -1253,30 +1257,32 @@ def vm_create():
         '-d {vm_domain} -f',
     ]
 
-    if options['hostname'] is not None:
+    if options['hostname']:
         command_args.append('--hostname {hostname}')
 
-    if options['image_dir'] is not None:
+    if options['image_dir']:
         command_args.append('-p {image_dir}')
 
-    if options['cpu_feature'] is not None:
+    if options['cpu_feature']:
         command_args.append('--cpu-feature {cpu_feature}')
 
-    if options['bridge'] is not None:
+    if options['nat']:
+        command_args.append('-n network={nat}')
+    elif options['bridge']:
         command_args.append('-n bridge={bridge}')
     else:
         command_args.append('-n bridge=br0')
 
-    if options['bridge2'] is not None:
+    if options['bridge2']:
         command_args.append('--network2 bridge={bridge2}')
 
-    if options['ip_addr'] is not None:
+    if options['ip_addr']:
         command_args.append('--static-ipaddr {ip_addr}')
 
-    if options['netmask'] is not None:
+    if options['netmask']:
         command_args.append('--static-netmask {netmask}')
 
-    if options['gateway'] is not None:
+    if options['gateway']:
         command_args.append('--static-gateway {gateway}')
 
     command = ' '.join(command_args).format(**options)
@@ -1285,18 +1291,23 @@ def vm_create():
     # Give some time to machine boot
     time.sleep(120)
 
-    # Fetch Ip information via ping only when not using VLAN Bridges as we
-    # know the VM's Ip address beforehand.
-    if options['bridge'] is None:
+    # Discover IP via ping only when using bridge br0 which provides a DHCP IP
+    # from corporate network. Otherwise IP information carries IPADDR env var
+    if not options['ip_addr']:
         result = run('ping -c 1 {0}.local'.format(options['target_image']))
         env['vm_ip'] = result.split('(')[1].split(')')[0]
-        env['vm_domain'] = '{target_image}.{vm_domain}'.format(**options)
     else:
         env['vm_ip'] = '{ip_addr}'.format(**options)
+
+    # If no hostname is specified compose it from target and default domain.
+    # Otherwise hostname is brought in by SERVER_HOSTNAME env var
+    if not options['hostname']:
+        env['vm_domain'] = '{target_image}.{vm_domain}'.format(**options)
+    else:
         env['vm_domain'] = '{hostname}'.format(**options)
 
     # fix_hostname only if using VLAN Bridge.
-    if os.environ.get('BRIDGE'):
+    if options['bridge'] != 'br0':
         # We need to fix the /etc/hosts file for snap-guest changes.
         execute(
             fix_hostname,
@@ -1305,9 +1316,9 @@ def vm_create():
             host=env['vm_ip'],
         )
 
-    # Execute setup_ddns only if not using VLAN Bridges.
+    # Execute setup_ddns only if using bridge br0 with dynamic IP
     if (
-        os.environ.get('BRIDGE') is None and
+        options['bridge'] == 'br0' and
         'DDNS_HASH' in os.environ and 'DDNS_PACKAGE_URL' in os.environ
     ):
         execute(
@@ -2246,7 +2257,7 @@ def product_install(distribution, create_vm=False, certificate_url=None,
 
     if create_vm:
         target_image = os.environ.get('TARGET_IMAGE')
-        if target_image is None:
+        if not target_image:
             print('The TARGET_IMAGE environment variable should be defined')
             sys.exit(1)
 
@@ -2325,7 +2336,8 @@ def product_install(distribution, create_vm=False, certificate_url=None,
     # When using VLAN Bridges os.environ.get('BRIDGE') is 'true' and
     # executes with 'interface=eth0' for Satellite6-automation.
     # When using Satellite6-installer one can specify custom interface.
-    if os.environ.get('BRIDGE') or os.environ.get('INTERFACE'):
+    if (os.environ.get('BRIDGE') or
+            os.environ.get('NAT') or os.environ.get('INTERFACE')):
         # For Client provisioning using Internal Capsule within Lab only
         execute(setup_firewall, {'udp': (67,)}, flush=False, host=host)
         # If an INTERFACE is specified it will be used otherwise would
@@ -2409,7 +2421,7 @@ def product_install(distribution, create_vm=False, certificate_url=None,
     execute(setup_default_subnet, sat_version=sat_version, host=host)
     execute(fix_qdrouterd_listen_to_ipv6, host=host)
 
-    if 'TARGET_IMAGE' in os.environ and 'base' in target_image:
+    if create_vm and 'base' in target_image:
         # Setup Python Code Coverage only for the provisoning jobs.
         execute(setup_python_code_coverage, host=host)
 
