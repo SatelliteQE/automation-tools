@@ -2211,9 +2211,10 @@ def fix_hostname(entry_domain=None, host_ip=None):
             .format(host_ip, entry_domain, host))
     else:
         # Required for fixing the hostname when using satellite-installer
-        ip_addr = run("ping -c 1 $(hostname) | grep 'icmp_seq' "
-                      "| awk -F '(' '{print $2}' | awk -F ')' '{print $1}'")
-        run('echo "{0} $(hostname)" >> /etc/hosts'.format(ip_addr))
+        ip_addr = run("ping -c1 $(hostname) | awk -F\( '/icmp_seq/{print$2}' "
+                      "| awk -F\) '{print$1}'")
+        run('echo "{0} $(hostname) $(hostname -s)" >> /etc/hosts'
+            .format(ip_addr))
 
 
 def iso_download(iso_url=None):
