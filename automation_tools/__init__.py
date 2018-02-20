@@ -2206,7 +2206,6 @@ def fix_hostname(entry_domain=None, host_ip=None):
     if host_ip and entry_domain:
         # Required when running product-automation.
         host = entry_domain.split('.', 1)[0]
-        run('echo "127.0.0.1 {0} localhost" > /etc/hosts'.format(entry_domain))
         run('echo "{0} {1} {2}" >> /etc/hosts'
             .format(host_ip, entry_domain, host))
     else:
