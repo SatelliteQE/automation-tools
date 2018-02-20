@@ -866,7 +866,7 @@ def setup_foreman_discovery(sat_version):
     )
     admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme')
 
-    if sat_version in ('6.1', '6.2'):
+    if sat_version in ('6.1', '6.2', '6.3'):
         run('yum install -y {0}'.format(' '.join(packages)), warn_only=True)
         run('yum install -y foreman-discovery-image')
         for daemon in ('foreman', 'httpd', 'foreman-proxy'):
