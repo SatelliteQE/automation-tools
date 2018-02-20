@@ -1954,8 +1954,8 @@ def product_install(distribution, create_vm=False, certificate_url=None,
     }
     distribution = distribution.lower()
 
-    # Make sure downstream_install only is called for sat6.1 and sat6.2
-    if satellite_version in ('6.1', '6.2'):
+    # Make sure downstream_install only is called for sat6.1, sat6.2, sat6.3
+    if satellite_version in ('6.1', '6.2', '6.3'):
         if distribution in ('satellite6-repofile', 'satellite6-activationkey'):
             distribution = 'satellite6-downstream'
 
@@ -1969,9 +1969,9 @@ def product_install(distribution, create_vm=False, certificate_url=None,
 
     if (
         distribution == 'satellite6-cdn' and
-        sat_cdn_version not in ('6.0', '6.1', '6.2')
+        sat_cdn_version not in ('6.0', '6.1', '6.2', '6.3')
     ):
-        raise ValueError("Satellite version should be in [6.0, 6.1, 6.2]")
+        raise ValueError("Satellite version should be in [6.0, 6.1, 6.2, 6.3]")
 
     if selinux_mode is None:
         selinux_mode = os.environ.get('SELINUX_MODE', 'enforcing')
@@ -2110,7 +2110,7 @@ def product_install(distribution, create_vm=False, certificate_url=None,
 
     # Temporary workaround to solve pulp message bus connection issue
     # only for 6.1 and above
-    if (sat_cdn_version not in ('6.0', '6.1', '6.2')):
+    if (sat_cdn_version not in ('6.0', '6.1', '6.2', '6.3')):
         execute(set_service_check_status, host=host)
 
     certificate_url = certificate_url or os.environ.get(
@@ -2741,7 +2741,7 @@ def java_workaround():
 
 
 def katello_installer(debug=False, distribution=None, verbose=True,
-                      sat_version='6.2', **kwargs):
+                      sat_version='6.3', **kwargs):
     """Runs the installer with ``kwargs`` as command options. If ``sam`` is
     True
 
