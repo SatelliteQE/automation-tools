@@ -4,10 +4,10 @@ from __future__ import print_function
 import os
 import re
 import sys
-import urllib2
 
-from BeautifulSoup import BeautifulSoup
+from bs4 import BeautifulSoup
 from fabric.api import env, run
+from urllib2 import urlopen
 
 
 def distro_info():
@@ -89,7 +89,7 @@ def get_discovery_image():
     :return: foreman-discovery-image iso under /var/lib/libvirt/images/
     """
     url = os.environ.get('BASE_URL') + '/Packages/'
-    soup = BeautifulSoup(urllib2.urlopen(url).read())
+    soup = BeautifulSoup(urlopen(url).read())
     for link in soup.findAll('a'):
         if 'foreman-discovery-image' in link.string:
             discovery_image = link.string
@@ -134,9 +134,9 @@ def compare_builds(url1, url2):
     """
     signature = os.getenv('SIGNATURE')
     flag = flag1 = flag2 = 0
-    list1 = get_packages_name(urllib2.urlopen(url1).read())
+    list1 = get_packages_name(urlopen(url1).read())
     list1.sort()
-    list2 = get_packages_name(urllib2.urlopen(url2).read())
+    list2 = get_packages_name(urlopen(url2).read())
     list2.sort()
     try:
         run('mkdir packages')
