@@ -139,7 +139,7 @@ def _save_full_log(host, log_file_path, content):
 
 def _print_wrapper(s):
     """Just a wrapper to make mocking easier on tests"""
-    if isinstance(s, unicode):
-        print(s.encode('utf-8'))
-    else:
+    if isinstance(s, bytes):
         print(s)
+    else:  # is unicode
+        print(s.encode('utf-8'))

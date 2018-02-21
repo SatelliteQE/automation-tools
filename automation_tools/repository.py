@@ -1,16 +1,10 @@
 """Taks for managing repositories"""
 from __future__ import print_function
 
-import sys
-
 from automation_tools.utils import distro_info
 from fabric.api import hide, put, run
 from functools import wraps
-
-if sys.version_info[0] == 2:
-    from StringIO import StringIO  # pylint:disable=import-error
-else:
-    from io import StringIO
+from io import StringIO
 
 
 def _silencer(func):

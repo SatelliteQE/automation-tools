@@ -11,8 +11,8 @@ import socket
 import sys
 import time
 from datetime import date
+from io import StringIO
 from re import search
-from urlparse import urlsplit
 
 from automation_tools.bz import bz_bug_is_open
 from automation_tools.repository import (
@@ -22,12 +22,12 @@ from automation_tools.repository import (
 from automation_tools.utils import distro_info, update_packages
 from fabric.api import cd, env, execute, get, local, put, run, settings, sudo
 
-if sys.version_info[0] is 2:
-    from urlparse import urljoin  # (import-error) pylint:disable=F0401
-    from StringIO import StringIO  # (import-error) pylint:disable=F0401
-else:
-    from urllib.parse import urljoin  # pylint:disable=F0401,E0611
-    from io import StringIO
+try:  # py3
+    from urllib.parse import urljoin
+    from urllib.parse import urlsplit
+except ImportError:  # py2
+    from urlparse import urljoin
+    from urlparse import urlsplit
 
 LIBVIRT_IMAGES_DIR = '/var/lib/libvirt/images'
 

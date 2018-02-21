@@ -7,7 +7,11 @@ import sys
 
 from bs4 import BeautifulSoup
 from fabric.api import env, run
-from urllib2 import urlopen
+
+try:  # py3
+    from urllib.request import urlopen
+except ImportError:  # py2
+    from urllib2 import urlopen
 
 
 def distro_info():
