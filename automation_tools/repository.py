@@ -107,11 +107,11 @@ def create_custom_repos(**kwargs):
     for name, url in kwargs.items():
         repo_file = StringIO()
         repo_file.write(
-            '[{name}]\n'
-            'name={name}\n'
-            'baseurl={url}\n'
-            'enabled=1\n'
-            'gpgcheck=0\n'
+            u'[{name}]\n'
+            u'name={name}\n'
+            u'baseurl={url}\n'
+            u'enabled=1\n'
+            u'gpgcheck=0\n'
             .format(name=name, url=url)
         )
         put(local_path=repo_file,
