@@ -2881,9 +2881,7 @@ def katello_installer(debug=False, distribution=None, verbose=True,
     run('{0}-installer {1} {2} {3} {4} {5}'.format(
         installer,
         '--scenario {0}'
-        .format(scenario) if sat_version in (
-            '6.2', '6.3', 'upstream-nightly', 'downstream-nightly'
-        ) else '',
+        .format(scenario) if sat_version not in ('6.0', '6.1') else '',
         '-d' if debug else '',
         '-v' if verbose else '',
         ' '.join([
