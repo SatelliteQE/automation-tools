@@ -2147,9 +2147,6 @@ def product_install(distribution, create_vm=False, certificate_url=None,
 
     execute(setup_avahi_discovery, host=host)
 
-    if distribution in ('satellite6-downstream', 'satellite6-iso'):
-        execute(java_workaround, host=host)
-
     # execute returns a dictionary mapping host strings to the given task's
     # return value
     installer_options.update(execute(
@@ -2835,16 +2832,6 @@ def foreman_debug(tarball_name=None, local_path=None):
 # =============================================================================
 # Helper functions
 # =============================================================================
-def java_workaround():
-    """By default java-1.8.0-openjdk will be installed on RHEL 6.6 but it makes
-    the katello-installer fail. Install java-1.7.0-openjdk which is the
-    recommended version for RHEL 6.6.
-
-    """
-    if distro_info() == ('rhel', 6, 6):
-        run('yum install -y java-1.7.0-openjdk')
-
-
 def katello_installer(debug=False, distribution=None, verbose=True,
                       sat_version='6.3', **kwargs):
     """Runs the installer with ``kwargs`` as command options. If ``sam`` is
