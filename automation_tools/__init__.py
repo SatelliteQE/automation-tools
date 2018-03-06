@@ -1741,9 +1741,10 @@ def apply_hotfix():
         run('/root/hotfix.sh')
 
 
-def upstream_install(admin_password=None, run_katello_installer=True,
-                     puppet4=True):
+def upstream_install(admin_password=None, run_katello_installer=True):
     """Task to install Foreman nightly using forklift scripts"""
+    use_koji = 'koji' in os.environ.get('DISTRIBUTION').lower()
+    puppet4 = bool(os.environ.get('PUPPET4_REPO'))  # otherwise puppet5
     if admin_password is None:
         admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme')
 
@@ -1757,13 +1758,14 @@ def upstream_install(admin_password=None, run_katello_installer=True,
     run('git clone -q https://github.com/theforeman/forklift.git')
 
     with cd('forklift'):
-        # For now, puppet-four is configured by default. Toggle option
-        # will be added later.
         run('ansible-playbook -c local -i,$(hostname) '
-            '-e katello_version=nightly {0} '
+            '-e katello_version=nightly {0} {1} {2} '
             '-e foreman_installer_skip_installer=True '
             'playbooks/katello.yml'.format(
-                '-e puppet_repositories_version=4' if puppet4 else ''))
+                '-e puppet_repositories_version=4' if puppet4 else '',
+                '-e foreman_repositories_use_koji=True' if use_koji else '',
+                '-e katello_repositories_use_koji=True' if use_koji else '',
+            ))
 
     # Install support for various compute resources in upstream
     compute_resources = [
@@ -1775,7 +1777,18 @@ def upstream_install(admin_password=None, run_katello_installer=True,
         'rackspace',
         'vmware',
     ]
-    run('yum install -y foreman-{{{0}}}'.format(','.join(compute_resources)))
+    # Install hammer plugins to match downstream set of plugins
+    hammer_plugins = [
+        'csv',
+        'foreman_admin',
+        'foreman_openscap',
+        'foreman_remote_execution',
+        'foreman_virt_who_configure',
+    ]
+    run('yum install -y foreman-{{{0}}} tfm-rubygem-hammer_cli_{{{1}}}'.format(
+        ','.join(compute_resources),
+        ','.join(hammer_plugins),
+    ))
 
     installer_options = {
         'foreman-admin-password': admin_password,
@@ -1986,28 +1999,6 @@ def iso_install(
         return installer_options
 
 
-def sam_upstream_install(admin_password=None, run_katello_installer=True):
-    """Task to install SAM nightly"""
-
-    if admin_password is None:
-        admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme')
-
-    # TODO forklift (katello-deploy) dropped SAM support (--sam)
-    # DUMMY
-    #
-    # to be implemented...
-
-    installer_options = {
-        'foreman-admin-password': admin_password,
-    }
-    if run_katello_installer:
-        katello_installer(**installer_options)
-        # Ensure that the installer worked
-        run('hammer -u admin -p {0} ping'.format(admin_password))
-    else:
-        return installer_options
-
-
 def product_install(distribution, create_vm=False, certificate_url=None,
                     selinux_mode=None, sat_cdn_version=None,
                     test_in_stage=False):
@@ -2025,8 +2016,8 @@ def product_install(distribution, create_vm=False, certificate_url=None,
     SATELLITE_VERSION
         Satellite version.
 
-    Product distributions are sam-upstream, satellite6-cdn,
-    satellite6-downstream, satellite6-iso or satellite6-upstream.
+    Product distributions are satellite6-cdn, satellite6-downstream,
+    satellite6-iso or satellite6-upstream, satellite6-koji
 
     If ``create_vm`` is True then ``vm_destroy`` and ``vm_create`` tasks will
     be run. Make sure to set the required environment variables for those
@@ -2063,7 +2054,6 @@ def product_install(distribution, create_vm=False, certificate_url=None,
         test_in_stage = (test_in_stage.lower() == 'true')
 
     install_tasks = {
-        'sam-upstream': sam_upstream_install,
         'satellite6-beta': cdn_install,
         'satellite6-cdn': cdn_install,
         'satellite6-downstream': downstream_install,
@@ -2071,6 +2061,7 @@ def product_install(distribution, create_vm=False, certificate_url=None,
         'satellite6-activationkey': ak_install,
         'satellite6-iso': iso_install,
         'satellite6-upstream': upstream_install,
+        'satellite6-koji': upstream_install,
     }
     distribution = distribution.lower()
 
@@ -2193,13 +2184,12 @@ def product_install(distribution, create_vm=False, certificate_url=None,
         host=host, interface=interface, run_katello_installer=False
     )[host])
 
-    if distribution.startswith('satellite6'):
-        if os.environ.get('PROXY_INFO'):
-            # execute returns a dictionary mapping host strings to the given
-            # task's return value
-            installer_options.update(execute(
-                setup_proxy, host=host, run_katello_installer=False
-            )[host])
+    if os.environ.get('PROXY_INFO'):
+        # execute returns a dictionary mapping host strings to the given
+        # task's return value
+        installer_options.update(execute(
+            setup_proxy, host=host, run_katello_installer=False
+        )[host])
 
     if os.environ.get('INSTALLER_OPTIONS'):
         # INSTALLER_OPTIONS are comma separated katello-installer options.
@@ -2240,30 +2230,29 @@ def product_install(distribution, create_vm=False, certificate_url=None,
         )
     execute(setup_alternate_capsule_ports, host=host)
 
-    if distribution.startswith('satellite6'):
-        execute(setup_default_docker, host=host)
-        execute(katello_service, 'restart', host=host)
-        # if we have ssh key to libvirt machine we can setup access to it
-        if os.environ.get('LIBVIRT_KEY_URL') is not None:
-            execute(setup_libvirt_key, host=host)
-        if satellite_version not in ('6.0', 'upstream-nightly'):
-            execute(install_puppet_scap_client, host=host)
-        if satellite_version == '6.1':
-            execute(setup_oscap, host=host)
-        if satellite_version not in ('6.0', '6.1', 'upstream-nightly'):
-            execute(oscap_content, host=host)
-        # ostree plugin is for Sat6.2+ and upstream-nightly (rhel7 only)
-        if satellite_version not in ('6.0', '6.1'):
-            execute(enable_ostree, sat_version=satellite_version, host=host)
-        # setup_foreman_discovery
-        # setup_discovery_task needs to be run at last otherwise, any other
-        # tasks like ostree which is re-running installer would re-set the
-        # discovery templates as well. Please see #1387179 for more info.
-        execute(
-            setup_foreman_discovery,
-            sat_version=satellite_version,
-            host=host
-        )
+    execute(setup_default_docker, host=host)
+    execute(katello_service, 'restart', host=host)
+    # if we have ssh key to libvirt machine we can setup access to it
+    if os.environ.get('LIBVIRT_KEY_URL') is not None:
+        execute(setup_libvirt_key, host=host)
+    if satellite_version not in ('6.0', 'upstream-nightly'):
+        execute(install_puppet_scap_client, host=host)
+    if satellite_version == '6.1':
+        execute(setup_oscap, host=host)
+    if satellite_version not in ('6.0', '6.1', 'upstream-nightly'):
+        execute(oscap_content, host=host)
+    # ostree plugin is for Sat6.2+ and upstream-nightly (rhel7 only)
+    if satellite_version not in ('6.0', '6.1'):
+        execute(enable_ostree, sat_version=satellite_version, host=host)
+    # setup_foreman_discovery
+    # setup_discovery_task needs to be run at last otherwise, any other
+    # tasks like ostree which is re-running installer would re-set the
+    # discovery templates as well. Please see #1387179 for more info.
+    execute(
+        setup_foreman_discovery,
+        sat_version=satellite_version,
+        host=host
+    )
     execute(setup_default_subnet, sat_version=satellite_version, host=host)
     execute(fix_qdrouterd_listen_to_ipv6, host=host)
 
@@ -2860,30 +2849,26 @@ def foreman_debug(tarball_name=None, local_path=None):
 # =============================================================================
 def katello_installer(debug=False, distribution=None, verbose=True,
                       sat_version='6.3', **kwargs):
-    """Runs the installer with ``kwargs`` as command options. If ``sam`` is
-    True
-
-    """
+    """Runs the installer with ``kwargs`` as command options."""
     # capsule-dns-forwarders should be repeated if setting more than one
     # value check if a list is being received and repeat the option with
     # different values
-    if sat_version in ('6.0', '6.1'):
-        proxy = 'capsule'
-        installer = 'katello'
-    if distribution == 'sam-upstream':
-        installer = 'sam'
-        sat_version = ''
-    if (sat_version in ('6.2', '6.3', 'downstream-nightly') and
-            distribution != 'satellite6-upstream'):
-        proxy = 'foreman-proxy'
-        installer = 'satellite'
-        scenario = 'satellite'
-    if distribution == 'satellite6-upstream':
+    extra_options = []
+
+    if sat_version == 'upstream-nightly':
         proxy = 'foreman-proxy'
         installer = 'foreman'
         scenario = 'katello'
+        extra_options.append('--enable-foreman-plugin-remote-execution')
+        extra_options.append('--enable-foreman-proxy-plugin-remote-execution-ssh')  # noqa
+    elif sat_version in ('6.0', '6.1'):
+        proxy = 'capsule'
+        installer = 'katello'
+    else:  # sat_version in ('6.2', '6.3', 'downstream-nightly')
+        proxy = 'foreman-proxy'
+        installer = 'satellite'
+        scenario = 'satellite'
 
-    extra_options = []
     if ('{0}-dns-forwarders'.format(proxy) in kwargs and
             isinstance(kwargs['{0}-dns-forwarders'.format(proxy)], list)):
         forwarders = kwargs.pop('{0}-dns-forwarders'.format(proxy))
