@@ -929,19 +929,21 @@ def configure_sonarqube():
             sonar_server, build_label, satellite_version,
             sonar_login, sonar_password))
 
-    run('sonar-scanner-2.6-SNAPSHOT/bin/sonar-scanner -X -e '
-        '-Dsonar.host.url={0} -Dsonar.language=ruby -Dsonar.ws.timeout=180 '
-        '-Dsonar.projectVersion={1} '
-        '"-Dsonar.projectName=Satellite{2} TFM Ruby Analysis" '
-        '"-Dsonar.simplecovrcov.reportPath=/etc/coverage'
-        '/ruby/tfm/reports/results.json" '
-        '"-Dsonar.projectKey=Satellite{2}_tfm_ruby_full_analysis" '
-        '-Dsonar.projectBaseDir=/opt/theforeman/tfm/root/usr/share/gems/gems/ '
-        '-Dsonar.sources=/opt/theforeman/tfm/root/usr/share/gems/gems/ '
-        '"-Dsonar.login={3}" "-Dsonar.password={4}"'
-        .format(
-            sonar_server, build_label, satellite_version,
-            sonar_login, sonar_password))
+    if os.environ.get('RUBY_CODE_COVERAGE') == 'true':
+        run('sonar-scanner-2.6-SNAPSHOT/bin/sonar-scanner -X -e '
+            '-Dsonar.host.url={0} -Dsonar.language=ruby '
+            '-Dsonar.ws.timeout=180 -Dsonar.projectVersion={1} '
+            '"-Dsonar.projectName=Satellite{2} TFM Ruby Analysis" '
+            '"-Dsonar.simplecovrcov.reportPath=/etc/coverage'
+            '/ruby/tfm/reports/results.json" '
+            '"-Dsonar.projectKey=Satellite{2}_tfm_ruby_full_analysis" '
+            '-Dsonar.projectBaseDir=/opt/theforeman/tfm/root'
+            '/usr/share/gems/gems/ '
+            '-Dsonar.sources=/opt/theforeman/tfm/root/usr/share/gems/gems/ '
+            '"-Dsonar.login={3}" "-Dsonar.password={4}"'
+            .format(
+                sonar_server, build_label, satellite_version,
+                sonar_login, sonar_password))
 
 
 def setup_oscap():
@@ -2269,6 +2271,7 @@ def product_install(distribution, create_vm=False, certificate_url=None,
         # Setup Python Code Coverage only for the provisoning jobs.
         execute(setup_python_code_coverage, host=host)
 
+    if os.environ.get('RUBY_CODE_COVERAGE') == 'true':
         # Setup Ruby Code Coverage only for the provisioning jobs.
         execute(setup_ruby_code_coverage, host=host)
 
@@ -2277,6 +2280,7 @@ def product_install(distribution, create_vm=False, certificate_url=None,
 
         # Configure for Ruby TFM Code Coverage.
         execute(setup_rubytfm_code_coverage, host=host)
+
     if (
         os.environ.get('EXTERNAL_AUTH') == 'IDM' or
         os.environ.get('IDM_REALM') == 'true'
