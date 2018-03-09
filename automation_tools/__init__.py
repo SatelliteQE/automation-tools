@@ -812,6 +812,9 @@ def setup_ruby_code_coverage():
         'config_sys.yml" >> ~/.bashrc')
     run('echo "export RUBY_TFM_COVERAGE_CONFIG=/etc/coverage/ruby/tfm/'
         'config_tfm.yml" >> ~/.bashrc')
+    run('for i in `find / -name simplecov-html.rb`; do sed -i -e '
+        '"s/puts output_message(result)/# puts output_message(result)/"'
+        ' $i; done')
 
 
 # This function sets up the ruby code coverage around satellite-installer and
