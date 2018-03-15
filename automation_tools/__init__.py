@@ -1745,7 +1745,7 @@ def apply_hotfix():
 
 def upstream_install(admin_password=None, run_katello_installer=True):
     """Task to install Foreman nightly using forklift scripts"""
-    use_koji = 'koji' in os.environ.get('DISTRIBUTION').lower()
+    koji = 'koji' in os.environ.get('DISTRIBUTION').lower()
     puppet4 = bool(os.environ.get('PUPPET4_REPO'))  # otherwise puppet5
     if admin_password is None:
         admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme')
@@ -1766,8 +1766,8 @@ def upstream_install(admin_password=None, run_katello_installer=True):
             '-e foreman_installer_skip_installer=True '
             'playbooks/katello.yml'.format(
                 '-e puppet_repositories_version=4' if puppet4 else '',
-                '-e foreman_repositories_use_koji=True' if use_koji else '',
-                '-e katello_repositories_use_koji=True' if use_koji else '',
+                '-e foreman_repositories_environment=staging' if koji else '',
+                '-e katello_repositories_environment=staging' if koji else '',
             ))
 
     # Install support for various compute resources in upstream
