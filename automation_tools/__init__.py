@@ -237,10 +237,13 @@ def setup_avahi_discovery():
        by 'ping vm.local' run at Satellite
     """
     os_version = distro_info()[1]
-    run('yum -y install https://dl.fedoraproject.org/pub/epel/'
-        'epel-release-latest-{0}.noarch.rpm'.format(os_version))
+    epel_present = run('rpm -q epel-release', warn_only=True).return_code == 0
+    if not epel_present:
+        run('yum -y install https://dl.fedoraproject.org/pub/epel/'
+            'epel-release-latest-{0}.noarch.rpm'.format(os_version))
     run('yum -y install nss-mdns')  # also pulls in avahi
-    run('rpm -e epel-release')
+    if not epel_present:  # we installed epel, so removing aftwerwards
+        run('rpm -e epel-release')
     if os_version >= 7:
         run('firewall-cmd --add-service mdns --permanent')
         run('firewall-cmd --reload')
@@ -772,13 +775,15 @@ def setup_python_code_coverage():
     sitecustomize_file.close()
 
     # Install EPEL packages for the installation
-    run('yum -y install https://dl.fedoraproject.org'
-        '/pub/epel/epel-release-latest-{0}.noarch.rpm'
-        .format(os_version))
+    epel_present = run('rpm -q epel-release', warn_only=True).return_code == 0
+    if not epel_present:
+        run('yum -y install https://dl.fedoraproject.org/pub/epel/'
+            'epel-release-latest-{0}.noarch.rpm'.format(os_version))
     run('yum -y install python-pip')
     run('pip install -U coverage')
-    # Uninstall EPEL package rather than delete just the epel.repo file.
-    run('yum remove -y epel-release.noarch')
+    # Uninstall EPEL package only if we have installed it (leave for upstream)
+    if not epel_present:
+        run('rpm -e epel-release')
     run('chcon -R -u system_u -t httpd_sys_rw_content_t /etc/coverage')
     run('chmod -R 777 /etc/coverage ; chown -R apache.apache /etc/coverage')
 
@@ -1750,7 +1755,8 @@ def upstream_install(admin_password=None, run_katello_installer=True):
 
     enable_repos('rhel-*-server-extras-rpms', 'rhel-*-server-optional-rpms')
     # Install required packages for the installation
-    if not run('rpm -qa epel-release'):
+    epel_present = run('rpm -q epel-release', warn_only=True).return_code == 0
+    if not epel_present:
         run('rpm -iv http://dl.fedoraproject.org/pub/epel/'
             'epel-release-latest-7.noarch.rpm')
     run('yum -y install ansible git')
