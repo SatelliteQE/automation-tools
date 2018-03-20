@@ -1020,12 +1020,9 @@ def setup_foreman_discovery(sat_version):
         return
 
     if sat_version == 'upstream-nightly':
-        run('foreman-installer --enable-foreman-plugin-discovery '
-            '--enable-foreman-proxy-plugin-discovery')
-        run('yum install -y {0}'.format(' '.join(packages)), warn_only=True)
         # Fetch the upstream-nightly FDI from upstream
         image_url = 'http://downloads.theforeman.org/discovery/nightly/fdi-image-latest.tar'  # noqa
-        run('wget {0} + -O - | tar x --overwrite -C /var/lib/tftpboot/boot'
+        run('wget -nv -O- {0} | tar x --overwrite -C /var/lib/tftpboot/boot'
             .format(image_url))
 
     if sat_version in ('6.3', 'downstream-nightly'):
@@ -2867,6 +2864,8 @@ def katello_installer(debug=False, distribution=None, verbose=True,
         scenario = 'katello'
         extra_options.append('--enable-foreman-plugin-remote-execution')
         extra_options.append('--enable-foreman-proxy-plugin-remote-execution-ssh')  # noqa
+        extra_options.append('--enable-foreman-plugin-discovery')
+        extra_options.append('--enable-foreman-proxy-plugin-discovery')
     elif sat_version in ('6.0', '6.1'):
         proxy = 'capsule'
         installer = 'katello'
