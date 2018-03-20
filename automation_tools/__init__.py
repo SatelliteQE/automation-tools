@@ -1784,6 +1784,7 @@ def upstream_install(admin_password=None, run_katello_installer=True):
     hammer_plugins = [
         'csv',
         'foreman_admin',
+        'foreman_discovery',
         'foreman_openscap',
         'foreman_remote_execution',
         'foreman_virt_who_configure',
