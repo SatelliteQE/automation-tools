@@ -2977,7 +2977,15 @@ def download_manifest(url=None, consumer=None):
     """
     user = os.environ.get('RHN_USERNAME')
     password = os.environ.get('RHN_PASSWORD')
-    base64string = base64.encodestring('%s:%s' % (user, password)).strip()
+    string = u'{0}:{1}'.format(user, password)
+
+    if isinstance(string, str):  # py3
+        bytestring = bytes('{0}:{1}'.format(user, password), 'utf-8')
+    else:  # py2
+        bytestring = bytes('{0}:{1}'.format(user, password))
+
+    base64string = base64.encodestring(bytestring).strip()
+
     if url is None:
         url = os.environ.get('SM_URL')
     if consumer is None:
@@ -2989,13 +2997,14 @@ def download_manifest(url=None, consumer=None):
     # required Entitlement certificates to actually access the content.
     certs_put = ('curl -sk -X PUT -H "Authorization:Basic {0}"'
                  ' {1}/subscription/consumers/{2}/certificates'
-                 '?lazy_regen=false').format(base64string, url, consumer)
+                 '?lazy_regen=false').format(
+                 base64string.decode('utf-8'), url, consumer)
     run(certs_put)
 
     command = ('curl -sk -H "Authorization:Basic {0}"'
                ' {1}/subscription/consumers/{2}/export/').format(
-        base64string, url, consumer
-    )
+               base64string.decode('utf-8'), url, consumer)
+
     response = run(command + ' -I')
     if ('Content-Disposition: attachment' in response):
         run(command + ' -o {0}'.format(manifest_file))
