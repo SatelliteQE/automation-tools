@@ -29,6 +29,7 @@ setup(
         'python-bugzilla==1.2.2',
         'requests',
         'robozilla',
+        'six',
         'unittest2',
     ],
     license='GNU GPL v3.0',
