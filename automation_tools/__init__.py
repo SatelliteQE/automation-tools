@@ -22,12 +22,8 @@ from automation_tools.repository import (
 from automation_tools.utils import distro_info, update_packages
 from fabric.api import cd, env, execute, get, local, put, run, settings, sudo
 
-try:  # py3
-    from urllib.parse import urljoin
-    from urllib.parse import urlsplit
-except ImportError:  # py2
-    from urlparse import urljoin
-    from urlparse import urlsplit
+from six.moves.urllib.parse import urljoin
+from six.moves.urllib.parse import urlsplit
 
 LIBVIRT_IMAGES_DIR = '/var/lib/libvirt/images'
 
