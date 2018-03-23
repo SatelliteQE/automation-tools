@@ -4,7 +4,7 @@ import json
 import os
 
 from fabric.api import env, get, put, run, settings, task
-from hammer import (
+from automation_tools.satellite6.hammer import (
     hammer_activation_key_add_subscription,
     hammer_activation_key_create,
     hammer_content_view_add_repository,
