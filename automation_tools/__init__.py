@@ -2495,7 +2495,7 @@ def update_basic_packages():
     """Updates some basic packages before we can run some real tests."""
     update_packages('subscription-manager', 'yum-utils', quiet=True)
     run('yum install -y yum-plugin-security yum-security', quiet=True)
-    run('rpm -q subscription-manager python-rhsm')
+    run('rpm -q subscription-manager')
 
 
 def client_registration_test(clean_beaker=True, update_package=True,
