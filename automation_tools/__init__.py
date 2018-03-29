@@ -2065,8 +2065,9 @@ def product_install(distribution, create_vm=False, certificate_url=None,
     }
     distribution = distribution.lower()
 
-    # Make sure downstream_install only is called for sat6.1, sat6.2, sat6.3
-    if satellite_version in ('6.1', '6.2', '6.3'):
+    # Make sure downstream_install only is called for sat6.1, sat6.2 only,
+    # not from sat6.3+. Do not add '6.3' and following versions below.
+    if satellite_version in ('6.1', '6.2'):
         if distribution in ('satellite6-repofile', 'satellite6-activationkey'):
             distribution = 'satellite6-downstream'
 
