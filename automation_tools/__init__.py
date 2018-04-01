@@ -16,8 +16,8 @@ from re import search
 
 from automation_tools.bz import bz_bug_is_open
 from automation_tools.repository import (
-    create_custom_repos, delete_custom_repos, enable_repos,
-    enable_satellite_repos, disable_repos
+    create_custom_repos, delete_custom_repos, disable_repos,
+    disable_beaker_repos, enable_repos, enable_satellite_repos,
 )
 from automation_tools.utils import distro_info, update_packages
 from fabric.api import cd, env, execute, get, local, put, run, settings, sudo
@@ -121,7 +121,7 @@ def subscribe_dogfood(clean_beaker=True):
 
     # If this is a Beaker box, 'disable' Beaker repos
     if clean_beaker is True:
-        run('mv /etc/yum.repos.d/beaker* .', warn_only=True)
+        disable_beaker_repos(silent=True)
 
     # Clean up and install with basic packages.
     clean_rhsm()
