@@ -2236,11 +2236,11 @@ def product_install(distribution, create_vm=False, certificate_url=None,
     # if we have ssh key to libvirt machine we can setup access to it
     if os.environ.get('LIBVIRT_KEY_URL') is not None:
         execute(setup_libvirt_key, host=host)
-    if satellite_version not in ('6.0', 'upstream-nightly'):
+    if satellite_version != '6.0':
         execute(install_puppet_scap_client, host=host)
     if satellite_version == '6.1':
         execute(setup_oscap, host=host)
-    if satellite_version not in ('6.0', '6.1', 'upstream-nightly'):
+    if satellite_version not in ('6.0', '6.1'):
         execute(oscap_content, host=host)
     # ostree plugin is for Sat6.2+ and upstream-nightly (rhel7 only)
     if satellite_version not in ('6.0', '6.1'):
@@ -2864,6 +2864,8 @@ def katello_installer(debug=False, distribution=None, verbose=True,
         extra_options.append('--enable-foreman-proxy-plugin-remote-execution-ssh')  # noqa
         extra_options.append('--enable-foreman-plugin-discovery')
         extra_options.append('--enable-foreman-proxy-plugin-discovery')
+        extra_options.append('--enable-foreman-plugin-openscap')
+        extra_options.append('--enable-foreman-proxy-plugin-openscap')
     elif sat_version in ('6.0', '6.1'):
         proxy = 'capsule'
         installer = 'katello'
