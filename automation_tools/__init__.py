@@ -1527,7 +1527,7 @@ def generate_capsule_certs(capsule_fqdn=None):
         .format(capsule_fqdn))
     run('chmod +x /var/www/html/pub/capsule_script.sh')
     run('sed -i \'s|/var/www/html/pub/{0}-certs.tar|/root/{0}-certs.tar|\' '
-        '"/var/www/html/pub/capsule-script.sh"'
+        '"/var/www/html/pub/capsule_script.sh"'
         .format(capsule_fqdn))
 
 
