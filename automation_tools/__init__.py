@@ -1525,18 +1525,26 @@ def generate_capsule_certs(capsule_fqdn=None):
         ' --scenario capsule" > /var/www/html/pub/capsule_script.sh'
         .format(capsule_fqdn))
     run('chmod +x /var/www/html/pub/capsule_script.sh')
+    run('sed -i \'s|/var/www/html/pub/{0}-certs.tar|/root/{0}-certs.tar|\' '
+        '"/var/www/html/pub/capsule-script.sh"'
+        .format(capsule_fqdn))
 
 
-def setup_capsule(satellite_fqdn=None, capsule_org=None, capsule_ak=None):
+def setup_capsule(satellite_fqdn=None, capsule_fqdn=None, capsule_org=None,
+                  capsule_ak=None):
     """Setup and install the pre-requisites required for Capsule.
 
     SATELLITE_FQDN
         SATELLITE FQDN from which the certs.tar and capsule_script.sh needed.
+    CAPSULE_FQDN
+        CAPSULE FQDN for which the certs.tar has been generated.
 
     """
     os_version = distro_info()[1]
     if satellite_fqdn is None:
         satellite_fqdn = os.environ.get('SATELLITE_FQDN')
+    if capsule_fqdn is None:
+        capsule_fqdn = os.environ.get('CAPSULE_FQDN')
     if capsule_org is None:
         capsule_org = "Default_Organization"
     if capsule_ak is None:
@@ -1550,6 +1558,8 @@ def setup_capsule(satellite_fqdn=None, capsule_org=None, capsule_ak=None):
         .format(satellite_fqdn))
     run('wget -O /root/capsule_script.sh http://{0}/pub/capsule_script.sh'
         .format(satellite_fqdn))
+    run('wget -O /root/{1}-certs.tar http://{0}/pub/{1}-certs.tar'
+        .format(satellite_fqdn, capsule_fqdn))
     run('chmod +x /root/capsule_script.sh')
 
     # Register and subscribe
