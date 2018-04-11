@@ -1506,6 +1506,78 @@ def configure_osp(admin_password=None, forward_zone=None, reverse_zone=None,
             .format(admin_password))
 
 
+def generate_capsule_certs(capsule_fqdn=None):
+    """Generate Capsule Certs required for Capsule Installation.
+
+    CAPSULE_FQDN
+        CAPSULE FQDN for which certs needs to be created.
+
+    """
+    if capsule_fqdn is None:
+        capsule_fqdn = os.environ.get('CAPSULE_FQDN')
+    run('capsule-certs-generate --foreman-proxy-fqdn {0}'
+        ' --certs-tar "/var/www/html/pub/{0}-certs.tar" > '
+        '/var/www/html/pub/{0}-out.txt'
+        .format(capsule_fqdn))
+    run('cat /var/www/html/pub/{0}-out.txt|'
+        'grep -v help  | grep -A 10 "satellite-installer'
+        ' --scenario capsule" > /var/www/html/pub/capsule_script.sh'
+        .format(capsule_fqdn))
+    run('chmod +x /var/www/html/pub/capsule_script.sh')
+
+
+def setup_capsule(satellite_fqdn=None, capsule_org=None, capsule_ak=None):
+    """Setup and install the pre-requisites required for Capsule.
+
+    SATELLITE_FQDN
+        SATELLITE FQDN from which the certs.tar and capsule_script.sh needed.
+
+    """
+    os_version = distro_info()[1]
+    if satellite_fqdn is None:
+        satellite_fqdn = os.environ.get('SATELLITE_FQDN')
+    if capsule_org is None:
+        capsule_org = "Default_Organization"
+    if capsule_ak is None:
+        capsule_ak = "ak-capsule-{0}".format(os_version)
+    # Clean up and install with basic packages.
+    clean_rhsm()
+
+    # Install the cert file
+    run('yum -y localinstall '
+        'http://{0}/pub/katello-ca-consumer-latest.noarch.rpm'
+        .format(satellite_fqdn))
+    run('wget -O /root/capsule_script.sh http://{0}/pub/capsule_script.sh'
+        .format(satellite_fqdn))
+    run('chmod +x /root/capsule_script.sh')
+
+    # Register and subscribe
+    print('Register/Subscribe using Subscription-manager.')
+    cmd = (
+        'subscription-manager register --force --org="{0}" '
+        '--activationkey="{1}"'.format(capsule_org, capsule_ak)
+    )
+    run(cmd)
+
+    # Refresh subscriptions and clean up YUM
+    print('Refreshing Subscription-manager.')
+    run('subscription-manager refresh')
+    print('Performing yum clean up.')
+    run('yum clean all', quiet=True)
+    run('yum -y katello-agent')
+
+    # Ensure Capsule and Satellite6 Server time is in sync.
+    manage_daemon('stop', 'chronyd', warn_only=True)
+    manage_daemon('stop', 'ntpd', warn_only=True)
+    run('ntpdate clock.redhat.com')
+
+    # Install and run satellite-installer to configure capsule.
+    run('yum -y install satellite-capsule')
+    run('/root/capsule_script.sh')
+    run('satellite-installer --scenario capsule '
+        ' --enable-foreman-proxy-plugin-remote-execution-ssh')
+
+
 def cleanup_idm(hostname, idm_password=None):
     """Clean up the IDM server of any previous entries.
 
