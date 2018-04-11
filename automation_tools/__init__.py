@@ -430,6 +430,7 @@ def setup_default_libvirt(bridge=None):
 
     os_version = distro_info()[1]
     if os_version >= 7:
+        manage_daemon('start', 'firewalld')
         run('firewall-cmd --add-service vnc-server --permanent')
         run('firewall-cmd --service=vnc-server --add-port=5901-5999/tcp '
             '--permanent')
