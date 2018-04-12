@@ -1576,6 +1576,9 @@ def setup_capsule(satellite_fqdn=None, capsule_fqdn=None, capsule_org=None,
     run('subscription-manager refresh')
     print('Performing yum clean up.')
     run('yum clean all', quiet=True)
+
+    run('yum -y update')
+
     run('yum -y install katello-agent')
 
     # Ensure Capsule and Satellite6 Server time is in sync.
