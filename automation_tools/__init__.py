@@ -19,7 +19,9 @@ from automation_tools.repository import (
     create_custom_repos, delete_custom_repos, disable_repos,
     disable_beaker_repos, enable_repos, enable_satellite_repos,
 )
-from automation_tools.utils import distro_info, update_packages
+from automation_tools.utils import (
+    distro_info, run_command, update_packages
+)
 from fabric.api import cd, env, execute, get, local, put, run, settings, sudo
 
 from six.moves.urllib.parse import urljoin
@@ -2251,6 +2253,7 @@ def product_install(distribution, create_vm=False, certificate_url=None,
 
     execute(setup_avahi_discovery, host=host)
 
+    execute(run_command, os.environ.get('FIX_PREINSTALL'), host=host)
     # execute returns a dictionary mapping host strings to the given task's
     # return value
     installer_options.update(execute(
@@ -2301,6 +2304,8 @@ def product_install(distribution, create_vm=False, certificate_url=None,
         sat_version=satellite_version,
         **installer_options
     )
+
+    execute(run_command, os.environ.get('FIX_POSTINSTALL'), host=host)
 
     # With SSL verification in hammer the installer should set hostname itself
     if satellite_version == 'downstream-nightly' and bz_bug_is_open('1454706'):
