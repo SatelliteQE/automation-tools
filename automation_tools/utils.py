@@ -85,6 +85,15 @@ def update_packages(*args, **kwargs):
     )
 
 
+def run_command(cmd=None):
+    """ Task to run only sane commands
+    :param str cmd: command to be run
+
+    """
+    if cmd:
+        run(cmd)
+
+
 def get_discovery_image():
     """ Task for getting unattended foreman-discovery ISO image
     :return: foreman-discovery-image iso under /var/lib/libvirt/images/

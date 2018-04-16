@@ -85,5 +85,6 @@ from automation_tools.utils import (
     compare_builds,
     distro_info,
     get_discovery_image,
-    update_packages
+    run_command,
+    update_packages,
 )
