@@ -243,7 +243,6 @@ def setup_avahi_discovery():
     if os_version >= 7:
         run('firewall-cmd --add-service mdns --permanent')
         run('firewall-cmd --reload')
-        run('service dbus restart')
     else:
         run('iptables -I INPUT -d 224.0.0.251/32 -p udp -m udp --dport 5353'
             ' -m conntrack --ctstate NEW -j ACCEPT')
