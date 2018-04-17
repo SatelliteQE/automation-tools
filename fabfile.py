@@ -41,6 +41,7 @@ from automation_tools import (  # flake8: noqa
     setup_capsule,
     setup_ddns,
     setup_default_capsule,
+    setup_external_capsule,
     setup_default_docker,
     setup_default_libvirt,
     setup_default_subnet,

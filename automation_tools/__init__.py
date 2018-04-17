@@ -388,6 +388,14 @@ def setup_default_capsule(interface=None, run_katello_installer=True):
         return installer_options
 
 
+def setup_external_capsule():
+    """Task to setup an external Capsule for Satellite."""
+    install_options = setup_default_capsule(
+        interface="eth0",
+        run_katello_installer=False)
+    katello_installer(scenario="capsule", **install_options)
+
+
 def setup_default_libvirt(bridge=None):
     """Task to setup a the default capsule for Satellite
 
@@ -2936,7 +2944,7 @@ def foreman_debug(tarball_name=None, local_path=None):
 # Helper functions
 # =============================================================================
 def katello_installer(debug=False, distribution=None, verbose=True,
-                      sat_version='6.3', **kwargs):
+                      sat_version='6.3', scenario=None, **kwargs):
     """Runs the installer with ``kwargs`` as command options."""
     # capsule-dns-forwarders should be repeated if setting more than one
     # value check if a list is being received and repeat the option with
@@ -2959,7 +2967,8 @@ def katello_installer(debug=False, distribution=None, verbose=True,
     else:  # sat_version in ('6.2', '6.3', 'downstream-nightly')
         proxy = 'foreman-proxy'
         installer = 'satellite'
-        scenario = 'satellite'
+        if scenario is None:
+            scenario = 'satellite'
 
     if ('{0}-dns-forwarders'.format(proxy) in kwargs and
             isinstance(kwargs['{0}-dns-forwarders'.format(proxy)], list)):
