@@ -1597,8 +1597,6 @@ def setup_capsule(satellite_fqdn=None, capsule_fqdn=None, capsule_org=None,
     # Install and run satellite-installer to configure capsule.
     run('yum -y install satellite-capsule')
     run('/root/capsule_script.sh')
-    run('satellite-installer --scenario capsule '
-        ' --enable-foreman-proxy-plugin-remote-execution-ssh')
 
 
 def cleanup_idm(hostname, idm_password=None):
