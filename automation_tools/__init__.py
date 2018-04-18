@@ -392,13 +392,16 @@ def setup_default_capsule(interface=None, run_katello_installer=True):
 
 def setup_external_capsule():
     """Task to setup an external Capsule for Satellite."""
+    interface = os.environ.get('INTERFACE', 'virbr0')
+    gateway = os.environ.get('GATEWAY', '192.168.200.1')
+    setup_default_libvirt(ip_address=gateway)
     install_options = setup_default_capsule(
-        interface="eth0",
+        interface=interface,
         run_katello_installer=False)
     katello_installer(scenario="capsule", **install_options)
 
 
-def setup_default_libvirt(bridge=None):
+def setup_default_libvirt(bridge=None, ip_address="192.168.100.1"):
     """Task to setup a the default capsule for Satellite
 
     :param str interface: Network interface name to be used
@@ -432,7 +435,8 @@ def setup_default_libvirt(bridge=None):
             '  </forward>\n' +
             ('  <bridge name=\'{}\' stp=\'on\' delay=\'0\'/>\n'.format(bridge)
                 if bridge else '') +
-            '  <ip address=\'192.168.100.1\' netmask=\'255.255.255.0\'>\n'
+            ('  <ip address=\'{0}\' netmask=\'255.255.255.0\'>\n'
+                .format(ip_address)) +
             '  </ip>\n'
             '</network>")')
         run('virsh net-start foreman')
