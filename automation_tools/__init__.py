@@ -1520,19 +1520,30 @@ def configure_osp(admin_password=None, forward_zone=None, reverse_zone=None,
             .format(admin_password))
 
 
-def generate_capsule_certs(capsule_fqdn=None):
+def generate_capsule_certs(capsule_fqdn=None, sat_version=None):
     """Generate Capsule Certs required for Capsule Installation.
 
     CAPSULE_FQDN
         CAPSULE FQDN for which certs needs to be created.
+    SATELLITE_VERSION
+        SATELLITE_VERSION for which the capsule certs needs to be created.
 
     """
     if capsule_fqdn is None:
         capsule_fqdn = os.environ.get('CAPSULE_FQDN')
-    run('capsule-certs-generate --foreman-proxy-fqdn {0}'
-        ' --certs-tar "/var/www/html/pub/{0}-certs.tar" > '
-        '/var/www/html/pub/{0}-out.txt'
-        .format(capsule_fqdn))
+    if sat_version is None:
+        sat_version = os.environ.get('SATELLITE_VERSION')
+
+    if sat_version in ('6.3', '6.4', 'upstream-nightly'):
+        run('capsule-certs-generate --foreman-proxy-fqdn {0}'
+            ' --certs-tar "/var/www/html/pub/{0}-certs.tar" > '
+            '/var/www/html/pub/{0}-out.txt'
+            .format(capsule_fqdn))
+    else:
+        run('capsule-certs-generate --capsule-fqdn {0}'
+            ' --certs-tar "/var/www/html/pub/{0}-certs.tar" > '
+            '/var/www/html/pub/{0}-out.txt'
+            .format(capsule_fqdn))
     run('cat /var/www/html/pub/{0}-out.txt|'
         'grep -v help  | grep -A 10 "satellite-installer'
         ' --scenario capsule" > /var/www/html/pub/capsule_script.sh'
