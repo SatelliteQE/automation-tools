@@ -1547,7 +1547,7 @@ def generate_capsule_certs(capsule_fqdn=None, sat_version=None):
             '/var/www/html/pub/{0}-out.txt'
             .format(capsule_fqdn))
     run('cat /var/www/html/pub/{0}-out.txt|'
-        'grep -v help  | grep -A 10 "satellite-installer'
+        'grep -v help | grep -v log | grep -A 10 "satellite-installer'
         ' --scenario capsule" > /var/www/html/pub/capsule_script.sh'
         .format(capsule_fqdn))
     run('chmod +x /var/www/html/pub/capsule_script.sh')
@@ -1575,6 +1575,9 @@ def setup_capsule(satellite_fqdn=None, capsule_fqdn=None, capsule_org=None,
         capsule_org = "Default_Organization"
     if capsule_ak is None:
         capsule_ak = "ak-capsule-{0}".format(os_version)
+    # Disable Beaker Repos.
+    disable_beaker_repos(silent=True)
+
     # Clean up and install with basic packages.
     clean_rhsm()
 
@@ -1595,7 +1598,6 @@ def setup_capsule(satellite_fqdn=None, capsule_fqdn=None, capsule_org=None,
         '--activationkey="{1}"'.format(capsule_org, capsule_ak)
     )
     run(cmd)
-
     # Refresh subscriptions and clean up YUM
     print('Refreshing Subscription-manager.')
     run('subscription-manager refresh')
