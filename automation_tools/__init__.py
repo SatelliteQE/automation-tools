@@ -394,7 +394,8 @@ def setup_external_capsule():
     """Task to setup an external Capsule for Satellite."""
     interface = os.environ.get('INTERFACE', 'virbr0')
     gateway = os.environ.get('GATEWAY', '192.168.200.1')
-    setup_default_libvirt(ip_address=gateway)
+    if 'virbr' in interface:
+        setup_default_libvirt(ip_address=gateway)
     install_options = setup_default_capsule(
         interface=interface,
         run_katello_installer=False)
