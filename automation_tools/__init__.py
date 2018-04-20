@@ -365,7 +365,7 @@ def setup_default_capsule(interface=None, run_katello_installer=True):
     }
 
     # Handles enabling puppet support
-    if not os.environ.get('SATELLITE_VERSION') == '6.3':
+    if not os.environ.get('SATELLITE_VERSION') in ('6.3', '6.4'):
         installer_options['{0}-puppetca'.format(proxy)] = 'true'
         if os.environ.get('SATELLITE_VERSION') in ('6.0', '6.1', '6.2'):
             installer_options['capsule-puppet'] = 'true'
@@ -474,7 +474,7 @@ def setup_default_subnet(sat_version):
     DHCP_RANGE
         The range in the subnet operated by DHCP Capsule
 
-    :param str sat_version: contains Satellite version (e.g. 6.2, 6.3)
+    :param str sat_version: contains Satellite version (e.g. 6.2, 6.3, 6.4)
     """
     dhcp_range = os.environ.get(
         'DHCP_RANGE', '192.168.100.10 192.168.100.254').split()
@@ -1037,7 +1037,7 @@ def setup_foreman_discovery(sat_version):
         run('wget -nv -O- {0} | tar x --overwrite -C /var/lib/tftpboot/boot'
             .format(image_url))
 
-    if sat_version in ('6.3', 'downstream-nightly'):
+    if sat_version in ('6.3', '6.4', 'downstream-nightly'):
         # In 6.3, installer should install all required packages except FDI
         run('rpm -q {0}'.format(' '.join(packages)))
         run('yum install -y foreman-discovery-image')
@@ -1094,7 +1094,7 @@ def enable_ostree(sat_version='6.3'):
                 'foreman' if sat_version == 'upstream-nightly' else 'satellite',  # noqa
                 'katello' if sat_version == 'upstream-nightly' else 'satellite',  # noqa
                 '--disable-system-checks' if sat_version in (
-                    '6.3', 'downstream-nightly'
+                    '6.3', '6.4', 'downstream-nightly'
                 ) else ''))
         if sat_version == 'upstream-nightly':
             delete_custom_repos('centos_atomic')
@@ -1510,7 +1510,7 @@ def configure_osp(admin_password=None, forward_zone=None, reverse_zone=None,
     run('cat /root/zones_cons.conf > {0}'.format(zone_file))
     run('cat /root/zones-pre_osp.conf >> {0}'.format(zone_file))
     run('service named restart')
-    if satellite_version != '6.3':
+    if satellite_version not in ('6.3', '6.4'):
         run('hammer -u admin -p changeme template clone '
             '--name \'Satellite Kickstart Default Finish\' '
             '--new-name \'Satellite Kickstart Default Finish OSP\'')
@@ -1964,7 +1964,7 @@ def downstream_install(admin_password=None, run_katello_installer=True):
 
 def repofile_install(admin_password=None, run_katello_installer=True,
                      repo_url=None):
-    """Task to install Satellite 6.3 via repo files
+    """Task to install Satellite 6.3 and 6.4 via repo files
 
     The following environment variables affect this command:
 
@@ -1982,7 +1982,7 @@ def repofile_install(admin_password=None, run_katello_installer=True,
         repo_url = os.environ.get('REPO_FILE_URL')
 
     run('yum install -y wget')
-    run('wget -O /etc/yum.repos.d/satellite63.repo {0}'.format(repo_url))
+    run('wget -O /etc/yum.repos.d/satellite6.repo {0}'.format(repo_url))
 
     # Enable required repository
     run('subscription-manager repos --enable rhel-{0}-server-optional-rpms'
@@ -2003,7 +2003,7 @@ def repofile_install(admin_password=None, run_katello_installer=True,
 
 
 def ak_install(admin_password=None, run_katello_installer=True):
-    """Task to install Satellite 6.3 via Activation Keys
+    """Task to install Satellite 6.3 and 6.4 via Activation Keys
 
     The following environment variables affect this command:
 
@@ -2244,7 +2244,7 @@ def product_install(distribution, create_vm=False, certificate_url=None,
     # Check hostname and start ntpd
     execute(install_prerequisites, host=host)
     # Sat6.3+: If defined, create Puppet4 repo for Satellite p4 installation
-    if satellite_version in ('6.3', 'downstream-nightly'):
+    if satellite_version in ('6.3', '6.4', 'downstream-nightly'):
         puppet4_repo = os.environ.get('PUPPET4_REPO')
         if puppet4_repo:
             # Just enable puppet4 repo, no need to install puppet4 since
@@ -2333,7 +2333,7 @@ def product_install(distribution, create_vm=False, certificate_url=None,
 
     # Temporary workaround to solve pulp message bus connection issue
     # only for 6.1 and above
-    if (sat_cdn_version not in ('6.0', '6.1', '6.2', '6.3')):
+    if (sat_cdn_version not in ('6.0', '6.1', '6.2', '6.3', '6.4')):
         execute(set_service_check_status, host=host)
 
     certificate_url = certificate_url or os.environ.get(
