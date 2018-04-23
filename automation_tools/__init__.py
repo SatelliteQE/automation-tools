@@ -2314,6 +2314,9 @@ def product_install(distribution, create_vm=False, certificate_url=None,
         )
         installer_options.update(ins_opt_dict)
 
+    if satellite_version == '6.4':
+        enable_repos('rhel-7-server-extras-rpms')
+
     execute(
         katello_installer,
         host=host,
@@ -2321,6 +2324,9 @@ def product_install(distribution, create_vm=False, certificate_url=None,
         sat_version=satellite_version,
         **installer_options
     )
+
+    if satellite_version == '6.4':
+        disable_repos('rhel-7-server-extras-rpms')
 
     execute(run_command, os.environ.get('FIX_POSTINSTALL'), host=host)
 
