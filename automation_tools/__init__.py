@@ -1048,20 +1048,6 @@ def setup_foreman_discovery(sat_version):
     run('hammer -u admin -p {0} template update '
         '--name "PXELinux global default" --locked "false"'
         .format(admin_password))
-    # Unlock the 'pxelinux_discovery' snippet
-    run('hammer -u admin -p {0} template update '
-        '--name "pxelinux_discovery" --type "snippet" --locked "false"'
-        .format(admin_password))
-
-    # Fetch the updated discovery snippet where URL includes proxy port
-    snippet_url = os.environ.get('PXELINUX_DISCOVERY_SNIPPET_URL')
-    snippet_file = run('mktemp')
-    run('wget -O {0} {1}'.format(snippet_file, snippet_url))
-    # Update the template
-    run('hammer -u admin -p {0} template update --name '
-        '"pxelinux_discovery" --type "snippet" --file {1}'
-        .format(admin_password, snippet_file))
-    run('rm -rf {0}'.format(snippet_file))
     template_file = run('mktemp')
     # Dump the template
     run('hammer -u admin -p {0} template dump --name '
