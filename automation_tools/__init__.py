@@ -1901,6 +1901,10 @@ def upstream_install(admin_password=None, run_katello_installer=True):
         ','.join(compute_resources),
         ','.join(hammer_plugins),
     ))
+    # In koji installer modules often don't match with foreman-installer cache
+    # By providing some gems the installer cache gets automatically regenerated
+    if koji:
+        run('/opt/puppetlabs/puppet/bin/gem install puppet-strings')
 
     installer_options = {
         'foreman-admin-password': admin_password,
@@ -2987,6 +2991,8 @@ def katello_installer(debug=False, distribution=None, verbose=True,
         extra_options.append('--enable-foreman-proxy-plugin-discovery')
         extra_options.append('--enable-foreman-plugin-openscap')
         extra_options.append('--enable-foreman-proxy-plugin-openscap')
+        extra_options.append('--enable-foreman-plugin-ansible')
+        extra_options.append('--enable-foreman-proxy-plugin-ansible')
     elif sat_version in ('6.0', '6.1'):
         proxy = 'capsule'
         installer = 'katello'
