@@ -2349,7 +2349,7 @@ def product_install(distribution, create_vm=False, certificate_url=None,
     # if we have ssh key to libvirt machine we can setup access to it
     if os.environ.get('LIBVIRT_KEY_URL') is not None:
         execute(setup_libvirt_key, host=host)
-    if satellite_version != '6.0':
+    if satellite_version in ('6.1', '6.2', 'upstream-nightly'):
         execute(install_puppet_scap_client, host=host)
     if satellite_version == '6.1':
         execute(setup_oscap, host=host)
