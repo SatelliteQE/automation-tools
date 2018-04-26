@@ -493,7 +493,9 @@ def setup_default_subnet(sat_version):
         '--dhcp-id 1 --dns-id 1 --tftp-id 1 ' +
         ('--discovery-id 1' if sat_version not in ('6.1', '6.2') else '')
     ).format(**options)
-    run(command)
+    # create or update if failed
+    if run(command, warn_only=True).failed:
+        run(command.replace(' create ', ' update ', 1))
 
 
 def setup_email_notification(smtp=None):
