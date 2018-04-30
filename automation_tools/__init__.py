@@ -1055,8 +1055,14 @@ def setup_foreman_discovery(sat_version):
     run('hammer -u admin -p {0} template dump --name '
         '"PXELinux global default" > {1}'.format(
             admin_password, template_file))
-    run('sed -i -e "s/^ONTIMEOUT\s\+local/ONTIMEOUT discovery/" {0}'
-        .format(template_file))
+    if sat_version in ('6.1', '6.2', '6.3'):
+        # since 6.4, ONTIMEOUT option uses "default_pxe_item_global" setting
+        run('sed -i -e "s/^ONTIMEOUT\s\+local/ONTIMEOUT discovery/" {0}'
+            .format(template_file))
+    else:
+        run('hammer -u admin -p {0} settings set --name '
+            '"default_pxe_item_global" --value="discovery"'.format(
+                admin_password))
     run('sed -i -e "s/^TIMEOUT\s\+[0-9]\+/TIMEOUT 5/"'
         ' {0}'.format(template_file))
     # Update the template
