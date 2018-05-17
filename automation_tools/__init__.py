@@ -79,25 +79,27 @@ def subscribe(autosubscribe=False, stage=False):
             os.environ['RHN_USERNAME'],
             os.environ['RHN_PASSWORD'],
             major_version,
-            '--autosubscribe' if autosubscribe else ''
+            '--auto-attach' if autosubscribe else ''
         )
     )
 
-    # Subscribe the system if a pool ID was provided.
+    # Subscribe the system if a pool ID was provided
+    # Multiple pool IDs can be provided as space seprated list
     rhn_poolid = os.environ.get('RHN_POOLID')
-    if rhn_poolid is not None:
+    if rhn_poolid:
         has_pool_msg = (
             'This unit has already had the subscription matching pool ID'
         )
+        attach_cmd = 'subscription-manager attach {0}'.format(
+            ' '.join(['--pool={0}'.format(id) for id in rhn_poolid.split()])
+        )
+
         for _ in range(10):
-            result = run(
-                'subscription-manager subscribe --pool={0}'.format(rhn_poolid),
-                warn_only=True
-            )
+            result = run(attach_cmd, warn_only=True)
             if result.succeeded or has_pool_msg in result:
                 return
             time.sleep(5)
-        print('Unable to subscribe system to pool. Aborting.')
+        print('Unable to attach system to pool. Aborting.')
         sys.exit(1)
 
 
@@ -2120,7 +2122,7 @@ def iso_install(
 
 
 def product_install(distribution, create_vm=False, certificate_url=None,
-                    selinux_mode=None, sat_cdn_version=None,
+                    selinux_mode=None, sat_version=None,
                     test_in_stage=False):
     """Task which install every product distribution.
 
@@ -2162,10 +2164,11 @@ def product_install(distribution, create_vm=False, certificate_url=None,
     :param bool create_vm: creates a virtual machine and then install the
         product on it. Default: False.
     :param str certificate_url: where to fetch a fake certificate.
+    :param sat_version: Indicates which satellite version should be installed
 
     """
     # Fetch the Satellite Version information.
-    satellite_version = os.environ.get('SATELLITE_VERSION')
+    sat_version = sat_version or os.environ.get('SATELLITE_VERSION')
 
     # Command-line arguments are passed in as strings.
     if isinstance(create_vm, str):
@@ -2187,7 +2190,7 @@ def product_install(distribution, create_vm=False, certificate_url=None,
 
     # Make sure downstream_install only is called for sat6.1, sat6.2 only,
     # not from sat6.3+. Do not add '6.3' and following versions below.
-    if satellite_version in ('6.1', '6.2'):
+    if sat_version in ('6.1', '6.2'):
         if distribution in ('satellite6-repofile', 'satellite6-activationkey'):
             distribution = 'satellite6-downstream'
 
@@ -2201,7 +2204,7 @@ def product_install(distribution, create_vm=False, certificate_url=None,
 
     if (
         distribution == 'satellite6-cdn' and
-        sat_cdn_version not in ('6.0', '6.1', '6.2', '6.3')
+        sat_version not in ('6.0', '6.1', '6.2', '6.3')
     ):
         raise ValueError("Satellite version should be in [6.0, 6.1, 6.2, 6.3]")
 
@@ -2236,7 +2239,7 @@ def product_install(distribution, create_vm=False, certificate_url=None,
         execute(enable_satellite_repos,
                 cdn=distribution.endswith('cdn'),
                 beta=distribution.endswith('beta'),
-                cdn_version=sat_cdn_version,
+                sat_version=sat_version,
                 host=host)
 
     # Disable BaseOS if using custom image for vault_requests.
@@ -2248,7 +2251,7 @@ def product_install(distribution, create_vm=False, certificate_url=None,
     # Check hostname and start ntpd
     execute(install_prerequisites, host=host)
     # Sat6.3+: If defined, create Puppet4 repo for Satellite p4 installation
-    if satellite_version in ('6.3', '6.4', 'downstream-nightly'):
+    if sat_version in ('6.3', '6.4', 'downstream-nightly'):
         puppet4_repo = os.environ.get('PUPPET4_REPO')
         if puppet4_repo:
             # Just enable puppet4 repo, no need to install puppet4 since
@@ -2318,24 +2321,18 @@ def product_install(distribution, create_vm=False, certificate_url=None,
         )
         installer_options.update(ins_opt_dict)
 
-    if satellite_version == '6.4':
-        execute(lambda: enable_repos('rhel-7-server-extras-rpms'), host=host)
-
     execute(
         katello_installer,
         host=host,
         distribution=distribution,
-        sat_version=satellite_version,
+        sat_version=sat_version,
         **installer_options
     )
-
-    if satellite_version == '6.4':
-        execute(lambda: disable_repos('rhel-7-server-extras-rpms'), host=host)
 
     execute(run_command, os.environ.get('FIX_POSTINSTALL'), host=host)
 
     # With SSL verification in hammer the installer should set hostname itself
-    if satellite_version == 'downstream-nightly' and bz_bug_is_open('1454706'):
+    if sat_version == 'downstream-nightly' and bz_bug_is_open('1454706'):
         execute(lambda: run(
             'sed -i "s|/localhost/|/\$(hostname)/|"'
             ' /etc/hammer/cli.modules.d/foreman.yml'
@@ -2343,7 +2340,7 @@ def product_install(distribution, create_vm=False, certificate_url=None,
 
     # Temporary workaround to solve pulp message bus connection issue
     # only for 6.1 and above
-    if (sat_cdn_version not in ('6.0', '6.1', '6.2', '6.3', '6.4')):
+    if (sat_version not in ('6.0', '6.1', '6.2', '6.3', '6.4')):
         execute(set_service_check_status, host=host)
 
     certificate_url = certificate_url or os.environ.get(
@@ -2361,25 +2358,25 @@ def product_install(distribution, create_vm=False, certificate_url=None,
     # if we have ssh key to libvirt machine we can setup access to it
     if os.environ.get('LIBVIRT_KEY_URL') is not None:
         execute(setup_libvirt_key, host=host)
-    if satellite_version in ('6.1', '6.2', 'upstream-nightly'):
+    if sat_version in ('6.1', '6.2', 'upstream-nightly'):
         execute(install_puppet_scap_client, host=host)
-    if satellite_version == '6.1':
+    if sat_version == '6.1':
         execute(setup_oscap, host=host)
-    if satellite_version not in ('6.0', '6.1'):
+    if sat_version not in ('6.0', '6.1'):
         execute(oscap_content, host=host)
     # ostree plugin is for Sat6.2+ and upstream-nightly (rhel7 only)
-    if satellite_version not in ('6.0', '6.1'):
-        execute(enable_ostree, sat_version=satellite_version, host=host)
+    if sat_version not in ('6.0', '6.1'):
+        execute(enable_ostree, sat_version=sat_version, host=host)
     # setup_foreman_discovery
     # setup_discovery_task needs to be run at last otherwise, any other
     # tasks like ostree which is re-running installer would re-set the
     # discovery templates as well. Please see #1387179 for more info.
     execute(
         setup_foreman_discovery,
-        sat_version=satellite_version,
+        sat_version=sat_version,
         host=host
     )
-    execute(setup_default_subnet, sat_version=satellite_version, host=host)
+    execute(setup_default_subnet, sat_version=sat_version, host=host)
     execute(fix_qdrouterd_listen_to_ipv6, host=host)
 
     if 'TARGET_IMAGE' in os.environ and 'base' in target_image:
