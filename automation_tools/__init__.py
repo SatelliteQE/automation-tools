@@ -36,7 +36,7 @@ def unsubscribe():
     run('subscription-manager clean')
 
 
-def subscribe(autosubscribe=False):
+def subscribe(autosubscribe=False, stage=False):
     """Registers and subscribes machine to Red Hat.
 
     The following environment variables affect this command:
@@ -49,6 +49,8 @@ def subscribe(autosubscribe=False):
         Optional. Red Hat Network pool ID. Determines what software will be
         available from RHN.
 
+    :param bool stage: Subscribe to stage
+
     """
 
     # Registration and subscription is only meaningful for Red Hat Enterprise
@@ -57,11 +59,19 @@ def subscribe(autosubscribe=False):
     if distro.lower() != 'rhel':
         return
 
-    # Register the system.
     for env_var in ('RHN_USERNAME', 'RHN_PASSWORD'):
         if env_var not in os.environ:
             print('The {0} environment variable must be set.'.format(env_var))
             sys.exit(1)
+
+    # Clean and reset subscription manager to CDN defaults
+    clean_rhsm()
+
+    # Point subscription manager to stage if requested
+    if stage:
+        update_rhsm_stage()
+
+    # Register the system
     run(
         'subscription-manager register --force --user={0} --password={1} '
         '--release="{2}Server" {3}'
@@ -2216,16 +2226,12 @@ def product_install(distribution, create_vm=False, certificate_url=None,
     # When creating a vm the vm_ip will be set, otherwise use the fabric host
     host = env.get('vm_ip', env['host'])
 
-    # Register and subscribe machine to Red Hat
-    if distribution == 'satellite6-cdn' and test_in_stage:
-        execute(update_rhsm_stage, host=host)
-
     # If we are using activationkey, subscribe to dogfood server
     # otherwise subscribe to CDN
     if distribution == 'satellite6-activationkey':
         execute(subscribe_dogfood, host=host)
     else:
-        execute(subscribe, host=host)
+        execute(subscribe, stage=test_in_stage, host=host)
         # Enable repos for Satellite and disable other ones
         execute(enable_satellite_repos,
                 cdn=distribution.endswith('cdn'),
