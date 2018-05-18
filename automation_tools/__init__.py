@@ -10,6 +10,7 @@ import random
 import socket
 import sys
 import time
+import uuid
 from datetime import date
 from io import StringIO
 from re import search
@@ -1093,8 +1094,10 @@ def enable_ostree(sat_version='6.3'):
         if sat_version == 'upstream-nightly':
             create_custom_repos(centos_atomic='http://buildlogs.centos.org/'
                                 'centos/7/atomic/x86_64/Packages/')
-        run('{0}-installer --scenario {1} {2} --katello-enable-ostree=true'
+        run('RUBY_COVERAGE_NAME={0} {1}-installer --scenario {2} {3} '
+            '--katello-enable-ostree=true'
             .format(
+                str(uuid.uuid4())[:7],
                 'foreman' if sat_version == 'upstream-nightly' else 'satellite',  # noqa
                 'katello' if sat_version == 'upstream-nightly' else 'satellite',  # noqa
                 '--disable-system-checks' if sat_version in (
@@ -1504,12 +1507,13 @@ def configure_osp(admin_password=None, forward_zone=None, reverse_zone=None,
     run('rm -f /root/zones_cons.conf', warn_only=True)
     run('rm -f /root/zones-pre_osp.conf', warn_only=True)
     run('cp {0} /root/zones-pre_osp.conf'.format(zone_file))
-    run('for i in {0}; do satellite-installer '
+    run('for i in {0}; do RUBY_COVERAGE_NAME={1} satellite-installer '
         '--foreman-proxy-dns-reverse $i.in-addr.arpa ; '
-        'sed -n 1,7p {1} >> /root/zones_cons.conf ; done'
-        .format(reverse_zone, zone_file))
-    run('satellite-installer --foreman-proxy-dns-zone {0}'
-        .format(forward_zone))
+        'sed -n 1,7p {2} >> /root/zones_cons.conf ; done'
+        .format(reverse_zone, str(uuid.uuid4())[:7], zone_file))
+    run('RUBY_COVERAGE_NAME={0} satellite-installer '
+        '--foreman-proxy-dns-zone {1}'
+        .format(str(uuid.uuid4())[:7], forward_zone))
     run('sed -n 8,14p {0} >> /root/zones_cons.conf'.format(zone_file))
     run('cat /root/zones_cons.conf > {0}'.format(zone_file))
     run('cat /root/zones-pre_osp.conf >> {0}'.format(zone_file))
@@ -1682,7 +1686,8 @@ def configure_idm_external_auth(idm_password=None):
     if os.environ.get('SATELLITE_VERSION') == '6.1':
         run('katello-installer --foreman-ipa-authentication=true')
     else:
-        run('satellite-installer --foreman-ipa-authentication=true')
+        run('RUBY_COVERAGE_NAME={0} satellite-installer '
+            '--foreman-ipa-authentication=true'.format(str(uuid.uuid4())[:7]))
     run('katello-service restart')
 
 
@@ -1772,7 +1777,8 @@ def configure_ad_external_auth(ad_passwd=None, realm=None):
     if os.environ.get('SATELLITE_VERSION') == '6.1':
         run('katello-installer --foreman-ipa-authentication=true')
     else:
-        run('satellite-installer --foreman-ipa-authentication=true')
+        run('RUBY_COVERAGE_NAME={0} satellite-installer '
+            '--foreman-ipa-authentication=true'.format(str(uuid.uuid4())[:7]))
     run('systemctl restart gssproxy.service')
     run('systemctl enable gssproxy.service')
     httpd_service = StringIO()
@@ -1819,9 +1825,11 @@ def configure_realm(admin_password=None, keytab_url=None, realm=None,
     run('wget -O /root/freeipa.keytab {0}'.format(keytab_url))
     run('mv /root/freeipa.keytab /etc/foreman-proxy')
     run('chown foreman-proxy:foreman-proxy /etc/foreman-proxy/freeipa.keytab')
-    run('satellite-installer --foreman-proxy-realm true '
+    run('RUBY_COVERAGE_NAME={0} satellite-installer '
+        '--foreman-proxy-realm true '
         '--foreman-proxy-realm-principal realm-proxy@{0} '
-        '--foreman-proxy-dhcp-nameservers {1}'.format(realm, idm_server_ip))
+        '--foreman-proxy-dhcp-nameservers {1}'
+        .format(realm, str(uuid.uuid4())[:7], idm_server_ip))
     run('cp /etc/ipa/ca.crt /etc/pki/ca-trust/source/anchors/ipa.crt')
     run('update-ca-trust enable ; update-ca-trust')
     run('service foreman-proxy restart')
@@ -1846,7 +1854,8 @@ def apply_hotfix():
             '{0}/pub/hotfix/hotfix_rhel{1}.repo'
             .format(http_server, os_version))
         run('yum -y update')
-        run('satellite-installer --upgrade')
+        run('RUBY_COVERAGE_NAME={0} satellite-installer --upgrade'
+            .format(str(uuid.uuid4())[:7]))
     elif hotfix == 'CUSTOM':
         run('wget -0 /root/hotfix.sh '
             '{0}/pub/hotfix/hotfix_rhel{1}.sh'
@@ -3009,7 +3018,8 @@ def katello_installer(debug=False, distribution=None, verbose=True,
             extra_options.append(
                 '--{0}-dns-forwarders="{1}"'.format(proxy, forwarder))
 
-    run('{0}-installer {1} {2} {3} {4} {5}'.format(
+    run('RUBY_COVERAGE_NAME={0} {1}-installer {2} {3} {4} {5} {6}'.format(
+        str(uuid.uuid4())[:7],
         installer,
         '--scenario {0}'
         .format(scenario) if sat_version not in ('6.0', '6.1') else '',
