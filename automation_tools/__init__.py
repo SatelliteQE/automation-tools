@@ -974,6 +974,20 @@ def configure_sonarqube():
                 sonar_server, build_label, satellite_version,
                 sonar_login, sonar_password))
 
+    run('sonar-scanner-2.6-SNAPSHOT/bin/sonar-scanner -X -e '
+        '-Dsonar.host.url={0} -Dsonar.language=ruby -Dsonar.ws.timeout=180 '
+        '-Dsonar.projectVersion={1} '
+        '"-Dsonar.projectName=Satellite{2} SYS Ruby Analysis" '
+        '"-Dsonar.simplecovrcov.reportPath=/etc/coverage'
+        '/ruby/sys/reports/results.json" '
+        '"-Dsonar.projectKey=Satellite{2}_sys_ruby_full_analysis" '
+        '-Dsonar.projectBaseDir=/usr/share/gems/gems/ '
+        '-Dsonar.sources=/usr/share/gems/gems/ '
+        '"-Dsonar.login={3}" "-Dsonar.password={4}"'
+        .format(
+            sonar_server, build_label, satellite_version,
+            sonar_login, sonar_password))
+
 
 def setup_oscap():
     """Task to setup oscap on foreman."""
