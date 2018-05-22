@@ -210,7 +210,7 @@ def generate_capsule_certs(capsule_hostname, force=False):
         cert_path = '{0}-certs.tar'.format(capsule_hostname)
     result = run('[ -f {0} ]'.format(cert_path), quiet=True)
     if result.failed or force:
-        if os.environ.get('SATELLITE_VERSION') == '6.3':
+        if os.environ.get('SATELLITE_VERSION') in ['6.3', '6.4']:
             run('capsule-certs-generate -v --foreman-proxy-fqdn {0} '
                 '--certs-tar {1} --certs-update-all'.format(capsule_hostname,
                                                             cert_path
