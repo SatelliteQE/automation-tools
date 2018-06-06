@@ -1108,6 +1108,26 @@ def enable_ostree(sat_version='6.3'):
         print('ostree plugin is supported only on rhel7+')
 
 
+def upgrade_puppet(cdn=False):
+    """Upgrades puppet3 to puppet4 and is applicable to Satellite6.3 only
+
+    :param cdn: Indicates whether CDN or Internal Puppet4 repo be used
+
+    Expects the following environment variables:
+
+    PUPPET4_REPO
+        The internal puppet4 repository URL.
+
+    """
+    if cdn:
+        enable_repos('rhel-7-server-satellite-6.3-puppet4-rpms')
+    else:
+        puppet4_repo = os.environ.get('PUPPET4_REPO')
+        if puppet4_repo:
+            create_custom_repos(puppet4_repo=puppet4_repo)
+    run('satellite-installer --upgrade-puppet')
+
+
 def disable_baseos_repo():
     """Disable BaseOS Repo if using custom image for vault_requests.
 
@@ -1860,7 +1880,6 @@ def apply_hotfix():
 def upstream_install(admin_password=None, run_katello_installer=True):
     """Task to install Foreman nightly using forklift scripts"""
     koji = 'koji' in os.environ.get('DISTRIBUTION').lower()
-    puppet4 = bool(os.environ.get('PUPPET4_REPO'))  # otherwise puppet5
     if admin_password is None:
         admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme')
 
@@ -1876,10 +1895,9 @@ def upstream_install(admin_password=None, run_katello_installer=True):
 
     with cd('forklift'):
         run('ansible-playbook -c local -i,$(hostname) '
-            '-e katello_version=nightly {0} {1} {2} '
+            '-e katello_version=nightly {0} {1} '
             '-e foreman_installer_skip_installer=True '
             'playbooks/katello.yml'.format(
-                '-e puppet_repositories_version=4' if puppet4 else '',
                 '-e foreman_repositories_environment=staging' if koji else '',
                 '-e katello_repositories_environment=staging' if koji else '',
             ))
@@ -2123,7 +2141,7 @@ def iso_install(
 
 def product_install(distribution, create_vm=False, certificate_url=None,
                     selinux_mode=None, sat_version=None,
-                    test_in_stage=False):
+                    test_in_stage=False, puppet4='no'):
     """Task which install every product distribution.
 
     The following environment variables affect this command:
@@ -2165,10 +2183,15 @@ def product_install(distribution, create_vm=False, certificate_url=None,
         product on it. Default: False.
     :param str certificate_url: where to fetch a fake certificate.
     :param sat_version: Indicates which satellite version should be installed
+    :param puppet4: Indicates what puppet to install with Satellite 6.3
+        Default: 'no', 'yes', 'upgrade'
 
     """
     # Fetch the Satellite Version information.
     sat_version = sat_version or os.environ.get('SATELLITE_VERSION')
+
+    # Honour puppet4 flag only for 6.3, set 'no' for all other sat versions
+    puppet4 = puppet4 if sat_version == '6.3' else 'no'
 
     # Command-line arguments are passed in as strings.
     if isinstance(create_vm, str):
@@ -2240,6 +2263,7 @@ def product_install(distribution, create_vm=False, certificate_url=None,
                 cdn=distribution.endswith('cdn'),
                 beta=distribution.endswith('beta'),
                 sat_version=sat_version,
+                puppet4=puppet4,
                 host=host)
 
     # Disable BaseOS if using custom image for vault_requests.
@@ -2250,14 +2274,6 @@ def product_install(distribution, create_vm=False, certificate_url=None,
     execute(update_basic_packages, host=host)
     # Check hostname and start ntpd
     execute(install_prerequisites, host=host)
-    # Sat6.3+: If defined, create Puppet4 repo for Satellite p4 installation
-    if sat_version in ('6.3', '6.4', 'downstream-nightly'):
-        puppet4_repo = os.environ.get('PUPPET4_REPO')
-        if puppet4_repo:
-            # Just enable puppet4 repo, no need to install puppet4 since
-            # puppet-agent is pulled in by rpm deps
-            # puppetserver is pulled in by installer
-            execute(create_custom_repos, puppet4_repo=puppet4_repo, host=host)
     # If defined, create custom repo with RHEL candidate for OS upgrade
     # OS_UPGRADE_REPOS can be space-separated list of multiple custom repo urls
     if os.environ.get('OS_UPGRADE_REPOS'):
@@ -2278,6 +2294,11 @@ def product_install(distribution, create_vm=False, certificate_url=None,
     execute(setup_avahi_discovery, host=host)
 
     execute(run_command, os.environ.get('FIX_PREINSTALL'), host=host)
+    # Sat6.3: enable *internal* puppet4 repo to perform fresh p4 install
+    if puppet4 == 'yes' and not distribution.endswith('cdn'):
+        puppet4_repo = os.environ.get('PUPPET4_REPO')
+        if puppet4_repo:
+            execute(create_custom_repos, puppet4_repo=puppet4_repo, host=host)
     # execute returns a dictionary mapping host strings to the given task's
     # return value
     installer_options.update(execute(
@@ -2330,13 +2351,6 @@ def product_install(distribution, create_vm=False, certificate_url=None,
     )
 
     execute(run_command, os.environ.get('FIX_POSTINSTALL'), host=host)
-
-    # With SSL verification in hammer the installer should set hostname itself
-    if sat_version == 'downstream-nightly' and bz_bug_is_open('1454706'):
-        execute(lambda: run(
-            'sed -i "s|/localhost/|/\$(hostname)/|"'
-            ' /etc/hammer/cli.modules.d/foreman.yml'
-        ), host=host)
 
     # Temporary workaround to solve pulp message bus connection issue
     # only for 6.1 and above
@@ -2412,6 +2426,9 @@ def product_install(distribution, create_vm=False, certificate_url=None,
     if os.environ.get('EXTERNAL_AUTH') == 'AD':
         execute(enroll_ad, host=host)
         execute(configure_ad_external_auth, host=host)
+    # Sat6.3: enable puppet4 repo and perform upgraded p4 install
+    if puppet4 == 'upgrade':
+        execute(upgrade_puppet, cdn=distribution.endswith('cdn'), host=host)
     if os.environ.get('HOTFIX') != 'NO_HOTFIX':
         execute(apply_hotfix, host=host)
 

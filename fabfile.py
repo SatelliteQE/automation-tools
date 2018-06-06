@@ -63,6 +63,7 @@ from automation_tools import (  # flake8: noqa
     unsubscribe,
     update_basic_packages,
     update_rhsm_stage,
+    upgrade_puppet,
     upstream_install,
     vm_create,
     vm_destroy,
