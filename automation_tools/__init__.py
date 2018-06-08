@@ -246,15 +246,14 @@ def setup_avahi_discovery():
     """Task to setup avahi discovery used to discover VMs deployed to a VLAN
        by 'ping vm.local' run at Satellite
     """
-    os_version = distro_info()[1]
-    epel_present = run('rpm -q epel-release', warn_only=True).return_code == 0
-    if not epel_present:
-        run('yum -y install https://dl.fedoraproject.org/pub/epel/'
-            'epel-release-latest-{0}.noarch.rpm'.format(os_version))
-    run('yum -y install nss-mdns')  # also pulls in avahi
-    if not epel_present:  # we installed epel, so removing aftwerwards
-        run('rpm -e epel-release')
-    if os_version >= 7:
+    os_ver = distro_info()[1]
+    mdns_present = run('rpm -q nss-mdns', warn_only=True).return_code == 0
+    if not mdns_present:
+        mdns_vra = {6: '0.10-8.el6.x86_64', 7: '0.14.1-1.el7.x86_64'}
+        # nss-mdns also pulls in avahi from rhel repo
+        run('yum -y install https://dl.fedoraproject.org/pub/epel/{0}/x86_64/'
+            'Packages/n/nss-mdns-{1}.rpm'.format(os_ver, mdns_vra[os_ver]))
+    if os_ver >= 7:
         run('firewall-cmd --add-service mdns --permanent')
         run('firewall-cmd --reload')
     else:
