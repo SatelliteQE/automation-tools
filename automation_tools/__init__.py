@@ -2621,7 +2621,7 @@ def clean_rhsm():
     print('Erasing existing Candlepin certs, if any.')
     run('yum erase -y $(rpm -qa |grep katello-ca-consumer)', quiet=True)
     print('Resetting rhsm.conf to point to cdn.')
-    run("sed -i -e 's/^hostname.*/hostname=subscription.rhn.redhat.com/' "
+    run("sed -i -e 's/^hostname.*/hostname=subscription.rhsm.redhat.com/' "
         "/etc/rhsm/rhsm.conf")
     run("sed -i -e 's|^prefix.*|prefix=/subscription|' /etc/rhsm/rhsm.conf")
     run("sed -i -e 's|^baseurl.*|baseurl=https://cdn.redhat.com|' "
@@ -3104,7 +3104,7 @@ def download_manifest(url=None, consumer=None):
     The following environment variables affect this command:
 
     SM_URL
-      Subscription Manager URL (e.g. 'https://subscription.rhn.redhat.com')
+      Subscription Manager URL (e.g. 'https://subscription.rhsm.redhat.com')
     CONSUMER
         A consumer hash to be used for getting the manifest
     RHN_USERNAME
