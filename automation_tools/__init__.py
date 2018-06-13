@@ -596,9 +596,8 @@ def setup_firewall(definitions=None, flush=True):
 
     for protocol in definitions:
         for port in definitions[protocol]:
-            rule_exists = run(
-                exists_command.format(protocol, port),
-                quiet=True,
+            rule_exists = False if flush else run(
+                exists_command.format(protocol, port), quiet=True
             ).succeeded
             if not rule_exists:
                 run(command.format(protocol, port))
