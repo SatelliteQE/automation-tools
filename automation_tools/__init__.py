@@ -587,10 +587,12 @@ def setup_firewall(definitions=None, flush=True):
         exists_command = 'firewall-cmd --permanent --query-port="{1}/{0}"'
         command = 'firewall-cmd --permanent --add-port="{1}/{0}"'
         if flush:
-            run(
-                'for port in $(firewall-cmd --permanent --list-ports); do '
-                'firewall-cmd --permanent --remove-port="$port"; done'
+            ports = run('firewall-cmd --permanent --list-ports').split()
+            flush_cmd = 'firewall-cmd --permanent {0}'.format(
+                ' '.join(['--remove-port="{0}"'.format(p) for p in ports])
             )
+            if ports:
+                run(flush_cmd)
 
     for protocol in definitions:
         for port in definitions[protocol]:
