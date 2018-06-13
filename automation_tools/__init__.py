@@ -585,7 +585,7 @@ def setup_firewall(definitions=None, flush=True):
             run('systemctl enable firewalld')
             run('systemctl start firewalld')
         exists_command = 'firewall-cmd --permanent --query-port="{1}/{0}"'
-        command = 'firewall-cmd --permanent --add-port="{1}/{0}"'
+        command = ['firewall-cmd --permanent']
         if flush:
             ports = run('firewall-cmd --permanent --list-ports').split()
             flush_cmd = 'firewall-cmd --permanent {0}'.format(
@@ -600,7 +600,16 @@ def setup_firewall(definitions=None, flush=True):
                 exists_command.format(protocol, port), quiet=True
             ).succeeded
             if not rule_exists:
-                run(command.format(protocol, port))
+                if os_version < 7:
+                    run(command.format(protocol, port))
+                else:
+                    # rhel7: only build command
+                    command.append(
+                        '--add-port="{1}/{0}"'.format(protocol, port)
+                    )
+    if os_version >= 7 and len(command) > 1:
+        # rhel7: run built command since it was appended
+        run(' '.join(command))
 
     if os_version < 7:
         # To make the changes persistent across reboots
