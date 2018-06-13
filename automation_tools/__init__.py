@@ -584,15 +584,6 @@ def setup_firewall(definitions=None, flush=True):
         if run('systemctl status firewalld', quiet=True).failed:
             run('systemctl enable firewalld')
             run('systemctl start firewalld')
-        # FIXME attempt to mitigate "Error: INVALID_ZONE"
-        for i in range(5):
-            if run(
-                'firewall-cmd --permanent --list-all-zones', warn_only=True
-            ).succeeded:
-                break
-            run('systemctl restart firewalld')
-            time.sleep((i+1) * 5)
-
         exists_command = 'firewall-cmd --permanent --query-port="{1}/{0}"'
         command = 'firewall-cmd --permanent --add-port="{1}/{0}"'
         if flush:
