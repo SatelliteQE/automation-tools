@@ -153,6 +153,7 @@ def enable_satellite_repos(cdn=False, beta=False, disable_enabled=True,
     ]
     if sat_version == '6.4':
         repos.append('rhel-{0}-server-ansible-2-rpms')
+        repos.append('rhel-7-server-satellite-maintenance-6-rpms')
     if beta:
         repos.append('rhel-server-{0}-satellite-6-beta-rpms')
     elif cdn:
