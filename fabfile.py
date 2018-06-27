@@ -90,3 +90,9 @@ from automation_tools.utils import (
     run_command,
     update_packages,
 )
+from fabric.api import env
+
+hosts = env['hosts']
+with open("ansible_runner/inventory/hosts", "w") as file:
+    for host in hosts:
+        file.write(host + '\n')

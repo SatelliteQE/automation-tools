@@ -4,6 +4,7 @@ Many commands are affected by environment variables. Unless stated otherwise,
 all environment variables are required.
 """
 from __future__ import print_function
+import ansible_runner
 import base64
 import os
 import random
@@ -28,6 +29,7 @@ from six.moves.urllib.parse import urljoin
 from six.moves.urllib.parse import urlsplit
 
 LIBVIRT_IMAGES_DIR = '/var/lib/libvirt/images'
+PLAYBOOK_DIR = "ansible_runner/"
 
 
 def unsubscribe():
@@ -2462,13 +2464,10 @@ def partition_disk():
     synchronization of larger repositories.
 
     """
-    if run('df -P /home | awk \'END{print $NF}\'') == '/home':
-        run('umount /home')
-        run('lvremove -f /dev/mapper/*home')
-        run("sed -i '/\/home/d' /etc/fstab")
-        run('lvresize -f -l +100%FREE /dev/mapper/*root')
-        run('if uname -r | grep -q el6; then resize2fs -f /dev/mapper/*root; '
-            'else xfs_growfs / && mount / -o inode64,remount; fi')
+    ansible_runner.interface.run(
+        private_data_dir=PLAYBOOK_DIR,
+        playbook="partition_disk.yml"
+    )
 
 
 def fix_hostname(entry_domain=None, host_ip=None):
