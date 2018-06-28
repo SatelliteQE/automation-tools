@@ -21,7 +21,7 @@ from automation_tools.repository import (
     disable_beaker_repos, enable_repos, enable_satellite_repos,
 )
 from automation_tools.utils import (
-    distro_info, run_command, update_packages
+    distro_info, run_command, update_packages, ansible_setup, ansible_cleanup
 )
 from fabric.api import cd, env, execute, get, local, put, run, settings, sudo
 
@@ -2464,10 +2464,12 @@ def partition_disk():
     synchronization of larger repositories.
 
     """
+    ansible_setup()
     ansible_runner.interface.run(
         private_data_dir=PLAYBOOK_DIR,
         playbook="partition_disk.yml"
     )
+    ansible_cleanup()
 
 
 def fix_hostname(entry_domain=None, host_ip=None):
