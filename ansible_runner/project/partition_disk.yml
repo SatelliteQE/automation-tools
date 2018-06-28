@@ -1,0 +1,19 @@
+---
+- hosts: all
+  remote_user: root
+  tasks:
+    - name: partition-disk
+      shell: df -P /home | awk 'END{print $NF}'
+      register: disk_free
+
+    - debug: msg="{{ disk_free.stdout }}"
+    
+    - shell: |
+        umount /home
+        lvremove -f /dev/mapper/*home
+        sed -i '/\/home/d' /etc/fstab
+        lvresize -f -l +100%FREE /dev/mapper/*root
+        if uname -r | grep -q el6; then resize2fs -f /dev/mapper/*root;
+        else xfs_growfs / && mount / -o inode64,remount; fi
+      when: disk_free.stdout == '/home'
+

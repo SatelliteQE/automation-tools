@@ -11,6 +11,17 @@ from fabric.api import env, run
 from six.moves.urllib.request import urlopen
 
 
+def ansible_setup():
+    with open("ansible_runner/inventory/hosts", "w") as file:
+        for host in env['hosts']:
+            file.write(host + '\n')
+
+
+def ansible_cleanup():
+    with open("ansible_runner/inventory/hosts", "w") as file:
+        file.write("# Hostnames will be added here\n")
+
+
 def distro_info():
     """Task which figures out the distro information based on the
     /etc/redhat-release file

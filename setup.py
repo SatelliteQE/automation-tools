@@ -31,6 +31,7 @@ setup(
         'robozilla',
         'six',
         'unittest2',
+        'ansible-runner'
     ],
     license='GNU GPL v3.0',
     classifiers=(
