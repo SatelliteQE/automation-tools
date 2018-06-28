@@ -54,4 +54,4 @@ coverage.xml
 docs/_build/
 
 # ansible-runner
-ansible/artifacts/*
+ansible_runner/artifacts/*
