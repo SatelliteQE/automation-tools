@@ -25,7 +25,7 @@ pyc-clean: ## remove Python file artifacts
 gitflake8:
 	$(info "Checking style and syntax errors with flake8 linter...")
 	@which flake8 >> /dev/null || pip install flake8
-	@flake8 $(shell git diff --name-only) --show-source
+	@flake8 $(shell git diff --name-only) --show-source --exclude=Makefile,*.yml 
 
 can-i-push?: gitflake8
 	$(info "!!! Congratulations your changes are good to fly, make a great PR! ${USER}++ !!!")
