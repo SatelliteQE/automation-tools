@@ -1612,6 +1612,7 @@ def setup_capsule(satellite_fqdn=None, capsule_fqdn=None, capsule_org=None,
     run('yum -y localinstall '
         'http://{0}/pub/katello-ca-consumer-latest.noarch.rpm'
         .format(satellite_fqdn))
+    run('yum -y install wget', warn_only=True)
     run('wget -O /root/capsule_script.sh http://{0}/pub/capsule_script.sh'
         .format(satellite_fqdn))
     run('wget -O /root/{1}-certs.tar http://{0}/pub/{1}-certs.tar'
