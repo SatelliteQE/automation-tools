@@ -3246,3 +3246,33 @@ def setup_rhv_ca():
         '/etc/pki/ca-trust/source/anchors/'.format(http_server))
     run('update-ca-trust enable ; update-ca-trust')
     print("RHV CA cert has been successfully added to CA trust")
+
+
+def configure_telemetry():
+    """Setup telemetry on the satellite box with grafana monitoring tool
+    """
+    http_server = os.environ.get('HTTP_SERVER_HOSTNAME')
+    print("Install required packages for PCP")
+    run('yum -y install pcp pcp-pmda-apache')
+    run('wget {0}/pub/configure_telemetry.sh'.format(http_server))
+    print("Configure Apache and hotproc")
+    run('chmod 777 configure_telemetry.sh && ./configure_telemetry.sh')
+    run('cd /var/lib/pcp/pmdas/proc/ && ./Install <<< c')
+    run('cd /var/lib/pcp/pmdas/apache && ./Install <<< 80')
+    run('echo "apache::purge_configs: false" '
+        '>>/etc/foreman-installer/custom-hiera.yaml')
+    run('systemctl restart httpd pmcd pmlogger')
+    run('yum -y install foreman-telemetry pcp-mmvstatsd')
+    print("Enable telemetry via Statsd protocol")
+    run('satellite-installer --foreman-telemetry-statsd-enabled true')
+    run('systemctl restart httpd')
+    run('systemctl enable pcp-mmvstatsd pmcd pmlogger && '
+        'systemctl start pcp-mmvstatsd')
+    print("The telemetry metrics matrix")
+    run('foreman-rake telemetry:metrics')
+    print('Grafana Tool setup')
+    run('subscription-manager repos --enable rhel-7-server-optional-rpms')
+    run('yum -y install pcp-webapi pcp-webapp-grafana pcp-webapp-vector')
+    run('systemctl start pmwebd && systemctl enable pmwebd')
+    run('firewall-cmd --add-port=44323/tcp && '
+        'firewall-cmd --permanent --add-port=44323/tcp')
