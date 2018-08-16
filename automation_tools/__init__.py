@@ -1610,7 +1610,6 @@ def setup_capsule(satellite_fqdn=None, capsule_fqdn=None, capsule_org=None,
     # Clean up
     unsubscribe()
 
-
     # Clean up and install with basic packages.
     clean_rhsm()
 
@@ -2450,6 +2449,8 @@ def product_install(distribution, create_vm=False, certificate_url=None,
         execute(upgrade_puppet, cdn=distribution.endswith('cdn'), host=host)
     if os.environ.get('HOTFIX') != 'NO_HOTFIX':
         execute(apply_hotfix, host=host)
+    if bz_bug_is_open(1607793):
+        execute(setup_rhv_ca, host=host)
 
 
 def fix_qdrouterd_listen_to_ipv6():
@@ -3225,3 +3226,13 @@ def setup_alternate_capsule_ports(port_range='9400-14999'):
     # labelling custom port range so that passenger will be allowed to connect
     run('semanage port -a -t websm_port_t -p tcp {0}'
         .format(port_range), warn_only=True)
+
+
+def setup_rhv_ca():
+    """ Setups and trusts the provided CA cert
+    """
+    http_server = os.environ.get('HTTP_SERVER_HOSTNAME')
+    run('wget {0}/pub/rhevm1-ca.pem -P '
+        '/etc/pki/ca-trust/source/anchors/'.format(http_server))
+    run('update-ca-trust enable ; update-ca-trust')
+    print("RHV CA cert has been successfully added to CA trust")
