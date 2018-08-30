@@ -6,7 +6,7 @@ import re
 import sys
 
 from bs4 import BeautifulSoup
-from fabric.api import env, run
+from fabric.api import env, run, warn_only
 
 from six.moves.urllib.request import urlopen
 
@@ -148,25 +148,26 @@ def compare_builds(url1, url2):
     list1.sort()
     list2 = get_packages_name(urlopen(url2).read())
     list2.sort()
-    try:
-        run('mkdir packages')
-        for pkg in range(len(list2)):
-            get_packages(url2, list2[pkg])
-        for pkg in range(len(list2)):
-            if 'NOT OK' not in run('rpm -K packages/' + list1[pkg]):
-                flag1 = flag1 + 1
-                if signature in run(
-                                        'rpm -qpi packages/' +
-                                        list2[pkg] + '| grep "Signature" '
-                ):
-                    flag2 = flag2 + 1
+    with warn_only():
+        try:
+            run('mkdir packages')
+            for pkg in range(len(list2)):
+                get_packages(url2, list2[pkg])
+            for pkg in range(len(list2)):
+                if 'NOT OK' not in run('rpm -K packages/' + list1[pkg]):
+                    flag1 = flag1 + 1
+                    if signature in run(
+                                            'rpm -qpi packages/' +
+                                            list2[pkg] + '| grep "Signature" '
+                    ):
+                        flag2 = flag2 + 1
+                    else:
+                        print('signature ' + signature + ' not matched for '
+                              + list2[pkg])
                 else:
-                    print('signature ' + signature + ' not matched for '
-                          + list2[pkg])
-            else:
-                print(list2[pkg] + 'package is not signed')
-    finally:
-        run('rm packages -rf')
+                    print(list2[pkg] + 'package is not signed')
+        finally:
+            run('rm packages -rf')
 
     print("========================= Overall Report ======================")
 
