@@ -4,6 +4,8 @@ from __future__ import print_function
 import os
 import re
 import sys
+import subprocess
+import time
 
 from bs4 import BeautifulSoup
 from fabric.api import env, run, warn_only
@@ -203,3 +205,50 @@ def compare_builds(url1, url2):
         print('Signature ' + signature + ' for ' + str(len(list1) - flag2) +
               ' packages not matched!!')
     print("================================================================")
+
+
+def host_cmd_check(cmd, timeout=7):
+    """Helper to run commands and poll until returncode 0 or timeout
+    :param cmd: A string. The cmd you want to poll for.
+    :param int timeout: The polling timeout in minutes.
+    """
+    timeup = time.time() + int(timeout) * 60
+    while True:
+        command = subprocess.Popen(
+            '{0}'.format(cmd),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            shell=True
+        )
+        output = command.communicate()
+        print(output)
+        # Checking the return code of ping is 0
+        if time.time() > timeup:
+            print('Running {0} timed out for host '.format(cmd))
+            return False
+        if command.returncode == 0:
+            return True, output
+        else:
+            time.sleep(5)
+
+
+def host_ssh_availability_check(host):
+    """This ensures the given host has ssh up and running..
+    :param host: A string. The IP or hostname of host.
+    """
+    _, ip = host_pings(host)
+    print('Checking SSH availability')
+    _, output = host_cmd_check('nc -vn {0} 22 <<< \'\''.format(ip))
+    return output
+
+
+def host_pings(host):
+    """This ensures the given IP/hostname pings succesfully.
+    :param host: A string. The IP or hostname of host.
+    """
+    _, output = host_cmd_check('ping -c1 {0}; echo $?'.format(host))
+    output = str(output[0])
+    ip = output[output.find("(") + 1:output.find(")")]
+    status, _ = host_cmd_check('ping -c1 {0} | '
+                               'grep \'1 received\''.format(host))
+    return status, ip

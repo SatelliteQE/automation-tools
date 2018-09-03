@@ -89,4 +89,5 @@ from automation_tools.utils import (
     get_discovery_image,
     run_command,
     update_packages,
+    host_ssh_availability_check
 )
