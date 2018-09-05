@@ -35,6 +35,7 @@ wget
 yum-utils
 avahi-tools
 avahi
+qemu-guest-agent
 %end
 
 %post --logfile /var/log/baseimage-postinstall.log
