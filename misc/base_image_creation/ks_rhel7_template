@@ -36,6 +36,7 @@ repo --name="Red Hat Enterprise Linux"  --baseurl=OS_URL --cost=100
 wget
 yum-utils
 avahi
+qemu-guest-agent
 %end
 
 %post --logfile /var/log/baseimage-postinstall.log
