@@ -119,6 +119,12 @@ def get_discovery_image():
             ':9090 proxy.type=proxy fdi.pxfactname1=myfact '
             'fdi.pxfactvalue1=somevalue fdi.pxauto=1" /var/lib/libvirt/images/'
             + os.environ.get('DISCOVERY_ISO'))
+        size = run('du -h "/var/lib/libvirt/images/"' +
+                   os.environ.get('DISCOVERY_ISO')
+                   + ' | cut -f1 | tr -d [:alpha:]')
+        if int(size) < 150:
+            raise Exception("Generated ISO size is less than 150M!"
+                            " Check if ISO is corrupted.")
     finally:
         run('rm /tmp/foreman-discovery-image* /tmp/discovery-remaster '
             '/tmp/usr -rvf')
