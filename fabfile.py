@@ -1,5 +1,5 @@
 """Module which publish all automation-tools tasks"""
-from automation_tools import (  # noqa
+from automation_tools import (  # noqa: F401
     add_repo,
     cdn_install,
     clean_rhsm,
@@ -70,7 +70,13 @@ from automation_tools import (  # noqa
     vm_list,
     vm_list_base,
 )
-from automation_tools.repository import (  # noqa
+from automation_tools.baseimage import (  # noqa: F401
+    create_baseimage,
+    deploy_baseimage,
+    deploy_baseimage_by_url,
+    detect_imagename,
+)
+from automation_tools.repository import (  # noqa: F401
     create_custom_repos,
     delete_custom_repos,
     disable_beaker_repos,
@@ -79,11 +85,11 @@ from automation_tools.repository import (  # noqa
     enable_satellite_repos,
     manage_custom_repos,
 )
-from automation_tools.satellite5 import (  # noqa
+from automation_tools.satellite5 import (  # noqa: F401
     satellite5_installer,
     satellite5_product_install,
 )
-from automation_tools.utils import (  # noqa
+from automation_tools.utils import (  # noqa: F401
     compare_builds,
     distro_info,
     get_discovery_image,
