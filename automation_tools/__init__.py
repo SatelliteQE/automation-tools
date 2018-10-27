@@ -420,14 +420,10 @@ def setup_default_libvirt(bridge=None, ip_address="192.168.100.1"):
     """
     run('yum install -y libvirt libvirt-daemon-kvm virt-install qemu-kvm')
     run('lsmod | grep kvm_', warn_only=True)
-    run('sed -i \'s/^#*\s*LIBVIRTD_ARGS=.*/LIBVIRTD_ARGS=--listen/\''
-        ' /etc/sysconfig/libvirtd')
-    run('sed -i \'s/^#*\s*listen_tls\s*=.*/listen_tls = 0/\''
-        ' /etc/libvirt/libvirtd.conf')
-    run('sed -i \'s/^#*\s*listen_tcp\s*=.*/listen_tcp = 1/\''
-        ' /etc/libvirt/libvirtd.conf')
-    run('sed -i \'s/^#*\s*auth_tcp\s*=.*/auth_tcp = "none"/\''
-        ' /etc/libvirt/libvirtd.conf')
+    run('sed -i \'s/^#*\\s*LIBVIRTD_ARGS=.*/LIBVIRTD_ARGS=--listen/\' /etc/sysconfig/libvirtd')
+    run('sed -i \'s/^#*\\s*listen_tls\\s*=.*/listen_tls = 0/\' /etc/libvirt/libvirtd.conf')
+    run('sed -i \'s/^#*\\s*listen_tcp\\s*=.*/listen_tcp = 1/\' /etc/libvirt/libvirtd.conf')
+    run('sed -i \'s/^#*\\s*auth_tcp\\s*=.*/auth_tcp = "none"/\' /etc/libvirt/libvirtd.conf')
     manage_daemon('enable', 'libvirtd')
     manage_daemon('restart', 'libvirtd')
 
@@ -1030,27 +1026,21 @@ def setup_foreman_discovery(sat_version):
             run('wget -O {0} {1}'.format(template_file, template_url))
         else:
             # Dump the template
-            run('hammer -u admin -p {0} template dump --name '
-                '"PXELinux global default" > {1}'.format(
-                    admin_password, template_file))
-        run('sed -i -e "s/^ONTIMEOUT\s\+local/ONTIMEOUT discovery/" {0}'
-            .format(template_file))
-        run('sed -i -e "s/^TIMEOUT\s\+[0-9]\+/TIMEOUT 5/"'
-            ' {0}'.format(template_file))
-        run('sed -i -e "s/SATELLITE_CAPSULE_URL/{0}/i"'
-            ' {1}'.format(hostname, template_file))
+            run('hammer -u admin -p {0} template dump --name "PXELinux global default" > {1}'
+                .format(admin_password, template_file))
+        run(r'sed -i -e "s/^ONTIMEOUT\s\+local/ONTIMEOUT discovery/" {0}'.format(template_file))
+        run(r'sed -i -e "s/^TIMEOUT\s\+[0-9]\+/TIMEOUT 5/" {0}'.format(template_file))
+        run('sed -i -e "s/SATELLITE_CAPSULE_URL/{0}/i" {1}'.format(hostname, template_file))
         # Update the template
-        run('hammer -u admin -p {0} template update --name '
-            '"PXELinux global default" --file {1}'
+        run('hammer -u admin -p {0} template update --name "PXELinux global default" --file {1}'
             .format(admin_password, template_file))
         run('rm -rf {0}'.format(template_file))
         return
 
     if sat_version == 'upstream-nightly':
         # Fetch the upstream-nightly FDI from upstream
-        image_url = 'http://downloads.theforeman.org/discovery/nightly/fdi-image-latest.tar'  # noqa
-        run('wget -nv -O- {0} | tar x --overwrite -C /var/lib/tftpboot/boot'
-            .format(image_url))
+        image_url = 'http://downloads.theforeman.org/discovery/nightly/fdi-image-latest.tar'
+        run('wget -nv -O- {0} | tar x --overwrite -C /var/lib/tftpboot/boot'.format(image_url))
 
     if sat_version in ('6.3', '6.4', 'downstream-nightly'):
         # In 6.3, installer should install all required packages except FDI
@@ -1065,19 +1055,15 @@ def setup_foreman_discovery(sat_version):
         .format(admin_password))
     template_file = run('mktemp')
     # Dump the template
-    run('hammer -u admin -p {0} template dump --name '
-        '"PXELinux global default" > {1}'.format(
-            admin_password, template_file))
+    run('hammer -u admin -p {0} template dump --name "PXELinux global default" > {1}'
+        .format(admin_password, template_file))
     if sat_version in ('6.1', '6.2', '6.3'):
         # since 6.4, ONTIMEOUT option uses "default_pxe_item_global" setting
-        run('sed -i -e "s/^ONTIMEOUT\s\+local/ONTIMEOUT discovery/" {0}'
-            .format(template_file))
+        run(r'sed -i -e "s/^ONTIMEOUT\s\+local/ONTIMEOUT discovery/" {0}'.format(template_file))
     else:
         run('hammer -u admin -p {0} settings set --name '
-            '"default_pxe_item_global" --value="discovery"'.format(
-                admin_password))
-    run('sed -i -e "s/^TIMEOUT\s\+[0-9]\+/TIMEOUT 5/"'
-        ' {0}'.format(template_file))
+            '"default_pxe_item_global" --value="discovery"'.format(admin_password))
+    run(r'sed -i -e "s/^TIMEOUT\s\+[0-9]\+/TIMEOUT 5/" {0}'.format(template_file))
     # Update the template
     run('hammer -u admin -p {0} template update --name '
         '"PXELinux global default" --type "PXELinux" --file {1}'
@@ -2474,7 +2460,7 @@ def partition_disk():
     if run('df -P /home | awk \'END{print $NF}\'') == '/home':
         run('umount /home')
         run('lvremove -f /dev/mapper/*home')
-        run("sed -i '/\/home/d' /etc/fstab")
+        run("sed -i '|/home|d' /etc/fstab")
         run('lvresize -f -l +100%FREE /dev/mapper/*root')
         run('if uname -r | grep -q el6; then resize2fs -f /dev/mapper/*root; '
             'else xfs_growfs / && mount / -o inode64,remount; fi')
@@ -2489,8 +2475,8 @@ def fix_hostname(entry_domain=None, host_ip=None):
             .format(host_ip, entry_domain, host))
     else:
         # Required for fixing the hostname when using satellite-installer
-        ip_addr = run("ping -c1 $(hostname) | awk -F\( '/icmp_seq/{print$2}' "
-                      "| awk -F\) '{print$1}'")
+        ip_addr = run(r"ping -c1 $(hostname) | awk -F\( '/icmp_seq/{print$2}' "
+                      r"| awk -F\) '{print$1}'")
         run('echo "{0} $(hostname) $(hostname -s)" >> /etc/hosts'
             .format(ip_addr))
 
@@ -2535,8 +2521,7 @@ def iso_download(iso_url=None):
             if result.succeeded:
                 # match either '<hash> *<iso_filename>'
                 # or '{MD5|SHA1|SHA256} (<iso_filename>) = <hash>'
-                iso_filename = search(
-                    '\w+\s+[\*\(]?([^\s\)]+)', result).group(1)
+                iso_filename = search(r'\w+\s+[\*\(]?([^\s\)]+)', result).group(1)
                 break
 
         if iso_filename is None:
@@ -2909,7 +2894,7 @@ def errata_upgrade():
     run('echo {0}_TEST_PROFILE={1} >> /etc/sysconfig/{2}.conf'
         .format(package1.upper(), os.environ['TEST_PROFILE'], package1))
     run('echo TREE=$(grep -E -m 1 \'^(url|nfs) \' /root/anaconda-ks.cfg | '
-        'sed \'s|^[^/]*/\(.*\)$|/\1| ; s|//|| ; s|"||g\') '
+        'sed \'s|^[^/]*/\\(.*\\)$|/\\1| ; s|//|| ; s|"||g\') '
         '>> /etc/sysconfig/{0}.conf'.format(package1))
     run('echo {0}_{1}_STABLE=true >> /etc/sysconfig/{1}.conf'
         .format(package1.upper(), package2.upper()))

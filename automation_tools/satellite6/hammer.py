@@ -361,14 +361,15 @@ def hammer_activation_key_content_override(
             ak_id, content_label, value))
 
 
-def sync_capsule_content(capsule, async=True):
+def sync_capsule_content(capsule, sync=False):
     """Start content synchronization in the capsule.
 
     If The content synchronization is asynchronous, check the capsule
     logs to see when it have finished.
 
-    :param dict capsule: A capsule dictionary containing its ``id`` and
-        ``name``.
+    :param dict capsule: A capsule dictionary containing ``id`` and ``name``
+    :param bool sync: Synchronize synchronously
+
     """
     if capsule['id'] == 1:
         print('Skipping default capsule...')
@@ -376,11 +377,8 @@ def sync_capsule_content(capsule, async=True):
     lcenvs = hammer_capsule_lcenvs(capsule['id'])
     for lcenv in lcenvs:
         hammer_capsule_add_lcenv(capsule['id'], lcenv['id'])
-    if async is False:
-        hammer('capsule content synchronize --id {0}'.format(capsule['id']))
-    else:
-        hammer('capsule content synchronize --async --id {0}'.format(
-            capsule['id']))
+    hammer('capsule content synchronize --id {0} {1}'
+           .format(capsule['id']), '' if sync else '--async')
 
 
 def get_product_subscription_id(organization_id, product_name):
@@ -390,8 +388,7 @@ def get_product_subscription_id(organization_id, product_name):
     :param string product_name: Product name of which subscription id to return
     """
     return get_attribute_value(
-        hammer('subscription list --organization-id {}'.format(
-            organization_id)),
+        hammer('subscription list --organization-id {}'.format(organization_id)),
         product_name,
         'id')
 
