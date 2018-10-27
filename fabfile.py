@@ -1,5 +1,5 @@
 """Module which publish all automation-tools tasks"""
-from automation_tools import (  # flake8: noqa
+from automation_tools import (  # noqa
     add_repo,
     cdn_install,
     clean_rhsm,
@@ -70,7 +70,7 @@ from automation_tools import (  # flake8: noqa
     vm_list,
     vm_list_base,
 )
-from automation_tools.repository import (
+from automation_tools.repository import (  # noqa
     create_custom_repos,
     delete_custom_repos,
     disable_beaker_repos,
@@ -79,15 +79,15 @@ from automation_tools.repository import (
     enable_satellite_repos,
     manage_custom_repos,
 )
-from automation_tools.satellite5 import (
+from automation_tools.satellite5 import (  # noqa
     satellite5_installer,
     satellite5_product_install,
 )
-from automation_tools.utils import (
+from automation_tools.utils import (  # noqa
     compare_builds,
     distro_info,
     get_discovery_image,
     run_command,
     update_packages,
-    host_ssh_availability_check
+    host_ssh_availability_check,
 )
