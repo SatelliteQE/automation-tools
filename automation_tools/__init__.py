@@ -1052,7 +1052,7 @@ def setup_foreman_discovery(sat_version):
         run('wget -nv -O- {0} | tar x --overwrite -C /var/lib/tftpboot/boot'
             .format(image_url))
 
-    if sat_version in ('6.3', '6.4', 'downstream-nightly'):
+    if sat_version not in ('6.1', '6.2', 'upstream-nightly'):
         # In 6.3, installer should install all required packages except FDI
         run('rpm -q {0}'.format(' '.join(packages)))
         run('yum install -y foreman-discovery-image')
@@ -1563,7 +1563,7 @@ def generate_capsule_certs(capsule_fqdn=None, sat_version=None):
     if sat_version is None:
         sat_version = os.environ.get('SATELLITE_VERSION')
 
-    if sat_version in ('6.3', '6.4', 'upstream-nightly'):
+    if sat_version not in ('6.1', '6.2'):
         run('capsule-certs-generate --foreman-proxy-fqdn {0}'
             ' --certs-tar "/var/www/html/pub/{0}-certs.tar" > '
             '/var/www/html/pub/{0}-out.txt'
