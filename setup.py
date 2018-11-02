@@ -31,7 +31,6 @@ setup(
         'robozilla',
         'six',
         'unittest2',
-        'PyNaCl==1.2.1'
     ],
     license='GNU GPL v3.0',
     classifiers=(
