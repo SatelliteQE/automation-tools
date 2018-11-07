@@ -14,7 +14,7 @@ pipeline {
 
       }
       steps {
-        sh 'sleep'
+        sh 'make gitflake8'
       }
     }
   }
