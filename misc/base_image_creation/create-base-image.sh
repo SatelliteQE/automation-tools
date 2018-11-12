@@ -12,6 +12,10 @@ if [ "$1" == "-h" ] ; then
     echo "      password"
     echo "      Enter the Authorized keys url for the base image. (Hosted authorized_keys file with jenkins key)"
     echo "      http://xxxxx.com/xxx/authorized_keys"
+    echo "      Do you want to disable IPv6 in base image? (Y/n)"
+    echo "      y"
+    echo "      Enter custom DNS server if you want to set it in base image"
+    echo "      10.x.xxx.xx"
     exit 0
 fi
 echo "Enter the Operating System version. (Ex: 6 or 7)"
@@ -26,6 +30,8 @@ echo "Enter the Authorized keys url for the base image. (Hosted authorized_keys 
 read auth_url
 echo "Do you want to disable IPv6 in base image? (Y/n)"
 read disable_ipv6
+echo "Enter custom DNS server if you want to set it in base image"
+read dns_server
 
 if [ $os_version -eq 6 ] ; then 
     cp ks_rhel6_template /root/base-image.ks
@@ -49,13 +55,16 @@ sed -i "s|OS_URL|$os_url|g" /root/base-image.ks
 PASS=`openssl passwd -1 -salt xyz  $pass`
 sed -i "s|ENCRYPT_PASS|'$PASS'|g" /root/base-image.ks
 sed -i "s|AUTH_KEYS_URL|$auth_url|g" /root/base-image.ks
-
+if [[ -n $dns_server ]] ; then
+    sed -i "s|NAMESERVER|$dns_server|g" /root/base-image.ks
+else
+    sed -i "/NAMESERVER/d" /root/base-image.ks
+fi
 
 virt-install --connect=qemu:///system \
     --network=bridge:br0 \
     --initrd-inject=/root/base-image.ks \
-    --extra-args="ks=file:/base-image.ks \
-      console=tty0 console=ttyS0,115200" \
+    --extra-args="ks=file:/base-image.ks console=tty0 console=ttyS0,115200" \
     --name=${base_image}-base \
     --disk path=/var/lib/libvirt/images/${base_image}-base.img,size=200,device=disk,bus=virtio,format=raw,sparse=true \
     --ram 4096 \

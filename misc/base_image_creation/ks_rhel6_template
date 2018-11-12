@@ -44,6 +44,7 @@ ssh-keygen -t rsa -N "" -f /root/.ssh/id_dsa
 curl -sS -o /root/.ssh/authorized_keys AUTH_KEYS_URL
 restorecon -rv /root/.ssh/authorized_keys
 sysctl -w net.ipv6.conf.all.disable_ipv6=1 >> /etc/sysctl.conf
+sed -Ei 's/^(search.*)/\1\nnameserver NAMESERVER/' /etc/resolv.conf
 
 cat <<EOL > /etc/yum.repos.d/rhel6.repo
 [rhel6]
