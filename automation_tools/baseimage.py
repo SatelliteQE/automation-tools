@@ -31,14 +31,6 @@ def detect_imagename(os_url):
 def create_baseimage(os_url, image=None, auth_keys_url=None, dns_server=None, disable_ipv6=False):
     """Task to create standard base image using OS URL
 
-    The following environment variables affect this command:
-
-    AUTH_KEYS_URL
-        URL location of authorized_keys file
-
-    IDM_SERVER_IP
-        Custom DNS server IP address
-
     :param str os_url: URL of OS media to install
     :param str image: Image name to be created (without extension .img)
     :param str auth_keys_url: authorized_keys file URL to be put in baseimage
@@ -47,9 +39,9 @@ def create_baseimage(os_url, image=None, auth_keys_url=None, dns_server=None, di
 
     """
     if not os_url.endswith('/'):
-            os_url += '/'
-    auth_keys_url = auth_keys_url or os.environ.get('AUTH_KEYS_URL', '')
-    dns_server = dns_server or os.environ.get('IDM_SERVER_IP', '')
+        os_url += '/'
+    if isinstance(disable_ipv6, str):
+        disable_ipv6 = (disable_ipv6.lower() == 'true')
 
     # Detect OS version
     media = run('wget -q -O- {}'.format(urljoin(os_url, 'media.repo')))
@@ -74,6 +66,7 @@ def create_baseimage(os_url, image=None, auth_keys_url=None, dns_server=None, di
     else:
         run(r'sed -i "\|/etc/resolv.conf|d" ks.cfg')
 
+    run('virsh undefine {}'.format(image), warn_only=True)
     run('virt-install --connect qemu:///system -n {img} -l {url} -w bridge:br0 '
         '--initrd-inject ks.cfg -x "ks=file:/ks.cfg console=tty0 console=ttyS0,115200" '
         '--disk path=/var/lib/libvirt/images/{img}.img,size=200,device=disk,bus=virtio,format=raw,'
