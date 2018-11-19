@@ -59,7 +59,7 @@ def create_baseimage(os_url, image=None, auth_keys_url=None, dns_server=None, di
     run('sed -i "s|OS_URL|{}|g" ks.cfg'.format(os_url))
     run('sed -i "s|ENCRYPT_PASS|$1$xyz$7xHVh4/yhE6P00NIXbWZA/|g" ks.cfg')
     run('sed -i "s|AUTH_KEYS_URL|{}|g" ks.cfg'.format(auth_keys_url))
-    if disable_ipv6:
+    if not disable_ipv6:
         run('sed -i "/disable_ipv6/d" ks.cfg')
     if dns_server:
         run('sed -i "s|NAMESERVER|{}|g" ks.cfg'.format(dns_server))
