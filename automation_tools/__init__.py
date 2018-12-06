@@ -1316,9 +1316,10 @@ def vm_create():
             host=env['vm_ip'],
         )
 
-    # Execute setup_ddns only if using bridge br0 with dynamic IP
+    # Execute setup_ddns only if using bridge br0 and foreman (In case of internal
+    # libvirt provisioning) with dynamic IP
     if (
-        options['bridge'] == 'br0' and
+        options['bridge'] in ['br0', 'foreman'] and
         'DDNS_HASH' in os.environ and 'DDNS_PACKAGE_URL' in os.environ
     ):
         execute(
