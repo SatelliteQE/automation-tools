@@ -1945,7 +1945,7 @@ def upstream_install(admin_password=None, run_katello_installer=True):
         run('/opt/puppetlabs/puppet/bin/gem install puppet-strings')
 
     installer_options = {
-        'foreman-admin-password': admin_password,
+        'foreman-initial-admin-password': admin_password,
         'disable-system-checks': None,
     }
     if run_katello_installer:
