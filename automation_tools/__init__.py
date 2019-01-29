@@ -1134,7 +1134,7 @@ def disable_baseos_repo():
     IMAGE
         The custom image name to be used for vault_requests.
     """
-    if os.environ.get('IMAGE'):
+    if os.environ.get('OS_UPGRADE_REPOS'):
         os_version = distro_info()[1]
         disable_repos('rhel-{0}-server-rpms'.format(os_version))
 
