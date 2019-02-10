@@ -1272,7 +1272,7 @@ def vm_create():
     if (
         options['bridge'] in ['br0', 'foreman'] and
         'DDNS_HASH' in os.environ and 'DDNS_PACKAGE_URL' in os.environ
-    ):
+    ) or not options['bridge']:
         execute(
             setup_ddns,
             env['vm_domain'],
