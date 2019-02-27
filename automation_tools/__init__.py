@@ -1058,7 +1058,7 @@ def setup_foreman_discovery(sat_version):
         run('yum install -y foreman-discovery-image')
 
     for daemon in ('foreman', 'httpd', 'foreman-proxy'):
-            manage_daemon('restart', daemon)
+        manage_daemon('restart', daemon)
     # Unlock the default Locked template for discovery
     run('hammer -u admin -p {0} template update '
         '--name "PXELinux global default" --locked "false"'
@@ -3160,7 +3160,7 @@ def download_manifest(url=None, consumer=None):
     if url is None:
         url = os.environ.get('SM_URL')
     if consumer is None:
-            consumer = os.environ.get('CONSUMER')
+        consumer = os.environ.get('CONSUMER')
     manifest_file = run('mktemp --suffix=.zip')
 
     # we do this as we would otherwise potentially download a manifest which
