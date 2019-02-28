@@ -1614,6 +1614,7 @@ def setup_capsule(satellite_fqdn=None, capsule_fqdn=None, capsule_org=None,
     disable_beaker_repos(silent=True)
 
     subscribe(autosubscribe=True)
+    install_prerequisites()
     run('yum -y install wget', warn_only=True)
     # Clean up
     unsubscribe()
