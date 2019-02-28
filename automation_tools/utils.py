@@ -139,7 +139,7 @@ def get_packages_name(html):
     links = []
     for a in anchors:
         links.append(a['href'])
-    links = filter(lambda k: 'rpm' in k, links)
+    links = list(filter(lambda k: 'rpm' in k, links))
     return links
 
 
