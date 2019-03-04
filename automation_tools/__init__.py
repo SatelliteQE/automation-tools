@@ -1058,7 +1058,7 @@ def setup_foreman_discovery(sat_version):
         run('yum install -y foreman-discovery-image')
 
     for daemon in ('foreman', 'httpd', 'foreman-proxy'):
-            manage_daemon('restart', daemon)
+        manage_daemon('restart', daemon)
     # Unlock the default Locked template for discovery
     run('hammer -u admin -p {0} template update '
         '--name "PXELinux global default" --locked "false"'
@@ -1316,9 +1316,10 @@ def vm_create():
             host=env['vm_ip'],
         )
 
-    # Execute setup_ddns only if using bridge br0 with dynamic IP
+    # Execute setup_ddns only if using bridge br0 and foreman (In case of internal
+    # libvirt provisioning) with dynamic IP
     if (
-        options['bridge'] == 'br0' and
+        options['bridge'] in ['br0', 'foreman'] and
         'DDNS_HASH' in os.environ and 'DDNS_PACKAGE_URL' in os.environ
     ):
         execute(
@@ -1944,7 +1945,7 @@ def upstream_install(admin_password=None, run_katello_installer=True):
         run('/opt/puppetlabs/puppet/bin/gem install puppet-strings')
 
     installer_options = {
-        'foreman-admin-password': admin_password,
+        'foreman-initial-admin-password': admin_password,
         'disable-system-checks': None,
     }
     if run_katello_installer:
@@ -3159,7 +3160,7 @@ def download_manifest(url=None, consumer=None):
     if url is None:
         url = os.environ.get('SM_URL')
     if consumer is None:
-            consumer = os.environ.get('CONSUMER')
+        consumer = os.environ.get('CONSUMER')
     manifest_file = run('mktemp --suffix=.zip')
 
     # we do this as we would otherwise potentially download a manifest which
