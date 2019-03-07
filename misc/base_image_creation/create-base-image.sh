@@ -2,7 +2,7 @@
 if [ "$1" == "-h" ] ; then
     echo "      Usage: `basename $0` [-h]"
     echo "          *******Example*******"
-    echo "      Enter the Operating System version. (Ex: 6 or 7)"
+    echo "      Enter the Operating System version. [6,7,8]"
     echo "      6"
     echo "      Enter the url of the Operating System."
     echo "      http://xxxxxx.com/Server/x86_64/os/"
@@ -18,7 +18,7 @@ if [ "$1" == "-h" ] ; then
     echo "      10.x.xxx.xx"
     exit 0
 fi
-echo "Enter the Operating System version. (Ex: 6 or 7)"
+echo "Enter the Operating System version. [6,7,8]"
 read os_version
 echo "Enter the url of the Operating System."
 read os_url
@@ -33,12 +33,10 @@ read disable_ipv6
 echo "Enter custom DNS server if you want to set it in base image"
 read dns_server
 
-if [ $os_version -eq 6 ] ; then 
-    cp ks_rhel6_template /root/base-image.ks
-elif [ $os_version -eq 7 ] ; then
-    cp ks_rhel7_template /root/base-image.ks
-else 
-    echo "OS Version can only be 6 or 7"
+if [[ $os_version =~ (6|7|8) ]] ; then
+    cp ks_rhel${os_version}_template /root/base-image.ks
+else
+    echo "OS Version can only be 6, 7 or 8"
     exit
 fi
 
@@ -52,6 +50,7 @@ fi
 
 # | is used as $os_url also could contain '/'.
 sed -i "s|OS_URL|$os_url|g" /root/base-image.ks
+sed -i "s|AS_URL|${os_url/BaseOS/AppStream}|g" /root/base-image.ks
 PASS=`openssl passwd -1 -salt xyz  $pass`
 sed -i "s|ENCRYPT_PASS|'$PASS'|g" /root/base-image.ks
 sed -i "s|AUTH_KEYS_URL|$auth_url|g" /root/base-image.ks
