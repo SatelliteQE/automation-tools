@@ -50,13 +50,15 @@ def create_baseimage(os_url, image=None, auth_keys_url=None, dns_server=None, di
         if match_name:
             os_ver = match_name.group(2).split('.')[0]
         else:
-            os_ver = 7
+            os_ver = 8
 
     if not image:
         image = detect_imagename(os_url)
 
     put('misc/base_image_creation/ks_rhel{}_template'.format(os_ver), 'ks.cfg')
     run('sed -i "s|OS_URL|{}|g" ks.cfg'.format(os_url))
+    if os_ver not in [6, 7]:  # for RHEL8+ derive AppStream URL from BaseOS URL
+        run('sed -i "s|AS_URL|{}|g" ks.cfg'.format(os_url.replace('BaseOS', 'AppStream')))
     run(r'sed -i "s|ENCRYPT_PASS|\\$1\\$xyz\\$7xHVh4/yhE6P00NIXbWZA/|g" ks.cfg')
     run('sed -i "s|AUTH_KEYS_URL|{}|g" ks.cfg'.format(auth_keys_url))
     if not disable_ipv6:
