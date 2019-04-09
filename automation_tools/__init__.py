@@ -516,6 +516,26 @@ def setup_default_subnet(sat_version):
         run(command.replace(' create ', ' update ', 1))
 
 
+def setup_bfa_prevention(sat_version):
+    """Postinstall task to set the `failed_login_attempts_limit` global setting
+    to control brute-force-attack prevention.
+
+    Expects the following environment variables:
+
+    BFA_LIMIT
+        number of failed login attempts in 5 minute interval to trigger BFA prevention
+        0 (default) disables BFA prevention
+
+    :param str sat_version: contains Satellite version (e.g. 6.4, 6.5, 6.6)
+    """
+
+    command = (
+        'hammer -u admin -p {0} settings set --name "failed_login_attempts_limit" --value {1}'
+    ).format(os.environ.get('ADMIN_PASSWORD', 'changeme'), os.environ.get('BFA_LIMIT', '0'))
+    if sat_version not in ('6.1', '6.2', '6.3', '6.4'):
+        run(command, warn_only=True)
+
+
 def setup_email_notification(smtp=None):
     """Configures system to handle email notification.
 
@@ -2421,6 +2441,7 @@ def product_install(distribution, create_vm=False, certificate_url=None,
         host=host
     )
     execute(setup_default_subnet, sat_version=sat_version, host=host)
+    execute(setup_bfa_prevention, sat_version=sat_version, host=host)
     execute(fix_qdrouterd_listen_to_ipv6, host=host)
 
     if create_vm and 'base' in target_image:
