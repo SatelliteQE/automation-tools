@@ -39,6 +39,7 @@ from automation_tools import (  # noqa: F401
     setup_abrt,
     setup_alternate_capsule_ports,
     setup_avahi_discovery,
+    setup_bfa_prevention,
     setup_capsule,
     setup_ddns,
     setup_default_capsule,
