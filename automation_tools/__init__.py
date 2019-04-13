@@ -1077,8 +1077,6 @@ def setup_foreman_discovery(sat_version):
         run('rpm -q {0}'.format(' '.join(packages)))
         run('yum install -y foreman-discovery-image')
 
-    for daemon in ('foreman', 'httpd', 'foreman-proxy'):
-        manage_daemon('restart', daemon)
     # Unlock the default Locked template for discovery
     run('hammer -u admin -p {0} template update '
         '--name "PXELinux global default" --locked "false"'
