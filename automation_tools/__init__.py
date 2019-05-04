@@ -2007,14 +2007,15 @@ def downstream_install(admin_password=None, run_katello_installer=True):
     satellite_repo.close()
 
     # Install required packages for the installation
-    if os.environ.get('SATELLITE_VERSION') in ('6.0', '6.1'):
-        run('yum install -y katello')
+    run('yum install -y satellite')
+    if float(os.environ.get('SATELLITE_VERSION')) > 6.5:
+        installer_options = {
+            'foreman-initial-admin-password': admin_password,
+        }
     else:
-        run('yum install -y satellite')
-
-    installer_options = {
-        'foreman-admin-password': admin_password,
-    }
+        installer_options = {
+            'foreman-admin-password': admin_password,
+        }
     if run_katello_installer:
         katello_installer(**installer_options)
         # Ensure that the installer worked
@@ -2033,7 +2034,8 @@ def repofile_install(admin_password=None, run_katello_installer=True,
         Optional, defaults to 'changeme'. Foreman admin password.
     REPO_FILE_URL
         URL for the compose repository file to fetch.
-
+    SATELLITE_VERSION
+        Satellite version.
     """
     os_version = distro_info()[1]
     if admin_password is None:
@@ -2052,9 +2054,14 @@ def repofile_install(admin_password=None, run_katello_installer=True,
     # Install required packages for the installation
     run('yum install -y satellite')
 
-    installer_options = {
-        'foreman-admin-password': admin_password,
-    }
+    if float(os.environ.get('SATELLITE_VERSION')) > 6.5:
+        installer_options = {
+            'foreman-initial-admin-password': admin_password,
+        }
+    else:
+        installer_options = {
+            'foreman-admin-password': admin_password,
+        }
     if run_katello_installer:
         katello_installer(**installer_options)
         # Ensure that the installer worked
@@ -2070,7 +2077,8 @@ def ak_install(admin_password=None, run_katello_installer=True):
 
     ADMIN_PASSWORD
         Optional, defaults to 'changeme'. Foreman admin password.
-
+    SATELLITE_VERSION
+        Satellite version.
     """
     if admin_password is None:
         admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme')
@@ -2078,9 +2086,14 @@ def ak_install(admin_password=None, run_katello_installer=True):
     # Install required packages for the installation
     run('yum install -y satellite')
 
-    installer_options = {
-        'foreman-admin-password': admin_password,
-    }
+    if float(os.environ.get('SATELLITE_VERSION')) > 6.5:
+        installer_options = {
+            'foreman-initial-admin-password': admin_password,
+        }
+    else:
+        installer_options = {
+            'foreman-admin-password': admin_password,
+        }
     if run_katello_installer:
         katello_installer(**installer_options)
         # Ensure that the installer worked
@@ -2103,14 +2116,15 @@ def cdn_install(run_katello_installer=True):
     admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme')
 
     # Install required packages for the installation
-    if os.environ.get('SATELLITE_VERSION') in ('6.0', '6.1'):
-        run('yum install -y katello')
+    run('yum install -y satellite')
+    if float(os.environ.get('SATELLITE_VERSION')) > 6.5:
+        installer_options = {
+            'foreman-initial-admin-password': admin_password,
+        }
     else:
-        run('yum install -y satellite')
-
-    installer_options = {
-        'foreman-admin-password': admin_password,
-    }
+        installer_options = {
+            'foreman-admin-password': admin_password,
+        }
     if run_katello_installer:
         katello_installer(**installer_options)
         # Ensure that the installer worked
@@ -2132,7 +2146,8 @@ def iso_install(
         Optional, defaults to 'changeme'. Foreman admin password.
     CHECK_GPG_SIGNATURES
        Optional, all values other than 'true' will default to 'false'.
-
+    SATELLITE_VERSION
+        Satellite version.
     """
     iso_url = os.environ.get('ISO_URL') or os.environ.get('BASE_URL')
     if iso_url is None:
@@ -2161,9 +2176,14 @@ def iso_install(
         else:
             run('./install_packages --nogpgsigs')
 
-    installer_options = {
-        'foreman-admin-password': admin_password,
-    }
+    if float(os.environ.get('SATELLITE_VERSION')) > 6.5:
+        installer_options = {
+            'foreman-initial-admin-password': admin_password,
+        }
+    else:
+        installer_options = {
+            'foreman-admin-password': admin_password,
+        }
     if run_katello_installer:
         katello_installer(**installer_options)
         # Ensure that the installer worked
