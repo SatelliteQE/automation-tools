@@ -42,7 +42,8 @@ def disable_repos(*args, **kwargs):
 
     """
     run('subscription-manager repos {0}'
-        .format(' '.join(['--disable "{0}"'.format(repo) for repo in args])))
+        .format(' '.join(['--disable "{0}"'.format(repo) for repo in args])),
+        **kwargs)
 
 
 def delete_custom_repos(*args):
@@ -145,7 +146,7 @@ def enable_satellite_repos(cdn=False, beta=False, disable_enabled=True,
 
     if disable_enabled is True:
         disable_beaker_repos(silent=True)
-        disable_repos('*', silent=True)
+        disable_repos('*', silent=True, warn_only=True)
 
     os_version = distro_info()[1]
     if os_version > 7:
