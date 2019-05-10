@@ -67,6 +67,8 @@ def create_baseimage(os_url, image=None, auth_keys_url=None, dns_server=None, di
         run('sed -i "s|NAMESERVER|{}|g" ks.cfg'.format(dns_server))
     else:
         run(r'sed -i "\|/etc/resolv.conf|d" ks.cfg')
+    # disable use of DNS by SSHD to prevent potential delays
+    run(r'echo "UseDNS no" >> /etc/ssh/sshd_config')
 
     run('virsh undefine {}'.format(image), warn_only=True)
     run('virt-install --connect qemu:///system -n {img} -l {url} -w bridge:br0 '
