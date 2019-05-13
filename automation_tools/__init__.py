@@ -255,13 +255,19 @@ def setup_avahi_discovery():
        by 'ping vm.local' run at Satellite
     """
     os_version = distro_info()[1]
-    epel_present = run('rpm -q epel-release', warn_only=True).return_code == 0
-    if not epel_present:
-        run('yum -y install https://dl.fedoraproject.org/pub/epel/'
-            'epel-release-latest-{0}.noarch.rpm'.format(os_version))
-    run('yum -y install nss-mdns')  # also pulls in avahi
-    if not epel_present:  # we installed epel, so removing aftwerwards
-        run('rpm -e epel-release')
+    if run('rpm -q nss-mdns', warn_only=True).failed:
+        if os_version == 8:  # temporary fix until EPEL8 goes out
+            run('yum -y install https://dl.fedoraproject.org/pub/epel/7/x86_64/Packages'
+                '/n/nss-mdns-0.14.1-1.el7.x86_64.rpm')
+        else:
+            epel_present = run('rpm -q epel-release', warn_only=True).return_code == 0
+            if not epel_present:
+                run('yum -y install https://dl.fedoraproject.org/pub/epel/'
+                    'epel-release-latest-{0}.noarch.rpm'.format(os_version))
+            run('yum -y install nss-mdns')  # also pulls in avahi
+            if not epel_present:  # we installed epel, so removing aftwerwards
+                run('rpm -e epel-release')
+
     if os_version >= 7:
         run('firewall-cmd --add-service mdns --permanent')
         run('firewall-cmd --reload')
