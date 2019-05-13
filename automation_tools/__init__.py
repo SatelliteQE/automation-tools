@@ -73,12 +73,10 @@ def subscribe(autosubscribe=False, stage=False):
 
     # Register the system
     run(
-        'subscription-manager register --force --user={0} --password={1} '
-        '--release="{2}Server" {3}'
-        .format(
+        'subscription-manager register --force --user={0} --password={1} {2} {3}'.format(
             os.environ['RHN_USERNAME'],
             os.environ['RHN_PASSWORD'],
-            major_version,
+            '--release="{0}{1}"'.format(major_version, 'Server' if major_version < 8 else ''),
             '--auto-attach' if autosubscribe else ''
         )
     )
