@@ -152,15 +152,16 @@ def enable_satellite_repos(cdn=False, beta=False, disable_enabled=True,
         repos = [
             'rhel-{0}-for-x86_64-baseos-rpms',
             'rhel-{0}-for-x86_64-appstream-rpms',
+            'ansible-2.8-for-rhel-{0}-x86_64-rpms'
         ]
     else:
         repos = [
             'rhel-{0}-server-rpms',
             'rhel-server-rhscl-{0}-rpms',
         ]
-    if sat_version in ['6.4', '6.5']:
-        repos.append('rhel-{0}-server-ansible-2-rpms')
-        repos.append('rhel-7-server-satellite-maintenance-6-rpms')
+        if sat_version != '6.3':  # 6.4+
+            repos.append('rhel-{0}-server-ansible-2-rpms')
+            repos.append('rhel-{0}-server-satellite-maintenance-6-rpms')
     if beta:
         repos.append('rhel-server-{0}-satellite-6-beta-rpms')
     elif cdn:
