@@ -2284,10 +2284,10 @@ def product_install(distribution, create_vm=False, certificate_url=None,
 
     if (
         distribution == 'satellite6-cdn' and
-        sat_version not in ('6.0', '6.1', '6.2', '6.3', '6.4')
+        sat_version not in ('6.0', '6.1', '6.2', '6.3', '6.4', '6.5')
     ):
         raise ValueError(
-            "Satellite version should be in [6.0, 6.1, 6.2, 6.3, 6.4]"
+            "Satellite version should be in [6.0, 6.1, 6.2, 6.3, 6.4, 6.5]"
         )
 
     if selinux_mode is None:
