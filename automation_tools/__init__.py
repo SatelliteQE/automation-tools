@@ -2307,6 +2307,9 @@ def product_install(distribution, create_vm=False, certificate_url=None,
 
         execute(vm_destroy, target_image, delete_image=True)
         execute(vm_create)
+    else:
+        # if host already exists (vm_create=False) still fix hostname
+        execute(fix_hostname)
 
     # When creating a vm the vm_ip will be set, otherwise use the fabric host
     host = env.get('vm_ip', env['host'])
