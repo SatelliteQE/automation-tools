@@ -1008,17 +1008,11 @@ def configure_sonarqube():
                 sonar_login, sonar_password))
 
 
-def setup_oscap():
-    """Task to setup oscap on foreman."""
+def setup_ansible_scap_client():
+    """Task to setup ansible-foreman_scap_client."""
     # Install required packages for the installation
-    packages = [
-        'rubygem-smart_proxy_openscap',
-        'ruby193-rubygem-foreman_openscap'
-    ]
-    run('yum install -y {0}'.format(' '.join(packages)))
-
-    for daemon in ('foreman', 'httpd', 'foreman-proxy'):
-        manage_daemon('restart', daemon)
+    # Remove the whole task once 1711219 is fixed
+    run('yum install -y ansiblerole-foreman_scap_client')
 
 
 def oscap_content():
@@ -2446,8 +2440,9 @@ def product_install(distribution, create_vm=False, certificate_url=None,
         execute(setup_libvirt_key, host=host)
     if sat_version in ('6.1', '6.2', 'upstream-nightly'):
         execute(install_puppet_scap_client, host=host)
-    if sat_version == '6.1':
-        execute(setup_oscap, host=host)
+    # Remove the execution of the task once 1711219 is fixed
+    if bz_bug_is_open(1711219) and sat_version == '6.6':
+        execute(setup_ansible_scap_client, host=host)
     if sat_version not in ('6.0', '6.1'):
         execute(oscap_content, host=host)
     # ostree plugin is for Sat6.2+ and upstream-nightly (rhel7 only)
