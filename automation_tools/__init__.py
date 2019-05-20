@@ -611,7 +611,7 @@ def setup_firewall(definitions=None, flush=True):
     else:
         if run('rpm -q firewalld', quiet=True).failed:
             run('yum install -y firewalld')
-        if run('systemctl status firewalld', quiet=True).failed:
+        if run('systemctl --no-pager status firewalld', quiet=True).failed:
             run('systemctl enable firewalld')
             run('systemctl start firewalld')
         exists_command = 'firewall-cmd --permanent --query-port="{1}/{0}"'
