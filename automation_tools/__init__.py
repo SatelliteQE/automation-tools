@@ -375,41 +375,36 @@ def setup_default_capsule(interface=None, run_katello_installer=True):
             print('Was not possible to fetch interface information')
             sys.exit(1)
 
-    if os.environ.get('SATELLITE_VERSION') in ('6.0', '6.1'):
-        proxy = 'capsule'
-    else:
-        proxy = 'foreman-proxy'
-
     installer_options = {
-        '{0}-dns'.format(proxy): 'true',
-        '{0}-dns-forwarders'.format(proxy): forwarders,
-        '{0}-dns-interface'.format(proxy): interface,
-        '{0}-dns-zone'.format(proxy): domain,
-        '{0}-dhcp'.format(proxy): 'true',
-        '{0}-dhcp-interface'.format(proxy): interface,
-        '{0}-tftp'.format(proxy): 'true',
-        '{0}-tftp-servername'.format(proxy): hostname,
-        '{0}-register-in-foreman'.format(proxy): 'true',
+        'foreman-proxy-dns': 'true',
+        'foreman-proxy-dns-forwarders': forwarders,
+        'foreman-proxy-dns-interface': interface,
+        'foreman-proxy-dns-zone': domain,
+        'foreman-proxy-dhcp': 'true',
+        'foreman-proxy-dhcp-interface': interface,
+        'foreman-proxy-tftp': 'true',
+        'foreman-proxy-tftp-servername': hostname,
+        'foreman-proxy-register-in-foreman': 'true',
     }
 
     # Handles enabling puppet support
     if not os.environ.get('SATELLITE_VERSION') in ('6.3', '6.4'):
-        installer_options['{0}-puppetca'.format(proxy)] = 'true'
+        installer_options['foreman-proxy-puppetca'] = 'true'
         if os.environ.get('SATELLITE_VERSION') in ('6.0', '6.1', '6.2'):
             installer_options['capsule-puppet'] = 'true'
         else:
             installer_options['foreman-proxy-puppet'] = 'true'
 
     installer_options[
-        '{0}-dhcp-range'.format(proxy)
+        'foreman-proxy-dhcp-range'
     ] = os.environ.get('DHCP_RANGE', '192.168.100.10 192.168.100.254')
 
     gateway = os.environ.get('GATEWAY', '192.168.100.1')
-    installer_options['{0}-dhcp-gateway'.format(proxy)] = gateway
+    installer_options['foreman-proxy-dhcp-gateway'] = gateway
     zone = gateway.rpartition('.')[0]
     reversed_zone = '.'.join(reversed(zone.split('.')))
     dns_reverse_zone = '{0}.in-addr.arpa'.format(reversed_zone)
-    installer_options['{0}-dns-reverse'.format(proxy)] = dns_reverse_zone
+    installer_options['foreman-proxy-dns-reverse'] = dns_reverse_zone
 
     if run_katello_installer:
         katello_installer(**installer_options)
@@ -515,7 +510,7 @@ def setup_default_subnet(sat_version):
         '--gateway {gateway} --dns-primary {gateway} '
         '--ipam DHCP --from {from} --to {to} '
         '--dhcp-id 1 --dns-id 1 --tftp-id 1 ' +
-        ('--discovery-id 1' if sat_version not in ('6.1', '6.2') else '')
+        ('--discovery-id 1' if sat_version != '6.2' else '')
     ).format(**options)
     # create or update if failed
     if run(command, warn_only=True).failed:
@@ -1035,7 +1030,7 @@ def setup_foreman_discovery(sat_version):
     * `PXE_DEFAULT_TEMPLATE_URL`
     * `PXELINUX_DISCOVERY_SNIPPET_URL`
 
-    :param str sat_version: should contain satellite version e.g. 6.1, 6.2
+    :param str sat_version: should contain satellite version e.g. 6.2
     """
     packages = (
         'tfm-rubygem-foreman_discovery',
@@ -1044,20 +1039,16 @@ def setup_foreman_discovery(sat_version):
     )
     admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme')
 
-    if sat_version in ('6.1', '6.2'):
+    if sat_version == '6.2':
         run('yum install -y {0}'.format(' '.join(packages)), warn_only=True)
         run('yum install -y foreman-discovery-image')
         for daemon in ('foreman', 'httpd', 'foreman-proxy'):
             manage_daemon('restart', daemon)
         template_file = run('mktemp')
         hostname = run('hostname -f', quiet=True).strip()
-        if sat_version == '6.1':
-            template_url = os.environ.get('PXE_DEFAULT_TEMPLATE_URL')
-            run('wget -O {0} {1}'.format(template_file, template_url))
-        else:
-            # Dump the template
-            run('hammer -u admin -p {0} template dump --name "PXELinux global default" > {1}'
-                .format(admin_password, template_file))
+        # Dump the template
+        run('hammer -u admin -p {0} template dump --name "PXELinux global default" > {1}'
+            .format(admin_password, template_file))
         run(r'sed -i -e "s/^ONTIMEOUT\s\+local/ONTIMEOUT discovery/" {0}'.format(template_file))
         run(r'sed -i -e "s/^TIMEOUT\s\+[0-9]\+/TIMEOUT 5/" {0}'.format(template_file))
         run('sed -i -e "s/SATELLITE_CAPSULE_URL/{0}/i" {1}'.format(hostname, template_file))
@@ -1065,14 +1056,13 @@ def setup_foreman_discovery(sat_version):
         run('hammer -u admin -p {0} template update --name "PXELinux global default" --file {1}'
             .format(admin_password, template_file))
         run('rm -rf {0}'.format(template_file))
-        return
+        return  # 6.2 exits here
 
     if sat_version == 'upstream-nightly':
         # Fetch the upstream-nightly FDI from upstream
         image_url = 'http://downloads.theforeman.org/discovery/nightly/fdi-image-latest.tar'
         run('wget -nv -O- {0} | tar x --overwrite -C /var/lib/tftpboot/boot'.format(image_url))
-
-    if sat_version not in ('6.1', '6.2', 'upstream-nightly'):
+    else:
         # In 6.3, installer should install all required packages except FDI
         run('rpm -q {0}'.format(' '.join(packages)))
         run('yum install -y foreman-discovery-image')
@@ -1085,10 +1075,10 @@ def setup_foreman_discovery(sat_version):
     # Dump the template
     run('hammer -u admin -p {0} template dump --name "PXELinux global default" > {1}'
         .format(admin_password, template_file))
-    if sat_version in ('6.1', '6.2', '6.3'):
-        # since 6.4, ONTIMEOUT option uses "default_pxe_item_global" setting
+    if sat_version == '6.3':
         run(r'sed -i -e "s/^ONTIMEOUT\s\+local/ONTIMEOUT discovery/" {0}'.format(template_file))
     else:
+        # since 6.4, ONTIMEOUT option uses "default_pxe_item_global" setting
         run('hammer -u admin -p {0} settings set --name '
             '"default_pxe_item_global" --value="discovery"'.format(admin_password))
     run(r'sed -i -e "s/^TIMEOUT\s\+[0-9]\+/TIMEOUT 5/" {0}'.format(template_file))
@@ -1538,7 +1528,7 @@ def configure_osp(admin_password=None, forward_zone=None, reverse_zone=None,
 
     """
     satellite_version = os.environ.get('SATELLITE_VERSION')
-    if satellite_version == '6.1' and satellite_version == '6.2':
+    if satellite_version == '6.2':
         zone_file = '/etc/zones.conf'
     else:
         zone_file = '/etc/named/zones.conf'
@@ -1734,10 +1724,7 @@ def configure_idm_external_auth(idm_password=None):
         idm_password = os.environ.get('IDM_PASSWORD')
     run('echo {0} | kinit admin'.format(idm_password))
     run('ipa service-add HTTP/$(hostname)')
-    if os.environ.get('SATELLITE_VERSION') == '6.1':
-        run('katello-installer --foreman-ipa-authentication=true')
-    else:
-        run('satellite-installer --foreman-ipa-authentication=true')
+    run('satellite-installer --foreman-ipa-authentication=true')
     run('katello-service restart')
 
 
@@ -1824,10 +1811,7 @@ def configure_ad_external_auth(ad_passwd=None, realm=None):
         .format(ad_passwd))
     run('chown root:root /etc/gssproxy/http.keytab')
     run('touch /etc/httpd/conf/http.keytab')
-    if os.environ.get('SATELLITE_VERSION') == '6.1':
-        run('katello-installer --foreman-ipa-authentication=true')
-    else:
-        run('satellite-installer --foreman-ipa-authentication=true')
+    run('satellite-installer --foreman-ipa-authentication=true')
     run('systemctl restart gssproxy.service')
     run('systemctl enable gssproxy.service')
     httpd_service = StringIO()
@@ -2264,12 +2248,6 @@ def product_install(distribution, create_vm=False, certificate_url=None,
     }
     distribution = distribution.lower()
 
-    # Make sure downstream_install only is called for sat6.1, sat6.2 only,
-    # not from sat6.3+. Do not add '6.3' and following versions below.
-    if sat_version in ('6.1', '6.2'):
-        if distribution in ('satellite6-repofile', 'satellite6-activationkey'):
-            distribution = 'satellite6-downstream'
-
     distributions = install_tasks.keys()
     installer_options = {}
 
@@ -2443,25 +2421,19 @@ def product_install(distribution, create_vm=False, certificate_url=None,
     # if we have ssh key to libvirt machine we can setup access to it
     if os.environ.get('LIBVIRT_KEY_URL') is not None:
         execute(setup_libvirt_key, host=host)
-    if sat_version in ('6.1', '6.2', 'upstream-nightly'):
+    if sat_version in ('6.2', 'upstream-nightly'):
         execute(install_puppet_scap_client, host=host)
     # Remove the execution of the task once 1711219 is fixed
     if bz_bug_is_open(1711219) and sat_version == '6.6':
         execute(setup_ansible_scap_client, host=host)
-    if sat_version not in ('6.0', '6.1'):
-        execute(oscap_content, host=host)
-    # ostree plugin is for Sat6.2+ and upstream-nightly (rhel7 only)
-    if sat_version not in ('6.0', '6.1'):
-        execute(enable_ostree, sat_version=sat_version, host=host)
+    execute(oscap_content, host=host)
+    # ostree plugin is for Sat6.2+ and rhel7 only
+    execute(enable_ostree, sat_version=sat_version, host=host)
     # setup_foreman_discovery
     # setup_discovery_task needs to be run at last otherwise, any other
     # tasks like ostree which is re-running installer would re-set the
     # discovery templates as well. Please see #1387179 for more info.
-    execute(
-        setup_foreman_discovery,
-        sat_version=sat_version,
-        host=host
-    )
+    execute(setup_foreman_discovery, sat_version=sat_version, host=host)
     execute(setup_default_subnet, sat_version=sat_version, host=host)
     execute(setup_bfa_prevention, sat_version=sat_version, host=host)
     execute(fix_qdrouterd_listen_to_ipv6, host=host)
@@ -3070,7 +3042,6 @@ def katello_installer(debug=False, distribution=None, verbose=True,
     extra_options = []
 
     if sat_version == 'upstream-nightly':
-        proxy = 'foreman-proxy'
         installer = 'foreman'
         scenario = 'katello'
         extra_options.append('--enable-foreman-plugin-remote-execution')
@@ -3081,26 +3052,20 @@ def katello_installer(debug=False, distribution=None, verbose=True,
         extra_options.append('--enable-foreman-proxy-plugin-openscap')
         extra_options.append('--enable-foreman-plugin-ansible')
         extra_options.append('--enable-foreman-proxy-plugin-ansible')
-    elif sat_version in ('6.0', '6.1'):
-        proxy = 'capsule'
-        installer = 'katello'
-    else:  # sat_version in ('6.2', '6.3', 'downstream-nightly')
-        proxy = 'foreman-proxy'
+    else:  # downstream
         installer = 'satellite'
-        if scenario is None:
-            scenario = 'satellite'
+        scenario = scenario or 'satellite'
 
-    if ('{0}-dns-forwarders'.format(proxy) in kwargs and
-            isinstance(kwargs['{0}-dns-forwarders'.format(proxy)], list)):
-        forwarders = kwargs.pop('{0}-dns-forwarders'.format(proxy))
+    if ('foreman-proxy-dns-forwarders' in kwargs and
+            isinstance(kwargs['foreman-proxy-dns-forwarders'], list)):
+        forwarders = kwargs.pop('foreman-proxy-dns-forwarders')
         for forwarder in forwarders:
             extra_options.append(
-                '--{0}-dns-forwarders="{1}"'.format(proxy, forwarder))
+                '--foreman-proxy-dns-forwarders="{0}"'.format(forwarder))
 
-    run('{0}-installer {1} {2} {3} {4} {5}'.format(
+    run('{0}-installer --scenario {1} {2} {3} {4} {5}'.format(
         installer,
-        '--scenario {0}'
-        .format(scenario) if sat_version not in ('6.0', '6.1') else '',
+        scenario,
         '-d' if debug else '',
         '-v' if verbose else '',
         ' '.join([
