@@ -22,7 +22,7 @@ from automation_tools.repository import (
 from automation_tools.utils import (
     distro_info, run_command, update_packages
 )
-from fabric.api import cd, env, execute, get, local, put, run, settings, sudo
+from fabric.api import cd, env, execute, get, hide, local, put, run, settings, sudo
 
 from six.moves.urllib.parse import urljoin
 from six.moves.urllib.parse import urlsplit
@@ -72,14 +72,16 @@ def subscribe(autosubscribe=False, stage=False):
         update_rhsm_stage()
 
     # Register the system
-    run(
-        'subscription-manager register --force --user={0} --password={1} {2} {3}'.format(
-            os.environ['RHN_USERNAME'],
-            os.environ['RHN_PASSWORD'],
-            '--release="{0}{1}"'.format(major_version, 'Server' if major_version < 8 else ''),
-            '--auto-attach' if autosubscribe else ''
+    with hide('running'):
+        run(
+            'subscription-manager register --force --user={0} --password={1} {2} {3}'.format(
+                os.environ['RHN_USERNAME'],
+                os.environ['RHN_PASSWORD'],
+                # set release to "6Server", "7Server" or "8" accordingly
+                '--release="{0}{1}"'.format(major_version, 'Server' if major_version < 8 else ''),
+                '--auto-attach' if autosubscribe else ''
+            )
         )
-    )
 
     # Subscribe the system if a pool ID was provided
     # Multiple pool IDs can be provided as space seprated list
