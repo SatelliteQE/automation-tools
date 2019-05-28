@@ -262,21 +262,17 @@ def hammer_content_view_publish(name, organization_id):
 
 @task
 def hammer_content_view_promote_version(
-        cv_name, cv_ver_id, lc_env_id, organization_id, sat61plus=True):
+        cv_name, cv_ver_id, lc_env_id, organization_id):
     """Promotes a content view version
 
     :param cv_name: name of the content view which will be published
     :param cv_ver_id: CV Version id to be promoted
     :param lc_env_id: LC Environment id onto which cv version to be promoted
     :param organization_id: organization where the content view was created
-    :param sat61plus: lc choosing option to promote the CV is different in
-        Sat 6.1+ versions
     """
-    lc_promote_opt = 'to-lifecycle-environment-id' if sat61plus else \
-        'lifecycle-environment-id'
     return hammer('content-view version promote --content-view {0} --id {1} '
-                  '--{2} {3} --organization-id 1'.format(
-                    cv_name, cv_ver_id, lc_promote_opt, lc_env_id))
+                  '--to-lifecycle-environment-id {2} --organization-id 1'
+                  .format(cv_name, cv_ver_id, lc_env_id))
 
 
 @task
