@@ -387,14 +387,6 @@ def setup_default_capsule(interface=None, run_katello_installer=True):
         'foreman-proxy-register-in-foreman': 'true',
     }
 
-    # Handles enabling puppet support
-    if not os.environ.get('SATELLITE_VERSION') in ('6.3', '6.4'):
-        installer_options['foreman-proxy-puppetca'] = 'true'
-        if os.environ.get('SATELLITE_VERSION') in ('6.0', '6.1', '6.2'):
-            installer_options['capsule-puppet'] = 'true'
-        else:
-            installer_options['foreman-proxy-puppet'] = 'true'
-
     installer_options[
         'foreman-proxy-dhcp-range'
     ] = os.environ.get('DHCP_RANGE', '192.168.100.10 192.168.100.254')
@@ -493,7 +485,7 @@ def setup_default_subnet(sat_version):
     DHCP_RANGE
         The range in the subnet operated by DHCP Capsule
 
-    :param str sat_version: contains Satellite version (e.g. 6.2, 6.3, 6.4)
+    :param str sat_version: contains Satellite version (e.g. 6.3, 6.4)
     """
     dhcp_range = os.environ.get(
         'DHCP_RANGE', '192.168.100.10 192.168.100.254').split()
@@ -509,32 +501,28 @@ def setup_default_subnet(sat_version):
         '--network {network} --mask {mask} '
         '--gateway {gateway} --dns-primary {gateway} '
         '--ipam DHCP --from {from} --to {to} '
-        '--dhcp-id 1 --dns-id 1 --tftp-id 1 ' +
-        ('--discovery-id 1' if sat_version != '6.2' else '')
+        '--dhcp-id 1 --dns-id 1 --tftp-id 1 --discovery-id 1'
     ).format(**options)
     # create or update if failed
     if run(command, warn_only=True).failed:
         run(command.replace(' create ', ' update ', 1))
 
 
-def setup_bfa_prevention(sat_version):
+def setup_bfa_prevention(bfa_limit=0):
     """Postinstall task to set the `failed_login_attempts_limit` global setting
     to control brute-force-attack prevention.
 
     Expects the following environment variables:
 
-    BFA_LIMIT
-        number of failed login attempts in 5 minute interval to trigger BFA prevention
+    :param int bfa_limit: number of failed login attempts in 5 minute to trigger BFA prevention
         0 (default) disables BFA prevention
 
-    :param str sat_version: contains Satellite version (e.g. 6.4, 6.5, 6.6)
     """
 
     command = (
         'hammer -u admin -p {0} settings set --name "failed_login_attempts_limit" --value {1}'
-    ).format(os.environ.get('ADMIN_PASSWORD', 'changeme'), os.environ.get('BFA_LIMIT', '0'))
-    if sat_version not in ('6.1', '6.2', '6.3', '6.4'):
-        run(command, warn_only=True)
+    ).format(os.environ.get('ADMIN_PASSWORD', 'changeme'), bfa_limit)
+    run(command, warn_only=True)
 
 
 def setup_email_notification(smtp=None):
@@ -1030,7 +1018,7 @@ def setup_foreman_discovery(sat_version):
     * `PXE_DEFAULT_TEMPLATE_URL`
     * `PXELINUX_DISCOVERY_SNIPPET_URL`
 
-    :param str sat_version: should contain satellite version e.g. 6.2
+    :param str sat_version: contains Satellite version e.g. 6.3
     """
     packages = (
         'tfm-rubygem-foreman_discovery',
@@ -1039,31 +1027,12 @@ def setup_foreman_discovery(sat_version):
     )
     admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme')
 
-    if sat_version == '6.2':
-        run('yum install -y {0}'.format(' '.join(packages)), warn_only=True)
-        run('yum install -y foreman-discovery-image')
-        for daemon in ('foreman', 'httpd', 'foreman-proxy'):
-            manage_daemon('restart', daemon)
-        template_file = run('mktemp')
-        hostname = run('hostname -f', quiet=True).strip()
-        # Dump the template
-        run('hammer -u admin -p {0} template dump --name "PXELinux global default" > {1}'
-            .format(admin_password, template_file))
-        run(r'sed -i -e "s/^ONTIMEOUT\s\+local/ONTIMEOUT discovery/" {0}'.format(template_file))
-        run(r'sed -i -e "s/^TIMEOUT\s\+[0-9]\+/TIMEOUT 5/" {0}'.format(template_file))
-        run('sed -i -e "s/SATELLITE_CAPSULE_URL/{0}/i" {1}'.format(hostname, template_file))
-        # Update the template
-        run('hammer -u admin -p {0} template update --name "PXELinux global default" --file {1}'
-            .format(admin_password, template_file))
-        run('rm -rf {0}'.format(template_file))
-        return  # 6.2 exits here
-
     if sat_version == 'upstream-nightly':
         # Fetch the upstream-nightly FDI from upstream
         image_url = 'http://downloads.theforeman.org/discovery/nightly/fdi-image-latest.tar'
         run('wget -nv -O- {0} | tar x --overwrite -C /var/lib/tftpboot/boot'.format(image_url))
     else:
-        # In 6.3, installer should install all required packages except FDI
+        # Since 6.3, installer should install all required packages except FDI
         run('rpm -q {0}'.format(' '.join(packages)))
         run('yum install -y foreman-discovery-image')
 
@@ -1093,20 +1062,19 @@ def enable_ostree(sat_version='6.3'):
     """Task to enable ostree plugin for Satellite on rhel7.
     This enables ostree type repository.
 
-    :param bool upstream: Flag whether we run on upstream. Default: ``False``.
+    :param str sat_version: contains Satellite version e.g. 6.3
     """
     os_version = distro_info()[1]
     if os_version >= 7:
         if sat_version == 'upstream-nightly':
-            create_custom_repos(centos_atomic='http://buildlogs.centos.org/'
-                                'centos/7/atomic/x86_64/Packages/')
-        run('{0}-installer --scenario {1} {2} --katello-enable-ostree=true'
+            create_custom_repos(
+                centos_atomic='http://buildlogs.centos.org/centos/7/atomic/x86_64/Packages/'
+            )
+        run('{0}-installer --scenario {1} --disable-system-checks --katello-enable-ostree=true'
             .format(
-                'foreman' if sat_version == 'upstream-nightly' else 'satellite',  # noqa
-                'katello' if sat_version == 'upstream-nightly' else 'satellite',  # noqa
-                '--disable-system-checks' if sat_version in (
-                    '6.3', '6.4', 'downstream-nightly'
-                ) else ''))
+                'foreman' if sat_version == 'upstream-nightly' else 'satellite',
+                'katello' if sat_version == 'upstream-nightly' else 'satellite',
+            ))
         if sat_version == 'upstream-nightly':
             delete_custom_repos('centos_atomic')
     else:
@@ -1505,8 +1473,7 @@ def install_prerequisites():
     manage_daemon('start', 'ntpd', warn_only=True)
 
 
-def configure_osp(admin_password=None, forward_zone=None, reverse_zone=None,
-                  template_url=None):
+def configure_osp(forward_zone=None, reverse_zone=None):
     """Configure the named service for OSP Compute Resource.
 
     Expects the following environment variables:
@@ -1517,29 +1484,12 @@ def configure_osp(admin_password=None, forward_zone=None, reverse_zone=None,
     OSP_FORWARD_ZONE
         Forward zone value Example: "lab.hyd.redhat.com".
 
-    OSP_FINISH_TEMPLATE_URL
-        The Satellite6 kickstart finish template.
-
-    ADMIN_PASSWORD
-        The Satellite6 Admin password.
-
-    SATELLITE_VERSION
-        Version of the satellite that is installed.(Eg. 6.2,6.3)
-
     """
-    satellite_version = os.environ.get('SATELLITE_VERSION')
-    if satellite_version == '6.2':
-        zone_file = '/etc/zones.conf'
-    else:
-        zone_file = '/etc/named/zones.conf'
+    zone_file = '/etc/named/zones.conf'
     if reverse_zone is None:
         reverse_zone = os.environ.get('OSP_REVERSE_ZONE')
     if forward_zone is None:
         forward_zone = os.environ.get('OSP_FORWARD_ZONE')
-    if admin_password is None:
-        admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme')
-    if template_url is None:
-        template_url = os.environ.get('OSP_FINISH_TEMPLATE_URL')
     run('rm -f /root/zones_cons.conf', warn_only=True)
     run('rm -f /root/zones-pre_osp.conf', warn_only=True)
     run('cp {0} /root/zones-pre_osp.conf'.format(zone_file))
@@ -1553,16 +1503,6 @@ def configure_osp(admin_password=None, forward_zone=None, reverse_zone=None,
     run('cat /root/zones_cons.conf > {0}'.format(zone_file))
     run('cat /root/zones-pre_osp.conf >> {0}'.format(zone_file))
     run('service named restart')
-    if satellite_version not in ('6.3', '6.4'):
-        run('hammer -u admin -p changeme template clone '
-            '--name \'Satellite Kickstart Default Finish\' '
-            '--new-name \'Satellite Kickstart Default Finish OSP\'')
-        run('wget -O /root/Satellite_Kickstart_Default_Finish_OSP.txt {0}'
-            .format(template_url))
-        run('hammer -u admin -p {0} template update --name '
-            '\'Satellite Kickstart Default Finish OSP\' --type finish '
-            '--file /root/Satellite_Kickstart_Default_Finish_OSP.txt'
-            .format(admin_password))
 
 
 def generate_capsule_certs(capsule_fqdn=None, sat_version=None):
@@ -1574,21 +1514,13 @@ def generate_capsule_certs(capsule_fqdn=None, sat_version=None):
         SATELLITE_VERSION for which the capsule certs needs to be created.
 
     """
-    if capsule_fqdn is None:
-        capsule_fqdn = os.environ.get('CAPSULE_FQDN')
-    if sat_version is None:
-        sat_version = os.environ.get('SATELLITE_VERSION')
+    capsule_fqdn = capsule_fqdn or os.environ.get('CAPSULE_FQDN')
+    sat_version = sat_version or os.environ.get('SATELLITE_VERSION')
 
-    if sat_version not in ('6.1', '6.2'):
-        run('capsule-certs-generate --foreman-proxy-fqdn {0}'
-            ' --certs-tar "/var/www/html/pub/{0}-certs.tar" > '
-            '/var/www/html/pub/{0}-out.txt'
-            .format(capsule_fqdn))
-    else:
-        run('capsule-certs-generate --capsule-fqdn {0}'
-            ' --certs-tar "/var/www/html/pub/{0}-certs.tar" > '
-            '/var/www/html/pub/{0}-out.txt'
-            .format(capsule_fqdn))
+    run('capsule-certs-generate --foreman-proxy-fqdn {0}'
+        ' --certs-tar "/var/www/html/pub/{0}-certs.tar" > '
+        '/var/www/html/pub/{0}-out.txt'
+        .format(capsule_fqdn))
     run('cat /var/www/html/pub/{0}-out.txt|'
         'grep -v help | grep -v log | grep -A 10 "satellite-installer'
         ' --scenario capsule" > /var/www/html/pub/capsule_script.sh'
@@ -1610,14 +1542,10 @@ def setup_capsule(satellite_fqdn=None, capsule_fqdn=None, capsule_org=None,
 
     """
     os_version = distro_info()[1]
-    if satellite_fqdn is None:
-        satellite_fqdn = os.environ.get('SATELLITE_FQDN')
-    if capsule_fqdn is None:
-        capsule_fqdn = os.environ.get('CAPSULE_FQDN')
-    if capsule_org is None:
-        capsule_org = "Default_Organization"
-    if capsule_ak is None:
-        capsule_ak = "ak-capsule-{0}".format(os_version)
+    satellite_fqdn = satellite_fqdn or os.environ.get('SATELLITE_FQDN')
+    capsule_fqdn = capsule_fqdn or os.environ.get('CAPSULE_FQDN')
+    capsule_org = capsule_org or "Default_Organization"
+    capsule_ak = capsule_ak or "ak-capsule-{0}".format(os_version)
     # Disable Beaker Repos.
     disable_beaker_repos(silent=True)
 
@@ -1631,8 +1559,7 @@ def setup_capsule(satellite_fqdn=None, capsule_fqdn=None, capsule_org=None,
     clean_rhsm()
 
     # Install the cert file
-    run('yum -y localinstall '
-        'http://{0}/pub/katello-ca-consumer-latest.noarch.rpm'
+    run('yum -y localinstall http://{0}/pub/katello-ca-consumer-latest.noarch.rpm'
         .format(satellite_fqdn))
     run('wget -O /root/capsule_script.sh http://{0}/pub/capsule_script.sh'
         .format(satellite_fqdn))
@@ -2258,10 +2185,10 @@ def product_install(distribution, create_vm=False, certificate_url=None,
 
     if (
         distribution == 'satellite6-cdn' and
-        sat_version not in ('6.0', '6.1', '6.2', '6.3', '6.4', '6.5')
+        sat_version not in ('6.3', '6.4', '6.5')
     ):
         raise ValueError(
-            "Satellite version should be in [6.0, 6.1, 6.2, 6.3, 6.4, 6.5]"
+            "Satellite version should be in [6.3, 6.4, 6.5]"
         )
 
     if selinux_mode is None:
@@ -2336,17 +2263,10 @@ def product_install(distribution, create_vm=False, certificate_url=None,
         if puppet4_repo:
             execute(create_custom_repos, puppet4_repo=puppet4_repo, host=host)
     # Sat6.4 and above: enable internal foreman-maintain repo for installation
-    if (
-            sat_version not in ['6.1', '6.2', '6.3']
-            and not distribution.endswith('cdn')
-    ):
+    if sat_version != '6.3' and not distribution.endswith('cdn'):
         maintain_repo = os.environ.get('MAINTAIN_REPO')
         if maintain_repo:
-            execute(
-                create_custom_repos,
-                maintain_repo=maintain_repo,
-                host=host
-            )
+            execute(create_custom_repos, maintain_repo=maintain_repo, host=host)
     # execute returns a dictionary mapping host strings to the given task's
     # return value
     installer_options.update(execute(
@@ -2421,7 +2341,7 @@ def product_install(distribution, create_vm=False, certificate_url=None,
     # if we have ssh key to libvirt machine we can setup access to it
     if os.environ.get('LIBVIRT_KEY_URL') is not None:
         execute(setup_libvirt_key, host=host)
-    if sat_version in ('6.2', 'upstream-nightly'):
+    if sat_version == 'upstream-nightly':
         execute(install_puppet_scap_client, host=host)
     # Remove the execution of the task once 1711219 is fixed
     if bz_bug_is_open(1711219) and sat_version == '6.6':
@@ -2435,7 +2355,8 @@ def product_install(distribution, create_vm=False, certificate_url=None,
     # discovery templates as well. Please see #1387179 for more info.
     execute(setup_foreman_discovery, sat_version=sat_version, host=host)
     execute(setup_default_subnet, sat_version=sat_version, host=host)
-    execute(setup_bfa_prevention, sat_version=sat_version, host=host)
+    if sat_version not in ('6.3', '6.4'):
+        execute(setup_bfa_prevention, host=host)
     execute(fix_qdrouterd_listen_to_ipv6, host=host)
 
     if create_vm and 'base' in target_image:
