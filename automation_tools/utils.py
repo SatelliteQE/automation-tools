@@ -154,6 +154,7 @@ def compare_builds(url1, url2):
      under RCM_COMPOSE_URL are signed!
     """
     signature = os.getenv('SIGNATURE')
+    signature_list = signature.split(',')
     flag = flag1 = flag2 = 0
     list1 = get_packages_name(urlopen(url1).read())
     list1.sort()
@@ -167,14 +168,13 @@ def compare_builds(url1, url2):
             for pkg in range(len(list2)):
                 if 'NOT OK' not in run('rpm -K packages/' + list1[pkg]):
                     flag1 = flag1 + 1
-                    if signature in run(
-                                            'rpm -qpi packages/' +
-                                            list2[pkg] + '| grep "Signature" '
-                    ):
+                    package_sign = run('rpm -qpi packages/' + list2[pkg] +
+                                       '| grep "Signature   :" | rev | cut -d" " -f1  | rev')
+                    if package_sign in signature_list:
                         flag2 = flag2 + 1
                     else:
-                        print('signature ' + signature + ' not matched for '
-                              + list2[pkg])
+                        print('Signatures from ' + str(signature_list) +
+                              ' not matched for ' + list2[pkg])
                 else:
                     print(list2[pkg] + 'package is not signed')
         finally:
@@ -211,8 +211,8 @@ def compare_builds(url1, url2):
     if flag2 == len(list1):
         print("Signature matched for all packages!!")
     else:
-        print('Signature ' + signature + ' for ' + str(len(list1) - flag2) +
-              ' packages not matched!!')
+        print('Signatures from ' + str(signature_list) + ' for '
+              + str(len(list1) - flag2) + ' packages not matched!!')
     print("================================================================")
 
 
