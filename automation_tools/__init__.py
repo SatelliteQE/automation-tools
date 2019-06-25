@@ -3115,6 +3115,39 @@ def download_manifest(url=None, consumer=None):
                          ' session and distributor hash')
 
 
+def validate_manifest(manifest_file):
+    """Make sure that manifest contains only subscriptions specified in config file
+    specified in environment variable:
+
+    EXP_SUBS_FILE
+        List of subscriptions which are supposed to be in the manifest (one
+        subscription name per line). No other subscription is allowed.
+
+    :param manifest_file: Where is the manifest to investigate.
+    """
+    exp_subs_file = os.environ.get('EXP_SUBS_FILE', None)
+    with open(exp_subs_file, 'r') as fp:
+        exp_subs = set([r.strip() for r in fp.readlines() if not r.strip().startswith('#')])
+    print("expected subscriptions in %s are %s" % (manifest_file, ' & '.join(exp_subs)))
+    rct_output = run("rct cat-manifest --no-content %s" % manifest_file).split("\n")
+    sub_name_next = False
+    current_subs = set()
+    for r in rct_output:
+        r = r.strip()
+        if r == 'Subscription:':
+            sub_name_next = True
+            continue
+        if sub_name_next:
+            if r.startswith('Name: '):
+                current_subs.add(r[6:])
+            sub_name_next = False
+    print("current subscriptions in %s are %s" % (manifest_file, ' & '.join(current_subs)))
+    if exp_subs == current_subs:
+        return True
+    else:
+        return False
+
+
 def relink_manifest(manifest_file=None):
     """Links the latest downloaded manifest file to the manifest_latest.zip
     softlink.
@@ -3123,6 +3156,8 @@ def relink_manifest(manifest_file=None):
     """
     if manifest_file is None:
         manifest_file = download_manifest()
+        if os.environ.get('EXP_SUBS_FILE', None) is not None:
+            assert validate_manifest(manifest_file)
     if not manifest_file:
         print('manifest_file is not populated.')
         sys.exit(1)
