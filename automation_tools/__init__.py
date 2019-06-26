@@ -10,6 +10,7 @@ import random
 import socket
 import sys
 import time
+import requests
 from datetime import date
 from io import StringIO
 from re import search
@@ -3115,6 +3116,31 @@ def download_manifest(url=None, consumer=None):
                          ' session and distributor hash')
 
 
+def assert_downloading_manifest():
+    """Makes sure that downloaded manifest matches manifest name from a reference file."""
+
+    user = os.environ.get('RHN_USERNAME')
+    password = os.environ.get('RHN_PASSWORD')
+    consumer = os.environ.get('CONSUMER')
+    product_names_file = os.environ.get('PRODUCT_NAMES')
+
+    r = requests.get('https://subscription.rhn.redhat.com/subscription/'
+                     'consumers/{0}/entitlements'.format(consumer),
+                     auth=(user, password), verify=False)
+    rhn = r.json()
+
+    product_names = open(product_names_file, 'r')
+    line = product_names.readline()
+    product_counter = 0
+    while line:
+        subscription = rhn[product_counter]["pool"]["productName"]
+        assert line != subscription, "Product name {0} doesn't match {1} from file!".format(
+            subscription, line)
+        line = product_names.readline()
+        product_counter += 1
+    product_names.close()
+
+
 def relink_manifest(manifest_file=None):
     """Links the latest downloaded manifest file to the manifest_latest.zip
     softlink.
@@ -3122,6 +3148,7 @@ def relink_manifest(manifest_file=None):
     :param manifest_file: Specify the manifest file path.
     """
     if manifest_file is None:
+        assert_downloading_manifest()
         manifest_file = download_manifest()
     if not manifest_file:
         print('manifest_file is not populated.')
