@@ -3142,16 +3142,17 @@ def verify_attached_subscriptions():
             try:
                 subscription = rhn[product_counter]["pool"]["productName"]
                 if line.rstrip() != subscription.rstrip():
-                    missing_product.append(subscription)
+                    missing_product.append(subscription.rstrip())
             except IndexError:
-                missing_product.append(line)
+                missing_product.append(line.rstrip())
             line = product_names.readline()
             product_counter += 1
 
-    assert len(missing_product) == 0, "Failed to fetch the list of subscriptions from portal: {0}. " \
-                                      "Missing: {1}".format('https://subscription.rhn.redhat.com/subscription'
-                                                            '/consumers/{0}/entitlements'.format(
-                                                                consumer), missing_product)
+    assert len(missing_product) == 0, "Failed to fetch the list of subscriptions" \
+                                      " from portal: {0}. Missing: {1}".format(
+                                    "https://subscription.rhn.redhat.com/subscription"
+                                    "/consumers/{0}/entitlements".format(
+                                        consumer), missing_product)
 
 
 def relink_manifest(manifest_file=None):
