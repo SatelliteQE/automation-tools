@@ -3116,8 +3116,8 @@ def download_manifest(url=None, consumer=None):
                          ' session and distributor hash')
 
 
-def assert_downloading_manifest():
-    """Makes sure that downloaded manifest matches manifest name from a reference file."""
+def verify_attached_subscriptions():
+    """Makes sure that the portal account has the required subscriptions attached."""
 
     user = os.environ.get('RHN_USERNAME')
     password = os.environ.get('RHN_PASSWORD')
@@ -3127,18 +3127,22 @@ def assert_downloading_manifest():
     r = requests.get('https://subscription.rhn.redhat.com/subscription/'
                      'consumers/{0}/entitlements'.format(consumer),
                      auth=(user, password), verify=False)
+    try:
+        r.raise_for_status()
+    except requests.exceptions.HTTPError as error:
+        print(error)
+
     rhn = r.json()
 
-    product_names = open(product_names_file, 'r')
-    line = product_names.readline()
-    product_counter = 0
-    while line:
-        subscription = rhn[product_counter]["pool"]["productName"]
-        assert line != subscription, "Product name {0} doesn't match {1} from file!".format(
-            subscription, line)
+    with open(product_names_file, 'r') as product_names:
         line = product_names.readline()
-        product_counter += 1
-    product_names.close()
+        product_counter = 0
+        while line:
+            subscription = rhn[product_counter]["pool"]["productName"]
+            assert line != subscription, "Product name {0} doesn't match {1} from file!".format(
+                subscription, line)
+            line = product_names.readline()
+            product_counter += 1
 
 
 def relink_manifest(manifest_file=None):
@@ -3148,7 +3152,7 @@ def relink_manifest(manifest_file=None):
     :param manifest_file: Specify the manifest file path.
     """
     if manifest_file is None:
-        assert_downloading_manifest()
+        verify_attached_subscriptions()
         manifest_file = download_manifest()
     if not manifest_file:
         print('manifest_file is not populated.')
