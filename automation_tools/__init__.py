@@ -3134,15 +3134,24 @@ def verify_attached_subscriptions():
 
     rhn = r.json()
 
+    missing_product = []
     with open(product_names_file, 'r') as product_names:
         line = product_names.readline()
         product_counter = 0
         while line:
-            subscription = rhn[product_counter]["pool"]["productName"]
-            assert line != subscription, "Product name {0} doesn't match {1} from file!".format(
-                subscription, line)
+            try:
+                subscription = rhn[product_counter]["pool"]["productName"]
+                if line.rstrip() != subscription.rstrip():
+                    missing_product.append(subscription)
+            except IndexError:
+                missing_product.append(line)
             line = product_names.readline()
             product_counter += 1
+
+    assert len(missing_product) == 0, "Failed to fetch the list of subscriptions from portal: {0}. " \
+                                      "Missing: {1}".format('https://subscription.rhn.redhat.com/subscription'
+                                                            '/consumers/{0}/entitlements'.format(
+                                                                consumer), missing_product)
 
 
 def relink_manifest(manifest_file=None):
