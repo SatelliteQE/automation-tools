@@ -14,7 +14,6 @@ from automation_tools import (  # noqa: F401
     create_personal_git_repo,
     download_manifest,
     downstream_install,
-    enable_ostree,
     enroll_ad,
     enroll_idm,
     errata_upgrade,

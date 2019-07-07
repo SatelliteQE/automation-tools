@@ -16,8 +16,7 @@ from re import search
 
 from automation_tools.bz import bz_bug_is_open
 from automation_tools.repository import (
-    create_custom_repos, delete_custom_repos, disable_repos,
-    disable_beaker_repos, enable_repos, enable_satellite_repos,
+    create_custom_repos, disable_repos, disable_beaker_repos, enable_repos, enable_satellite_repos,
 )
 from automation_tools.utils import (
     distro_info, run_command, update_packages
@@ -1058,29 +1057,6 @@ def setup_foreman_discovery(sat_version):
     run('rm -rf {0}'.format(template_file))
 
 
-def enable_ostree(sat_version='6.3'):
-    """Task to enable ostree plugin for Satellite on rhel7.
-    This enables ostree type repository.
-
-    :param str sat_version: contains Satellite version e.g. 6.3
-    """
-    os_version = distro_info()[1]
-    if os_version >= 7:
-        if sat_version == 'upstream-nightly':
-            create_custom_repos(
-                centos_atomic='http://buildlogs.centos.org/centos/7/atomic/x86_64/Packages/'
-            )
-        run('{0}-installer --scenario {1} --disable-system-checks --katello-enable-ostree=true'
-            .format(
-                'foreman' if sat_version == 'upstream-nightly' else 'satellite',
-                'katello' if sat_version == 'upstream-nightly' else 'satellite',
-            ))
-        if sat_version == 'upstream-nightly':
-            delete_custom_repos('centos_atomic')
-    else:
-        print('ostree plugin is supported only on rhel7+')
-
-
 def upgrade_puppet(cdn=False):
     """Upgrades puppet3 to puppet4 and is applicable to Satellite6.3 only
 
@@ -1823,7 +1799,7 @@ def apply_hotfix():
 
 def upstream_install(admin_password=None, run_katello_installer=True):
     """Task to install Foreman nightly using forklift scripts"""
-    koji = 'koji' in os.environ.get('DISTRIBUTION').lower()
+    koji = 'koji' in os.environ.get('DISTRIBUTION', '').lower()
     if admin_password is None:
         admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme')
 
@@ -1831,8 +1807,7 @@ def upstream_install(admin_password=None, run_katello_installer=True):
     # Install required packages for the installation
     epel_present = run('rpm -q epel-release', warn_only=True).return_code == 0
     if not epel_present:
-        run('rpm -iv http://dl.fedoraproject.org/pub/epel/'
-            'epel-release-latest-7.noarch.rpm')
+        run('rpm -iv http://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm')
     run('yum -y install ansible git')
     run('rm -rf forklift')
     run('git clone -q https://github.com/theforeman/forklift.git')
@@ -2295,6 +2270,9 @@ def product_install(distribution, create_vm=False, certificate_url=None,
         host=host, interface=interface, run_katello_installer=False
     )[host])
 
+    # enable ostree feature
+    installer_options.update({'katello-enable-ostree': 'true'})
+
     if os.environ.get('PROXY_INFO'):
         # execute returns a dictionary mapping host strings to the given
         # task's return value
@@ -2347,8 +2325,6 @@ def product_install(distribution, create_vm=False, certificate_url=None,
     if bz_bug_is_open(1711219) and sat_version == '6.6':
         execute(setup_ansible_scap_client, host=host)
     execute(oscap_content, host=host)
-    # ostree plugin is for Sat6.2+ and rhel7 only
-    execute(enable_ostree, sat_version=sat_version, host=host)
     # setup_foreman_discovery
     # setup_discovery_task needs to be run at last otherwise, any other
     # tasks like ostree which is re-running installer would re-set the
