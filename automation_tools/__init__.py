@@ -220,6 +220,7 @@ def setup_proxy(run_katello_installer=True):
 
         PROXY_INFO=proxy://<hostname>:<port>
 
+    :param bool run_katello_installer: Should the task run installer or just pass installer options
     """
     if isinstance(run_katello_installer, str):
         run_katello_installer = (run_katello_installer.lower() == 'true')
@@ -304,6 +305,7 @@ def setup_default_capsule(interface=None, run_katello_installer=True):
     """Task to setup a the default capsule for Satellite
 
     :param str interface: Network interface name to be used
+    :param bool run_katello_installer: Should the task run installer or just pass installer options
     """
     if isinstance(run_katello_installer, str):
         run_katello_installer = (run_katello_installer.lower() == 'true')
@@ -997,18 +999,13 @@ def install_puppet_scap_client():
     run('yum -y install puppet-foreman_scap_client', warn_only=True)
 
 
-def setup_foreman_discovery(sat_version):
+def setup_foreman_discovery(sat_version='7', admin_password='changeme'):
     """Task to setup foreman discovery.
 
-    The following environment variables affect this task:
+    :param str sat_version: Indicates which Satellite version is being installed
+    :param str admin_password: Foreman admin password. Default: 'changeme'.
 
-    * `PXE_DEFAULT_TEMPLATE_URL`
-    * `PXELINUX_DISCOVERY_SNIPPET_URL`
-
-    :param str sat_version: contains Satellite version
     """
-    admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme')
-
     if sat_version == 'upstream-nightly':
         # Fetch the upstream-nightly FDI from upstream
         image_url = 'http://downloads.theforeman.org/discovery/nightly/fdi-image-latest.tar'
@@ -1018,8 +1015,7 @@ def setup_foreman_discovery(sat_version):
         run(package_install('foreman-discovery-image'))
 
     # Unlock the default Locked template for discovery
-    run('hammer -u admin -p {0} template update '
-        '--name "PXELinux global default" --locked "false"'
+    run('hammer -u admin -p {0} template update --name "PXELinux global default" --locked "false"'
         .format(admin_password))
     template_file = run('mktemp')
     # Dump the template
@@ -1742,11 +1738,15 @@ def apply_hotfix():
         run('/root/hotfix.sh')
 
 
-def upstream_install(admin_password=None, run_katello_installer=True, **kwargs):
-    """Task to install Foreman nightly using forklift scripts"""
-    koji = 'koji' in os.environ.get('DISTRIBUTION', '').lower()
-    if admin_password is None:
-        admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme')
+def upstream_install(admin_password='changeme', run_katello_installer=True, distribution=None):
+    """Task to install Nightly using forklift playbook
+
+    :param str admin_password: Foreman admin password. Default: 'changeme'.
+    :param bool run_katello_installer: Should the task run installer or just pass installer options
+    :param str distribution: Product distribution being installed (upstream or koji applicable)
+
+    """
+    koji = distribution == 'koji'
 
     os_version = distro_info()[1]
     if os_version == 7:
@@ -1811,38 +1811,26 @@ def upstream_install(admin_password=None, run_katello_installer=True, **kwargs):
         return installer_options
 
 
-def downstream_install(sat_version='7', admin_password=None, run_katello_installer=True):
-    """Task to install Satellite 6
+def downstream_install(sat_version='7', admin_password='changeme', run_katello_installer=True,
+                       url=None, maintain_url=None):
+    """Task to install Satellite from internal repo
 
-    The following environment variables affect this command:
-
-    ADMIN_PASSWORD
-        Optional, defaults to 'changeme'. Foreman admin password.
-    BASE_URL
-        URL for the Satellite compose repository.
-    MAINTAIN_REPO
-        URL for the satellite maintenance compose repository
-
-    :param sat_version: Indicates which satellite version is being installed
+    :param str sat_version: Indicates which Satellite version is being installed
+    :param str admin_password: Foreman admin password. Default: 'changeme'.
+    :param bool run_katello_installer: Should the task run installer or just pass installer options
+    :param str url: the repo URL where to install from
+    :param str maintain_url: the maintain repo URL where to install from
 
     """
-    if admin_password is None:
-        admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme')
-
-    base_url = os.environ.get('BASE_URL')
-    if base_url is None:
-        print('The BASE_URL environment variable should be defined')
-        sys.exit(1)
-
-    maintain_url = os.environ.get('MAINTAIN_REPO')
-    if maintain_url is None:
-        print('The MAINTAIN_REPO environment variable should be defined')
-        sys.exit(1)
+    if not url:
+        raise ValueError('The url parameter is not defined')
+    if not maintain_url:
+        raise ValueError('The maintain_url parameter is not defined')
 
     satellite_repo = StringIO()
     satellite_repo.write(u'[satellite]\n')
     satellite_repo.write(u'name=satellite\n')
-    satellite_repo.write(u'baseurl={0}\n'.format(base_url))
+    satellite_repo.write(u'baseurl={0}\n'.format(url))
     satellite_repo.write(u'enabled=1\n')
     satellite_repo.write(u'gpgcheck=0\n')
     put(local_path=satellite_repo,
@@ -1867,29 +1855,22 @@ def downstream_install(sat_version='7', admin_password=None, run_katello_install
         return installer_options
 
 
-def repofile_install(sat_version='7', admin_password=None,
-                     run_katello_installer=True, repo_url=None):
-    """Task to install Satellite via repo files
+def repofile_install(sat_version='7', admin_password='changeme', run_katello_installer=True,
+                     url=None):
+    """Task to install Satellite via repofile from the Dogfood
 
-    The following environment variables affect this command:
-
-    ADMIN_PASSWORD
-        Optional, defaults to 'changeme'. Foreman admin password.
-    REPO_FILE_URL
-        URL for the compose repository file to fetch.
-
-    :param sat_version: Indicates which satellite version is being installed
-
+    :param str sat_version: Indicates which Satellite version is being installed
+    :param str admin_password: Foreman admin password. Default: 'changeme'.
+    :param bool run_katello_installer: Should the task run installer or just pass installer options
+    :param str url: the repofile URL where to install from
     """
-    os_version = distro_info()[1]
-    if admin_password is None:
-        admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme')
+    if not url:
+        raise ValueError('The url parameter is not defined')
 
-    if repo_url is None:
-        repo_url = os.environ.get('REPO_FILE_URL')
+    os_version = distro_info()[1]
 
     run('yum install -y wget')
-    run('wget -O /etc/yum.repos.d/satellite6.repo {0}'.format(repo_url))
+    run('wget -O /etc/yum.repos.d/satellite6.repo {0}'.format(url))
 
     # Enable required repository
     run('subscription-manager repos --enable rhel-{0}-server-optional-rpms'
@@ -1911,20 +1892,13 @@ def repofile_install(sat_version='7', admin_password=None,
         return installer_options
 
 
-def ak_install(sat_version='7', admin_password=None, run_katello_installer=True):
-    """Task to install Satellite via Activation Keys
+def ak_install(sat_version='7', admin_password='changeme', run_katello_installer=True):
+    """Task to install Satellite via Activation Key from the Dogfood
 
-    The following environment variables affect this command:
-
-    ADMIN_PASSWORD
-        Optional, defaults to 'changeme'. Foreman admin password.
-
-    :param sat_version: Indicates which satellite version is being installed
-
+    :param str sat_version: Indicates which Satellite version is being installed
+    :param str admin_password: Foreman admin password. Default: 'changeme'.
+    :param bool run_katello_installer: Should the task run installer or just pass installer options
     """
-    if admin_password is None:
-        admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme')
-
     # Install required packages for the installation
     run('yum install -y satellite')
 
@@ -1941,19 +1915,13 @@ def ak_install(sat_version='7', admin_password=None, run_katello_installer=True)
         return installer_options
 
 
-def cdn_install(sat_version='7', run_katello_installer=True):
-    """Installs Satellite 6 from CDN.
-
-    The following environment variables affect this command:
-
-    ADMIN_PASSWORD
-        Optional, defaults to 'changeme'. Foreman admin password.
+def cdn_install(sat_version='7', admin_password='changeme', run_katello_installer=True):
+    """Task to install Satellite from CDN.
 
     :param sat_version: Indicates which satellite version is being installed
-
+    :param str admin_password: Foreman admin password. Default: 'changeme'.
+    :param bool run_katello_installer: Should the task run installer or just pass installer options
     """
-    admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme')
-
     # Install required packages for the installation
     run('yum install -y satellite')
 
@@ -1970,45 +1938,26 @@ def cdn_install(sat_version='7', run_katello_installer=True):
         return installer_options
 
 
-def iso_install(sat_version='7',
-                admin_password=None, check_gpg_signatures=False, run_katello_installer=True):
-    """Installs Satellite 6 from an ISO image.
+def iso_install(sat_version='7', admin_password='changeme', run_katello_installer=True,
+                check_gpg_signatures=False, url=None):
+    """Installs Satellite from an ISO image.
 
-    The following environment variables affect this command:
-
-    ISO_URL or BASE_URL
-        The URL where the ISO will be downloaded.
-    ADMIN_PASSWORD
-        Optional, defaults to 'changeme'. Foreman admin password.
-    CHECK_GPG_SIGNATURES
-       Optional, all values other than 'true' will default to 'false'.
-
-    :param sat_version: Indicates which satellite version is being installed
-
+    :param str sat_version: Indicates which Satellite version is being installed
+    :param str admin_password: Foreman admin password. Default: 'changeme'.
+    :param bool run_katello_installer: Should the task run installer or just pass installer options
+    :param bool check_gpg_signatures : Whether to check rpm gpg signatures or not
+    :param str url: the ISO URL where to install from
     """
-    iso_url = os.environ.get('ISO_URL') or os.environ.get('BASE_URL')
-    if iso_url is None:
-        print('Please provide a valid URL for the ISO image.')
-        sys.exit(1)
-
-    if isinstance(check_gpg_signatures, str):
-        check_gpg_signatures = (check_gpg_signatures.lower() == 'true')
-
-    if admin_password is None:
-        admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme')
-
-    check_gpg_signatures = (
-        check_gpg_signatures or
-        os.environ.get('CHECK_GPG_SIGNATURES', '') == 'true'
-    )
+    if not url:
+        raise ValueError('The url parameter (URL of the ISO image) is not defined.')
 
     # Create a mountpoint for ISO
     run('mkdir -p ~/ISO')
     # Download and mount the ISO
-    run('mount {0} ~/ISO -t iso9660 -o loop'.format(iso_download(iso_url)))
+    run('mount {0} ~/ISO -t iso9660 -o loop'.format(iso_download(url)))
     # ...and run the installer script.
     with cd('~/ISO'):
-        if check_gpg_signatures is True:
+        if check_gpg_signatures:
             run('./install_packages')
         else:
             run('./install_packages --nogpgsigs')
@@ -2042,8 +1991,7 @@ def product_install(distribution, certificate_url=None, selinux_mode=None, sat_v
     SATELLITE_VERSION
         Satellite version.
 
-    Product distributions are satellite6-cdn, satellite6-downstream,
-    satellite6-iso or satellite6-upstream, satellite6-koji
+    Product distributions are cdn, downstream, iso or upstream, koji
 
     If ``certificate_url`` parameter or ``FAKE_MANIFEST_CERT_URL`` env var is
     defined the setup_fake_manifest_certificate task will run.
@@ -2057,59 +2005,84 @@ def product_install(distribution, certificate_url=None, selinux_mode=None, sat_v
 
     :param str distribution: product distribution wanted to install
     :param str certificate_url: where to fetch a fake certificate.
-    :param sat_version: Indicates which satellite version should be installed
+    :param str sat_version: Indicates which satellite version should be installed
 
     """
+    distribution = distribution.lower()
+    # Strip useless 'satellite6-' prefix if there is such
+    distribution = distribution[11:] if distribution.startswith('satellite6-') else distribution
     # Fetch the Satellite Version information.
     sat_version = sat_version or os.environ.get('SATELLITE_VERSION')
+    selinux_mode = selinux_mode or os.environ.get('SELINUX_MODE', 'enforcing')
+    admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme')
 
     # Command-line arguments are passed in as strings.
     if isinstance(test_in_stage, str):
         test_in_stage = (test_in_stage.lower() == 'true')
 
     install_tasks = {
-        'satellite6-beta': cdn_install,
-        'satellite6-cdn': cdn_install,
-        'satellite6-downstream': downstream_install,
-        'satellite6-repofile': repofile_install,
-        'satellite6-activationkey': ak_install,
-        'satellite6-iso': iso_install,
-        'satellite6-upstream': upstream_install,
-        'satellite6-koji': upstream_install,
+        'beta': cdn_install,
+        'cdn': cdn_install,
+        'downstream': downstream_install,
+        'repofile': repofile_install,
+        'activationkey': ak_install,
+        'iso': iso_install,
+        'upstream': upstream_install,
+        'koji': upstream_install,
     }
-    distribution = distribution.lower()
+
+    # install task params population
+    task_params = {
+        'run_katello_installer': False,
+        'admin_password': admin_password,
+    }
+    if distribution in ('upstream', 'koji'):
+        task_params.update({'distribution': distribution})
+    else:
+        task_params.update({'sat_version': sat_version})
+
+    if distribution == 'repofile':
+        url = os.environ.get('REPO_FILE_URL')
+        if url:
+            task_params.update({'url': url})
+        else:
+            raise ValueError('The REPO_FILE_URL environment variable is not defined')
+    elif distribution == 'downstream':
+        url = os.environ.get('BASE_URL')
+        if url:
+            task_params.update({'url': url})
+        else:
+            raise ValueError('The BASE_URL environment variable is not defined')
+        maintain_url = os.environ.get('MAINTAIN_REPO')
+        if maintain_url:
+            task_params.update({'maintain_url': maintain_url})
+        else:
+            raise ValueError('The MAINTAIN_REPO environment variable is not defined')
+    elif distribution == 'iso':
+        check_gpg_signatures = os.environ.get('CHECK_GPG_SIGNATURES', '').lower() == 'true'
+        task_params.update({'check_gpg_signatures': check_gpg_signatures})
+        url = os.environ.get('ISO_URL') or os.environ.get('BASE_URL')
+        if url:
+            task_params.update({'url': url})
+        else:
+            raise ValueError('Neither ISO_URL nor BASE_URL environment variables are defined')
 
     distributions = install_tasks.keys()
     installer_options = {}
 
     if distribution not in distributions:
-        print('distribution "{0}" should be one of {1}'.format(
+        raise ValueError('distribution "{0}" is not one of {1}'.format(
             distribution, ', '.join(distributions)))
-        sys.exit(1)
 
-    if (
-        distribution == 'satellite6-cdn' and
-        sat_version not in ('6.4', '6.5', '6.6', '6.7')
-    ):
-        raise ValueError(
-            "Satellite version should be in [6.4, 6.5, 6.6, 6.7]"
-        )
-
-    if selinux_mode is None:
-        selinux_mode = os.environ.get('SELINUX_MODE', 'enforcing')
-
-    if distribution == 'satellite6-iso':
-        iso_url = os.environ.get('ISO_URL')
-        if iso_url is None:
-            print('The ISO_URL environment variable should be defined')
-            sys.exit(1)
+    if distribution == 'cdn' and sat_version not in ('6.4', '6.5', '6.6', '6.7'):
+        raise ValueError("CDN Satellite version is not one of [6.4, 6.5, 6.6, 6.7]")
 
     # if host already exists still fix hostname
     execute(fix_hostname)
 
     # If we are using activationkey, subscribe to dogfood server
     # otherwise subscribe to CDN
-    if distribution == 'satellite6-activationkey':
+    if distribution == 'activationkey':
         execute(subscribe_dogfood)
     else:
         execute(subscribe, stage=test_in_stage)
@@ -2117,8 +2090,8 @@ def product_install(distribution, certificate_url=None, selinux_mode=None, sat_v
         execute(
             enable_satellite_repos,
             sat_version=sat_version,
-            cdn=distribution.endswith('cdn'),
-            beta=distribution.endswith('beta'),
+            cdn=distribution == 'cdn',
+            beta=distribution == 'beta',
         )
 
     # Disable BaseOS if using custom image for vault_requests.
@@ -2152,9 +2125,7 @@ def product_install(distribution, certificate_url=None, selinux_mode=None, sat_v
 
     # execute returns a dictionary mapping host strings to the given task's return value
     installer_options.update(
-        next(iter(execute(
-            install_tasks[distribution], sat_version=sat_version, run_katello_installer=False
-        ).values()))
+        next(iter(execute(install_tasks[distribution], **task_params).values()))
     )
 
     # When using VLAN Bridges os.environ.get('BRIDGE') is 'true' and
@@ -2232,11 +2203,10 @@ def product_install(distribution, certificate_url=None, selinux_mode=None, sat_v
     execute(oscap_content)
     execute(setup_local_rex_key)
     execute(setup_sendmail)
-    # setup_foreman_discovery
-    # setup_discovery_task needs to be run at last otherwise, any other
-    # tasks like ostree which is re-running installer would re-set the
-    # discovery templates as well. Please see #1387179 for more info.
-    execute(setup_foreman_discovery, sat_version=sat_version)
+    # setup_foreman_discovery task needs to be run at last otherwise, any other task like ostree
+    # which is re-running installer would re-set the discovery templates as well.
+    # Please see #1387179 for more info.
+    execute(setup_foreman_discovery, sat_version=sat_version, admin_password=admin_password)
     execute(setup_default_subnet)
     if version(sat_version) > version(6.4):
         execute(setup_bfa_prevention)
