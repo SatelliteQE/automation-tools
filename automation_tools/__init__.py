@@ -1498,7 +1498,7 @@ def generate_capsule_certs(capsule_fqdn=None, sat_version=None):
         .format(capsule_fqdn))
     run('cat /var/www/html/pub/{0}-out.txt|'
         'grep -v help | grep -v log | grep -A 10 "satellite-installer'
-        ' --scenario capsule" > /var/www/html/pub/capsule_script.sh'
+        '" > /var/www/html/pub/capsule_script.sh'
         .format(capsule_fqdn))
     run('chmod +x /var/www/html/pub/capsule_script.sh')
     run('sed -i \'s|/var/www/html/pub/{0}-certs.tar|/root/{0}-certs.tar|\' '
