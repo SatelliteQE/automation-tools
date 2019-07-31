@@ -3034,8 +3034,9 @@ def setenforce(mode):
     run('setenforce {0}'.format(mode))
 
 
-def download_manifest(url=None, consumer=None):
-    """Task for downloading the manifest file from customer portal.
+def download_manifest(url=None, consumer=None, pool_id=None, count=None):
+    """Task for downloading the manifest file from customer portal,
+    also attach subscription to it if requires.
 
     The following environment variables affect this command:
 
@@ -3050,6 +3051,8 @@ def download_manifest(url=None, consumer=None):
 
     :param url: Subscription Manager URL
     :param consumer: A consumer hash to be used for getting the manifest
+    :param pool_id: A pool ID of subscription
+    :param count: A quantity of subscription requires to attach
     :returns: a path string to a downloaded manifest file
     """
     user = os.environ.get('RHN_USERNAME')
@@ -3067,47 +3070,60 @@ def download_manifest(url=None, consumer=None):
         url = os.environ.get('SM_URL')
     if consumer is None:
         consumer = os.environ.get('CONSUMER')
-    manifest_file = run('mktemp --suffix=.zip')
 
-    # we do this as we would otherwise potentially download a manifest which
-    # has new metadata (such as new content sets/repos) but does not have the
-    # required Entitlement certificates to actually access the content.
-    certs_put = ('curl -sk -X PUT -H "Authorization:Basic {0}"'
-                 ' {1}/subscription/consumers/{2}/certificates'
-                 '?lazy_regen=false').format(
-                 base64string.decode('utf-8'), url, consumer)
-    run(certs_put)
-
-    command = ('curl -sk -H "Authorization:Basic {0}"'
-               ' {1}/subscription/consumers/{2}/export/').format(
-               base64string.decode('utf-8'), url, consumer)
-
-    response = run(command + ' -I')
-    if ('Content-Disposition: attachment' in response):
-        run(command + ' -o {0}'.format(manifest_file))
-        return manifest_file
+    if pool_id and count:
+        command = ('curl -sk -X POST -H "Authorization:Basic {0}"'
+                   ' "{1}/subscription/consumers/{2}/entitlements?pool={3}&quantity={4}"').format(
+            base64string.decode('utf-8'), url, consumer, pool_id, count)
+        response = run(command)
+        if 'updated' in response:
+            return True
+        else:
+            return False
     else:
-        raise ValueError('Request has returned no attachment. Check the'
-                         ' session and distributor hash')
+        manifest_file = run('mktemp --suffix=.zip')
+
+        # we do this as we would otherwise potentially download a manifest which
+        # has new metadata (such as new content sets/repos) but does not have the
+        # required Entitlement certificates to actually access the content.
+        certs_put = ('curl -sk -X PUT -H "Authorization:Basic {0}"'
+                     ' {1}/subscription/consumers/{2}/certificates'
+                     '?lazy_regen=false').format(
+                     base64string.decode('utf-8'), url, consumer)
+        run(certs_put)
+
+        command = ('curl -sk -H "Authorization:Basic {0}"'
+                   ' {1}/subscription/consumers/{2}/export/').format(
+                   base64string.decode('utf-8'), url, consumer)
+
+        response = run(command + ' -I')
+        if ('Content-Disposition: attachment' in response):
+            run(command + ' -o {0}'.format(manifest_file))
+            return manifest_file
+        else:
+            raise ValueError('Request has returned no attachment. Check the'
+                             ' session and distributor hash')
 
 
 def validate_manifest(manifest_file):
     """Make sure that manifest contains only subscriptions specified in config file
-    specified in environment variable:
-
+    specified in environment variable and attach if missing any:
     EXP_SUBS_FILE
         List of subscriptions which are supposed to be in the manifest (one
         subscription name per line). No other subscription is allowed.
-
     :param manifest_file: Where is the manifest to investigate.
     """
     exp_subs_file = os.environ.get('EXP_SUBS_FILE', None)
     with open(exp_subs_file, 'r') as fp:
-        exp_subs = set([r.strip() for r in fp.readlines() if not r.strip().startswith('#')])
-    print("expected subscriptions in %s are %s" % (manifest_file, ' & '.join(exp_subs)))
+        exp_subs = {}
+        exp_subs_details = [r.strip() for r in fp.readlines() if not r.strip().startswith('#')]
+        for name in exp_subs_details:
+            exp_subs[name.split(';')[0]] = [name.split(';')[1], name.split(';')[2]]
+
+    print("expected subscriptions in %s are %s" % (manifest_file, ' & '.join(exp_subs.keys())))
     rct_output = run("rct cat-manifest --no-content %s" % manifest_file).split("\n")
     sub_name_next = False
-    current_subs = set()
+    current_subs = list()
     for r in rct_output:
         r = r.strip()
         if r == 'Subscription:':
@@ -3115,13 +3131,23 @@ def validate_manifest(manifest_file):
             continue
         if sub_name_next:
             if r.startswith('Name: '):
-                current_subs.add(r[6:])
+                current_subs.append(r[6:])
             sub_name_next = False
     print("current subscriptions in %s are %s" % (manifest_file, ' & '.join(current_subs)))
-    if exp_subs == current_subs:
-        return True
-    else:
-        return False
+
+    response = [True]
+    for sub in exp_subs.keys():
+        if sub in current_subs:
+            continue
+        else:
+            response.append('Yes')
+            print("Attaching missing subscription %s" % (sub))
+            attach = download_manifest(pool_id=exp_subs[sub][0], count=exp_subs[sub][1])
+            if attach:
+                print("Successfully attached subscription %s" % (sub))
+            else:
+                return [False]
+    return response
 
 
 def relink_manifest(manifest_file=None):
@@ -3133,7 +3159,10 @@ def relink_manifest(manifest_file=None):
     if manifest_file is None:
         manifest_file = download_manifest()
         if os.environ.get('EXP_SUBS_FILE', None) is not None:
-            assert validate_manifest(manifest_file)
+            validate = validate_manifest(manifest_file)
+            assert validate[0]
+            if len(validate) > 1:
+                manifest_file = download_manifest()
     if not manifest_file:
         print('manifest_file is not populated.')
         sys.exit(1)
