@@ -3163,6 +3163,7 @@ def relink_manifest(manifest_file=None):
             assert validate[0]
             if len(validate) > 1:
                 manifest_file = download_manifest()
+                assert validate_manifest(manifest_file)[0]
     if not manifest_file:
         print('manifest_file is not populated.')
         sys.exit(1)
