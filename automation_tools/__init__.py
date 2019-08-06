@@ -1019,11 +1019,6 @@ def setup_foreman_discovery(sat_version):
 
     :param str sat_version: contains Satellite version e.g. 6.3
     """
-    packages = (
-        'tfm-rubygem-foreman_discovery',
-        'rubygem-smart_proxy_discovery',
-        'tfm-rubygem-hammer_cli_foreman_discovery',
-    )
     admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme')
 
     if sat_version == 'upstream-nightly':
@@ -1032,8 +1027,13 @@ def setup_foreman_discovery(sat_version):
         run('wget -nv -O- {0} | tar x --overwrite -C /var/lib/tftpboot/boot'.format(image_url))
     else:
         # Since 6.3, installer should install all required packages except FDI
-        run('rpm -q {0}'.format(' '.join(packages)))
+        if float(sat_version) > 6.5:
+            # Check BZ 1738199 for final solution (versionlock prevents satellite rpms to install)
+            run('foreman-maintain packages unlock')
         run('yum install -y foreman-discovery-image')
+        if float(sat_version) > 6.5:
+            # Check BZ 1738199 for final solution (versionlock prevents satellite rpms to install)
+            run('foreman-maintain packages lock')
 
     # Unlock the default Locked template for discovery
     run('hammer -u admin -p {0} template update '
