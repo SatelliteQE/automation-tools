@@ -3236,9 +3236,10 @@ def setup_alternate_capsule_ports(port_range='9400-14999'):
     # nmap's ncat (opposite to nc) supports -c option we use for capsule faking
     # and rhel7 has separate package for ncat named nmap-ncat
     run('which nmap || yum -d1 -y install nmap', warn_only=True)
+    # fuser is used to find out available ports to listen on
+    run('which fuser || yum -d1 -y install psmisc', warn_only=True)
     # labelling custom port range so that passenger will be allowed to connect
-    run('semanage port -a -t websm_port_t -p tcp {0}'
-        .format(port_range), warn_only=True)
+    run('semanage port -a -t websm_port_t -p tcp {0}'.format(port_range), warn_only=True)
 
 
 def setup_rhv_ca():
