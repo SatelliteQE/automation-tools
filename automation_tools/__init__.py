@@ -992,11 +992,10 @@ def configure_sonarqube():
                 sonar_login, sonar_password))
 
 
-def setup_ansible_scap_client():
-    """Task to setup ansible-foreman_scap_client."""
+def install_ansible_scap_client():
+    """Task to install ansiblerole-foreman_scap_client."""
     # Install required packages for the installation
-    # Remove the whole task once 1711219 is fixed
-    run('yum install -y ansiblerole-foreman_scap_client')
+    run('yum -y install ansiblerole-foreman_scap_client')
 
 
 def oscap_content():
@@ -1005,7 +1004,7 @@ def oscap_content():
 
 
 def install_puppet_scap_client():
-    """Task to setup puppet-foreman_scap_client."""
+    """Task to install puppet-foreman_scap_client."""
     run('yum -y install puppet-foreman_scap_client', warn_only=True)
 
 
@@ -2321,9 +2320,7 @@ def product_install(distribution, create_vm=False, certificate_url=None,
         execute(setup_libvirt_key, host=host)
     if sat_version == 'upstream-nightly':
         execute(install_puppet_scap_client, host=host)
-    # Remove the execution of the task once 1711219 is fixed
-    if bz_bug_is_open(1711219) and sat_version == '6.6':
-        execute(setup_ansible_scap_client, host=host)
+        execute(install_ansible_scap_client, host=host)
     execute(oscap_content, host=host)
     # setup_foreman_discovery
     # setup_discovery_task needs to be run at last otherwise, any other
