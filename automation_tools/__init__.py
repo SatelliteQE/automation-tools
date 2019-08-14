@@ -2236,11 +2236,7 @@ def product_install(distribution, create_vm=False, certificate_url=None,
         puppet4_repo = os.environ.get('PUPPET4_REPO')
         if puppet4_repo:
             execute(create_custom_repos, puppet4_repo=puppet4_repo, host=host)
-    # Sat6.4 and above: enable internal foreman-maintain repo for installation
-    if sat_version != '6.3' and not distribution.endswith('cdn'):
-        maintain_repo = os.environ.get('MAINTAIN_REPO')
-        if maintain_repo:
-            execute(create_custom_repos, maintain_repo=maintain_repo, host=host)
+
     # execute returns a dictionary mapping host strings to the given task's
     # return value
     installer_options.update(execute(

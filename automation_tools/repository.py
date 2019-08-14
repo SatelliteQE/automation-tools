@@ -162,11 +162,10 @@ def enable_satellite_repos(cdn=False, beta=False, disable_enabled=True,
         ]
         if sat_version in ['6.4', '6.5']:
             repos.append('rhel-{0}-server-ansible-2.6-rpms')
-            repos.append('rhel-{0}-server-satellite-maintenance-6-rpms')
         if sat_version == '6.6':
             # Ansible '2.8' was not released yet, so using '2' repo
             repos.append('rhel-{0}-server-ansible-2-rpms')
-            repos.append('rhel-{0}-server-satellite-maintenance-6-rpms')
+
     if beta:
         repos.append('rhel-server-{0}-satellite-6-beta-rpms')
     elif cdn:
@@ -174,6 +173,12 @@ def enable_satellite_repos(cdn=False, beta=False, disable_enabled=True,
         # Sat6.3: enable *cdn* puppet4 repo to perform fresh p4 install
         if sat_version == '6.3' and puppet4 == 'yes':
             repos.append('rhel-{0}-server-satellite-{1}-puppet4-rpms')
+
+    if sat_version in ['6.4', '6.5', '6.6']:
+        if beta:
+            repos.append('rhel-{0}-server-satellite-maintenance-6-beta-rpms')
+        else:
+            repos.append('rhel-{0}-server-satellite-maintenance-6-rpms')
 
     enable_repos(*[repo.format(os_version, sat_version) for repo in repos])
     run('yum repolist')
