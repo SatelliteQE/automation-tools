@@ -1891,6 +1891,10 @@ def downstream_install(admin_password=None, run_katello_installer=True):
         remote_path='/etc/yum.repos.d/satellite.repo')
     satellite_repo.close()
 
+    maintain_repo = os.environ.get('MAINTAIN_BASE_URL')
+    if maintain_repo:
+        execute(create_custom_repos, maintain_repo=maintain_repo, host=host)
+
     # Install required packages for the installation
     run('yum install -y satellite')
     if float(os.environ.get('SATELLITE_VERSION')) > 6.5:

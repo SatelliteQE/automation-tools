@@ -174,11 +174,10 @@ def enable_satellite_repos(cdn=False, beta=False, disable_enabled=True,
         if sat_version == '6.3' and puppet4 == 'yes':
             repos.append('rhel-{0}-server-satellite-{1}-puppet4-rpms')
 
-    if sat_version in ['6.4', '6.5', '6.6']:
-        if beta:
-            repos.append('rhel-{0}-server-satellite-maintenance-6-beta-rpms')
-        else:
-            repos.append('rhel-{0}-server-satellite-maintenance-6-rpms')
+    if beta:
+        repos.append('rhel-{0}-server-satellite-maintenance-6-beta-rpms')
+    else:
+        repos.append('rhel-{0}-server-satellite-maintenance-6-rpms')
 
     enable_repos(*[repo.format(os_version, sat_version) for repo in repos])
     run('yum repolist')
