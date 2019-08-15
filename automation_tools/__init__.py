@@ -1881,6 +1881,11 @@ def downstream_install(admin_password=None, run_katello_installer=True):
         print('The BASE_URL environment variable should be defined')
         sys.exit(1)
 
+    maintain_url = os.environ.get('MAINTAIN_BASE_URL')
+    if maintain_url is None:
+        print('The MAINTAIN_BASE_URL environment variable should be defined')
+        sys.exit(1)
+
     satellite_repo = StringIO()
     satellite_repo.write(u'[satellite]\n')
     satellite_repo.write(u'name=satellite\n')
@@ -1891,9 +1896,8 @@ def downstream_install(admin_password=None, run_katello_installer=True):
         remote_path='/etc/yum.repos.d/satellite.repo')
     satellite_repo.close()
 
-    maintain_repo = os.environ.get('MAINTAIN_BASE_URL')
-    if maintain_repo:
-        execute(create_custom_repos, maintain_repo=maintain_repo, host=host)
+    maintain_url = os.environ.get('MAINTAIN_BASE_URL')
+    create_custom_repos(maintain_repo=maintain_url)
 
     # Install required packages for the installation
     run('yum install -y satellite')
