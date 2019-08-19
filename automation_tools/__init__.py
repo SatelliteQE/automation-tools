@@ -1868,7 +1868,9 @@ def downstream_install(admin_password=None, run_katello_installer=True):
     ADMIN_PASSWORD
         Optional, defaults to 'changeme'. Foreman admin password.
     BASE_URL
-        URL for the compose repository.
+        URL for the Satellite compose repository.
+    MAINTAIN_BASE_URL
+        URL for the satellite maintenance compose repository
     SATELLITE_VERSION
         Satellite version.
 
