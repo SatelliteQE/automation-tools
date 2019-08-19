@@ -1896,7 +1896,6 @@ def downstream_install(admin_password=None, run_katello_installer=True):
         remote_path='/etc/yum.repos.d/satellite.repo')
     satellite_repo.close()
 
-    maintain_url = os.environ.get('MAINTAIN_BASE_URL')
     create_custom_repos(maintain_repo=maintain_url)
 
     # Install required packages for the installation
