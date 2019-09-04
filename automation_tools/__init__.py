@@ -1869,7 +1869,7 @@ def downstream_install(admin_password=None, run_katello_installer=True):
         Optional, defaults to 'changeme'. Foreman admin password.
     BASE_URL
         URL for the Satellite compose repository.
-    MAINTAIN_BASE_URL
+    MAINTAIN_REPO
         URL for the satellite maintenance compose repository
     SATELLITE_VERSION
         Satellite version.
@@ -1883,9 +1883,9 @@ def downstream_install(admin_password=None, run_katello_installer=True):
         print('The BASE_URL environment variable should be defined')
         sys.exit(1)
 
-    maintain_url = os.environ.get('MAINTAIN_BASE_URL')
+    maintain_url = os.environ.get('MAINTAIN_REPO')
     if maintain_url is None:
-        print('The MAINTAIN_BASE_URL environment variable should be defined')
+        print('The MAINTAIN_REPO environment variable should be defined')
         sys.exit(1)
 
     satellite_repo = StringIO()
