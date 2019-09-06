@@ -1026,13 +1026,7 @@ def setup_foreman_discovery(sat_version):
         run('wget -nv -O- {0} | tar x --overwrite -C /var/lib/tftpboot/boot'.format(image_url))
     else:
         # Since 6.3, installer should install all required packages except FDI
-        if float(sat_version) > 6.5:
-            # Check BZ 1738199 for final solution (versionlock prevents satellite rpms to install)
-            run('foreman-maintain packages unlock')
         run('yum install -y foreman-discovery-image')
-        if float(sat_version) > 6.5:
-            # Check BZ 1738199 for final solution (versionlock prevents satellite rpms to install)
-            run('foreman-maintain packages lock')
 
     # Unlock the default Locked template for discovery
     run('hammer -u admin -p {0} template update '
@@ -2300,6 +2294,10 @@ def product_install(distribution, create_vm=False, certificate_url=None,
         sat_version=sat_version,
         **installer_options
     )
+
+    # Workaround to disable the version locking feature for 6.6 until GH #800
+    if float(sat_version) == 6.6:
+        execute(lambda: run('satellite-installer --no-lock-package-versions'), host=host)
 
     execute(run_command, os.environ.get('FIX_POSTINSTALL'), host=host)
 
