@@ -298,16 +298,11 @@ def setup_default_docker():
         )
 
     # Install ``Docker`` package.
-    if os_version >= 7:
-        run('yum install -y docker', warn_only=True)
-        # enable the service as it is disabled by default
-        run('systemctl enable docker.service')
-        # Disable 'extras' repo after installing Docker
-        disable_repos('rhel-{0}-server-extras-rpms'.format(os_version))
-    else:
-        run('yum install -y docker-io', warn_only=True)
-        # Uninstall EPEL package rather than delete just the epel.repo file.
-        run('yum remove -y epel-release.noarch')
+    run(package_install('docker'), warn_only=True)
+    # enable the service as it is disabled by default
+    run('systemctl enable docker.service')
+    # Disable 'extras' repo after installing Docker
+    disable_repos('rhel-{0}-server-extras-rpms'.format(os_version))
 
     run('groupadd docker', warn_only=True)
     run('usermod -aG docker foreman')
@@ -820,7 +815,7 @@ def setup_python_code_coverage():
     if not epel_present:
         run('yum -y install https://dl.fedoraproject.org/pub/epel/'
             'epel-release-latest-{0}.noarch.rpm'.format(os_version))
-    run('yum -y install python-pip')
+    run(package_install('python-pip'))
     run('pip install -U coverage')
     # Uninstall EPEL package only if we have installed it (leave for upstream)
     if not epel_present:
@@ -1026,7 +1021,7 @@ def setup_foreman_discovery(sat_version):
         run('wget -nv -O- {0} | tar x --overwrite -C /var/lib/tftpboot/boot'.format(image_url))
     else:
         # Since 6.3, installer should install all required packages except FDI
-        run('yum install -y foreman-discovery-image')
+        run(package_install('foreman-discovery-image'))
 
     # Unlock the default Locked template for discovery
     run('hammer -u admin -p {0} template update '
@@ -1594,7 +1589,7 @@ def enroll_idm(idm_password=None):
     # first nameserver in /etc/resolv.conf file points to the IDM server.
     if idm_password is None:
         idm_password = os.environ.get('IDM_PASSWORD')
-    run('yum install -y ipa-client ipa-admintools')
+    run(package_install('ipa-client ipa-admintools'))
     run('ipa-client-install --password={0} --principal admin '
         '--unattended --no-ntp'.format(idm_password))
     result = run('id admin')
@@ -1750,7 +1745,7 @@ def configure_realm(admin_password=None, keytab_url=None, realm=None,
         admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme')
     if realm is None:
         realm = domain.upper()
-    run('yum install -y wget')
+    run(package_install('wget'))
     run('wget -O /root/freeipa.keytab {0}'.format(keytab_url))
     run('mv /root/freeipa.keytab /etc/foreman-proxy')
     run('chown foreman-proxy:foreman-proxy /etc/foreman-proxy/freeipa.keytab')
@@ -2294,10 +2289,6 @@ def product_install(distribution, create_vm=False, certificate_url=None,
         sat_version=sat_version,
         **installer_options
     )
-
-    # Workaround to disable the version locking feature for 6.6 until GH #800
-    if float(sat_version) == 6.6:
-        execute(lambda: run('satellite-installer --no-lock-package-versions'), host=host)
 
     execute(run_command, os.environ.get('FIX_POSTINSTALL'), host=host)
 
@@ -3235,9 +3226,9 @@ def setup_alternate_capsule_ports(port_range='9400-14999'):
     # nmap is used by checks for open port during capsule faking
     # nmap's ncat (opposite to nc) supports -c option we use for capsule faking
     # and rhel7 has separate package for ncat named nmap-ncat
-    run('which nmap || yum -d1 -y install nmap', warn_only=True)
+    run('which nmap || {}'.format(package_install('nmap')), warn_only=True)
     # fuser is used to find out available ports to listen on
-    run('which fuser || yum -d1 -y install psmisc', warn_only=True)
+    run('which fuser || {}'.format(package_install('psmisc')), warn_only=True)
     # labelling custom port range so that passenger will be allowed to connect
     run('semanage port -a -t websm_port_t -p tcp {0}'.format(port_range), warn_only=True)
 
@@ -3252,12 +3243,17 @@ def setup_rhv_ca():
     print("RHV CA cert has been successfully added to CA trust")
 
 
-def configure_telemetry():
+def configure_telemetry(http_server=None):
     """Setup telemetry on the satellite box with grafana monitoring tool
     """
-    http_server = os.environ.get('HTTP_SERVER_HOSTNAME')
+    http_server = http_server or os.environ.get('HTTP_SERVER_HOSTNAME')
+    if http_server is None:
+        print('Please provide http server where script is hosted.')
+        sys.exit(1)
     print("Install required packages for PCP")
-    run('yum -y install pcp pcp-pmda-apache')
+    run('subscription-manager repos --enable rhel-7-server-optional-rpms')
+    run(package_install('pcp pcp-pmda-apache foreman-telemetry pcp-mmvstatsd pcp-webapi '
+                        'pcp-webapp-grafana pcp-webapp-vector'))
     run('wget {0}/pub/configure_telemetry.sh'.format(http_server))
     print("Configure Apache and hotproc")
     run('chmod 777 configure_telemetry.sh && ./configure_telemetry.sh')
@@ -3266,7 +3262,6 @@ def configure_telemetry():
     run('echo "apache::purge_configs: false" '
         '>>/etc/foreman-installer/custom-hiera.yaml')
     run('systemctl restart httpd pmcd pmlogger')
-    run('yum -y install foreman-telemetry pcp-mmvstatsd')
     print("Enable telemetry via Statsd protocol")
     run('satellite-installer --foreman-telemetry-statsd-enabled true')
     run('systemctl restart httpd')
@@ -3275,8 +3270,16 @@ def configure_telemetry():
     print("The telemetry metrics matrix")
     run('foreman-rake telemetry:metrics')
     print('Grafana Tool setup')
-    run('subscription-manager repos --enable rhel-7-server-optional-rpms')
-    run('yum -y install pcp-webapi pcp-webapp-grafana pcp-webapp-vector')
     run('systemctl start pmwebd && systemctl enable pmwebd')
     run('firewall-cmd --add-port=44323/tcp && '
         'firewall-cmd --permanent --add-port=44323/tcp')
+
+
+def package_install(packages, sat_version=None):
+    # Fetch the Satellite Version information.
+    sat_version = sat_version or os.environ.get('SATELLITE_VERSION')
+    if sat_version is not None and float(sat_version) >= 6.6:
+        command = 'foreman-maintain packages install -y {}'.format(packages)
+    else:
+        command = 'yum -y install {}'.format(packages)
+    return command
