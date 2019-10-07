@@ -3173,6 +3173,67 @@ def attach_subscription(url=None, consumer=None, pool_id=None, count=None):
         raise ValueError("Pass values under pool_id and count")
 
 
+def refresh_manifest(url=None, consumer=None):
+    """Task to remove all subscriptions from manifest and attach required ones.
+
+    The following environment variables affect this command:
+
+    SM_URL
+      Subscription Manager URL (e.g. 'https://subscription.rhsm.redhat.com')
+    CONSUMER
+        A consumer hash to be used for getting the manifest
+    RHN_USERNAME
+        Red Hat Network username
+    RHN_PASSWORD
+        Red Hat Network password
+
+    :param url: Subscription Manager URL
+    :param consumer: A consumer hash to be used for getting the manifest
+    :returns: boolean True/False
+    """
+    user = os.environ.get('RHN_USERNAME')
+    password = os.environ.get('RHN_PASSWORD')
+    auth_details = u'{0}:{1}'.format(user, password)
+
+    if isinstance(auth_details, str):  # py3
+        bytestring = bytes('{0}:{1}'.format(user, password), 'utf-8')
+    else:  # py2
+        bytestring = bytes('{0}:{1}'.format(user, password))
+
+    base64string = base64.encodestring(bytestring).strip()
+
+    if url is None:
+        url = os.environ.get('SM_URL')
+    if consumer is None:
+        consumer = os.environ.get('CONSUMER')
+
+    command = ('curl -sk -X DELETE -H "Authorization:Basic {0}"'
+               ' "{1}/subscription/consumers/{2}/entitlements"').format(
+        base64string.decode('utf-8'), url, consumer)
+
+    print("Cleaning up all subscriptions from Manifest!")
+    response = run(command)
+    result = 'deletedRecords' in response
+
+    if result:
+        exp_subs_file = os.environ.get('EXP_SUBS_FILE', None)
+        with open(exp_subs_file, 'r') as fp:
+            exp_subs = {}
+            exp_subs_details = [r.strip().split(';') for r in fp.readlines() if not r.strip(
+            ).startswith('#')]
+            for name_list in exp_subs_details:
+                exp_subs[name_list[0]] = name_list[1:]
+
+            for sub in exp_subs.keys():
+                print("Attaching subscription {}".format(sub))
+                attach = attach_subscription(pool_id=exp_subs[sub][0], count=exp_subs[sub][1])
+                if attach:
+                    print("Successfully attached subscription {}".format(sub))
+                else:
+                    return attach
+    return result
+
+
 def relink_manifest(manifest_file=None):
     """Links the latest downloaded manifest file to the manifest_latest.zip
     softlink.
@@ -3182,6 +3243,7 @@ def relink_manifest(manifest_file=None):
     if manifest_file is None:
         manifest_file = download_manifest()
         if os.environ.get('EXP_SUBS_FILE', None) is not None:
+            assert refresh_manifest()
             validate = validate_manifest(manifest_file)
             assert validate[0]
             if len(validate) > 1:
