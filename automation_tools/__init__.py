@@ -3278,7 +3278,7 @@ def configure_telemetry(http_server=None):
 def package_install(packages, sat_version=None):
     # Fetch the Satellite Version information.
     sat_version = sat_version or os.environ.get('SATELLITE_VERSION')
-    if sat_version is not None and float(sat_version) >= 6.6:
+    if sat_version is not None and (sat_version == 'upstream-nightly' or float(sat_version) >= 6.6):
         command = 'foreman-maintain packages install -y {}'.format(packages)
     else:
         command = 'yum -y install {}'.format(packages)
