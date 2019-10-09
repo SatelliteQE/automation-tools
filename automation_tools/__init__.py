@@ -12,7 +12,7 @@ import sys
 import time
 from datetime import date
 from io import StringIO
-from re import search
+from re import MULTILINE, search
 
 from automation_tools.bz import bz_bug_is_open
 from automation_tools.repository import (
@@ -2448,7 +2448,7 @@ def iso_download(iso_url=None):
             if result.succeeded:
                 # match either '<hash> *<iso_filename>'
                 # or '{MD5|SHA1|SHA256} (<iso_filename>) = <hash>'
-                iso_filename = search(r'\w+\s+[\*\(]?([^\s\)]+)', result).group(1)
+                iso_filename = search(r'^\w+\s+[\*\(]?([^\s\)]+)', result, MULTILINE).group(1)
                 break
 
         if iso_filename is None:
