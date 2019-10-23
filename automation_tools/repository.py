@@ -163,8 +163,7 @@ def enable_satellite_repos(cdn=False, beta=False, disable_enabled=True,
         if sat_version in ['6.4', '6.5']:
             repos.append('rhel-{0}-server-ansible-2.6-rpms')
         if sat_version == '6.6':
-            # Ansible '2.8' was not released yet, so using '2' repo
-            repos.append('rhel-{0}-server-ansible-2-rpms')
+            repos.append('rhel-{0}-server-ansible-2.8-rpms')
 
     if beta:
         repos.append('rhel-server-{0}-satellite-6-beta-rpms')
