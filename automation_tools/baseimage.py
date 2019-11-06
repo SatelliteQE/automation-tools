@@ -20,9 +20,9 @@ def detect_imagename(os_url):
     if comp_id.succeeded:
         match_comp = search(r'(\w+)-([\d\.]+)-(?:\w+-)?([\d\.]+)', comp_id)
         image = match_comp.group(1).lower() + match_comp.group(2).replace('.', '') + '-' + \
-            match_comp.group(3)
+            match_comp.group(3) + '-base'
     else:
-        image = 'unknown-{}'.format(str(time.time()).split('.')[0])
+        image = 'unknown-{}-base'.format(str(time.time()).split('.')[0])
 
     print(image)
     return(image)
