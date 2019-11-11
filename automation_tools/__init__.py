@@ -589,7 +589,8 @@ def setup_firewall(definitions=None, flush=True):
             run('iptables --flush')
     else:
         if run('rpm -q firewalld', quiet=True).failed:
-            run('yum install -y firewalld')
+            run('if [ "`yum install -y firewalld 1>&2 2>/dev/null;echo $?`" -ne 0 ]; then'
+                'foreman-maintain packages install -y firewalld ; fi')
         if run('systemctl --no-pager status firewalld', quiet=True).failed:
             run('systemctl enable firewalld')
             run('systemctl start firewalld')
