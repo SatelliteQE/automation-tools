@@ -3025,7 +3025,7 @@ def setenforce(mode):
     run('setenforce {0}'.format(mode))
 
 
-def download_manifest(url=None, consumer=None):
+def download_manifest(url, consumer, user, password):
     """Task for downloading the manifest file from customer portal.
 
     The following environment variables affect this command:
@@ -3043,8 +3043,6 @@ def download_manifest(url=None, consumer=None):
     :param consumer: A consumer hash to be used for getting the manifest
     :returns: a path string to a downloaded manifest file
     """
-    user = os.environ.get('RHN_USERNAME')
-    password = os.environ.get('RHN_PASSWORD')
     string = u'{0}:{1}'.format(user, password)
 
     if isinstance(string, str):  # py3
@@ -3054,10 +3052,6 @@ def download_manifest(url=None, consumer=None):
 
     base64string = base64.encodestring(bytestring).strip()
 
-    if url is None:
-        url = os.environ.get('SM_URL')
-    if consumer is None:
-        consumer = os.environ.get('CONSUMER')
     manifest_file = run('mktemp --suffix=.zip')
 
     # we do this as we would otherwise potentially download a manifest which
@@ -3082,16 +3076,15 @@ def download_manifest(url=None, consumer=None):
                          ' session and distributor hash')
 
 
-def validate_manifest(manifest_file):
+def validate_manifest(user, password, manifest_file, exp_subs_file):
     """Make sure that manifest contains only subscriptions specified in config file
     specified in environment variable and attach if missing any:
-    EXP_SUBS_FILE
-        List of subscriptions which are supposed to be in the manifest (one
-        subscription name per line). No other subscription is allowed.
-    :param manifest_file: Where is the manifest to investigate.
+    :param user: Red Hat Network username
+    :param password: Red Hat Network password
+    :param exp_subs_file: Expected subscription file
+    :param manifest_file: Specify the manifest file path.
     :return: list with True/False boolean
     """
-    exp_subs_file = os.environ.get('EXP_SUBS_FILE', None)
     with open(exp_subs_file, 'r') as fp:
         exp_subs = {}
         exp_subs_details = [r.strip().split(';') for r in fp.readlines() if not r.strip(
@@ -3119,7 +3112,9 @@ def validate_manifest(manifest_file):
         if sub not in current_subs:
             response.append('Yes')
             print("Attaching missing subscription {}".format(sub))
-            attach = attach_subscription(pool_id=exp_subs[sub][0], count=exp_subs[sub][1])
+            attach = attach_subscription(user, password,
+                                         pool_id=exp_subs[sub][0],
+                                         count=exp_subs[sub][1])
             if attach:
                 print("Successfully attached subscription {}" .format(sub))
             else:
@@ -3127,28 +3122,17 @@ def validate_manifest(manifest_file):
     return response
 
 
-def attach_subscription(url=None, consumer=None, pool_id=None, count=None):
+def attach_subscription(user, password, url=None, consumer=None, pool_id=None, count=None):
     """Task to attach subscription to manifest.
-
-    The following environment variables affect this command:
-
-    SM_URL
-      Subscription Manager URL (e.g. 'https://subscription.rhsm.redhat.com')
-    CONSUMER
-        A consumer hash to be used for getting the manifest
-    RHN_USERNAME
-        Red Hat Network username
-    RHN_PASSWORD
-        Red Hat Network password
 
     :param url: Subscription Manager URL
     :param consumer: A consumer hash to be used for getting the manifest
+    :param user: Red Hat Network username
+    :param password: Red Hat Network password
     :param pool_id: A pool ID of subscription
     :param count: A quantity of subscription requires to attach
     :returns: boolean True/False
     """
-    user = os.environ.get('RHN_USERNAME')
-    password = os.environ.get('RHN_PASSWORD')
     auth_details = u'{0}:{1}'.format(user, password)
 
     if isinstance(auth_details, str):  # py3
@@ -3230,12 +3214,14 @@ def relink_manifest(url, consumer, user, password, exp_subs_file, manifest_file=
     :param manifest_file: Specify the manifest file path.
     """
     if manifest_file is None:
-        manifest_file = download_manifest()
+        manifest_file = download_manifest(url=url, consumer=consumer,
+                                          user=user, password=password)
         if exp_subs_file is not None:
             assert refresh_manifest(url=url, consumer=consumer,
                                     user=user, password=password,
                                     exp_subs_file=exp_subs_file)
-            validate = validate_manifest(manifest_file)
+            validate = validate_manifest(user, password, manifest_file,
+                                         exp_subs_file)
             assert validate[0]
             if len(validate) > 1:
                 manifest_file = download_manifest()
