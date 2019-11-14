@@ -3028,19 +3028,10 @@ def setenforce(mode):
 def download_manifest(url, consumer, user, password):
     """Task for downloading the manifest file from customer portal.
 
-    The following environment variables affect this command:
-
-    SM_URL
-      Subscription Manager URL (e.g. 'https://subscription.rhsm.redhat.com')
-    CONSUMER
-        A consumer hash to be used for getting the manifest
-    RHN_USERNAME
-        Red Hat Network username
-    RHN_PASSWORD
-        Red Hat Network password
-
     :param url: Subscription Manager URL
     :param consumer: A consumer hash to be used for getting the manifest
+    :param user: Red Hat Network username
+    :param password: Red Hat Network password
     :returns: a path string to a downloaded manifest file
     """
     string = u'{0}:{1}'.format(user, password)
@@ -3076,9 +3067,10 @@ def download_manifest(url, consumer, user, password):
                          ' session and distributor hash')
 
 
-def validate_manifest(user, password, manifest_file, exp_subs_file):
+def validate_manifest(user, password, url, consumer, manifest_file, exp_subs_file):
     """Make sure that manifest contains only subscriptions specified in config file
-    specified in environment variable and attach if missing any:
+    specified in variable and attach if missing any:
+
     :param user: Red Hat Network username
     :param password: Red Hat Network password
     :param exp_subs_file: Expected subscription file
@@ -3112,7 +3104,8 @@ def validate_manifest(user, password, manifest_file, exp_subs_file):
         if sub not in current_subs:
             response.append('Yes')
             print("Attaching missing subscription {}".format(sub))
-            attach = attach_subscription(user, password,
+            attach = attach_subscription(user=user, password=password,
+                                         url=url, consumer=consumer,
                                          pool_id=exp_subs[sub][0],
                                          count=exp_subs[sub][1])
             if attach:
@@ -3122,7 +3115,7 @@ def validate_manifest(user, password, manifest_file, exp_subs_file):
     return response
 
 
-def attach_subscription(user, password, url=None, consumer=None, pool_id=None, count=None):
+def attach_subscription(user, password, url, consumer, pool_id=None, count=None):
     """Task to attach subscription to manifest.
 
     :param url: Subscription Manager URL
@@ -3194,7 +3187,10 @@ def refresh_manifest(url, consumer, user, password, exp_subs_file):
 
             for sub in exp_subs.keys():
                 print("Attaching subscription {}".format(sub))
-                attach = attach_subscription(pool_id=exp_subs[sub][0], count=exp_subs[sub][1])
+                attach = attach_subscription(user=user, password=password,
+                                             url=url, consumer=consumer,
+                                             pool_id=exp_subs[sub][0],
+                                             count=exp_subs[sub][1])
                 if attach:
                     print("Successfully attached subscription {}".format(sub))
                 else:
@@ -3202,7 +3198,8 @@ def refresh_manifest(url, consumer, user, password, exp_subs_file):
     return result
 
 
-def relink_manifest(url, consumer, user, password, exp_subs_file, manifest_file=None):
+def relink_manifest(url, consumer, user, password, exp_subs_file,
+                    manifest_file=None):
     """Links the latest downloaded manifest file to the manifest_latest.zip
     softlink.
 
@@ -3220,12 +3217,18 @@ def relink_manifest(url, consumer, user, password, exp_subs_file, manifest_file=
             assert refresh_manifest(url=url, consumer=consumer,
                                     user=user, password=password,
                                     exp_subs_file=exp_subs_file)
-            validate = validate_manifest(user, password, manifest_file,
-                                         exp_subs_file)
+            validate = validate_manifest(user=user, password=password,
+                                         url=url, consumer=consumer,
+                                         manifest_file=manifest_file,
+                                         exp_subs_file=exp_subs_file)
             assert validate[0]
             if len(validate) > 1:
-                manifest_file = download_manifest()
-                assert validate_manifest(manifest_file)[0]
+                manifest_file = download_manifest(url=url, consumer=consumer,
+                                                  user=user, password=password)
+                assert validate_manifest(user=user, password=password,
+                                         url=url, consumer=consumer,
+                                         manifest_file=manifest_file,
+                                         exp_subs_file=exp_subs_file)[0]
     if not manifest_file:
         print('manifest_file is not populated.')
         sys.exit(1)
