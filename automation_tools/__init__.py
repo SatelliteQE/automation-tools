@@ -286,23 +286,14 @@ def setup_default_docker():
     os_version = distro_info()[1]
 
     # Enable required repository
-    if os_version >= 7:
-        run(
-            'subscription-manager repos --enable "rhel-{0}-server-extras-rpms"'
-            .format(os_version)
-        )
-    else:
-        run(
-            'yum -y localinstall '
-            'http://mirror.pnl.gov/epel/6/x86_64/epel-release-6-8.noarch.rpm'
-        )
+    if os_version == 7:
+        enable_repos('rhel-{0}-server-extras-rpms'.format(os_version))
 
     # Install ``Docker`` package.
-    run(package_install('docker'), warn_only=True)
-    # enable the service as it is disabled by default
-    run('systemctl enable docker.service')
+    run('yum -y --disableplugin=foreman-protector install docker')
     # Disable 'extras' repo after installing Docker
-    disable_repos('rhel-{0}-server-extras-rpms'.format(os_version))
+    if os_version == 7:
+        disable_repos('rhel-{0}-server-extras-rpms'.format(os_version))
 
     run('groupadd docker', warn_only=True)
     run('usermod -aG docker foreman')
@@ -319,19 +310,9 @@ def setup_default_docker():
         ])
     ))
 
-    # Restart ``docker`` service
-    # This can silently fail if a pseuo-terminal is used on RHEL 6, due to
-    # docker's non-standard approach to daemonizing and its naive init script.
-    # See:
-    #
-    # https://github.com/fabric/fabric/issues/395#issuecomment-1846383
-    # https://github.com/fabric/fabric/issues/395#issuecomment-32219270
-    # https://github.com/docker/docker/issues/2758
-
-    # enable the service as it is disabled by default on RHEL7
-    manage_daemon('enable', 'docker', pty=(os_version >= 7))
-    manage_daemon('restart', 'docker', pty=(os_version >= 7),
-                  warn_only=bz_bug_is_open('1414821'))
+    # Restart and enable ``docker`` service
+    manage_daemon('enable', 'docker')
+    manage_daemon('restart', 'docker')
 
 
 def setup_default_capsule(interface=None, run_katello_installer=True):
@@ -1589,7 +1570,7 @@ def enroll_idm(idm_password=None):
     # first nameserver in /etc/resolv.conf file points to the IDM server.
     if idm_password is None:
         idm_password = os.environ.get('IDM_PASSWORD')
-    run(package_install('ipa-client ipa-admintools'))
+    run('yum -y --disableplugin=foreman-protector install ipa-client ipa-admintools')
     run('ipa-client-install --password={0} --principal admin '
         '--unattended --no-ntp'.format(idm_password))
     result = run('id admin')
@@ -1642,8 +1623,8 @@ def enroll_ad(ad_passwd=None, ad_server_ip=None, realm=None):
         ad_passwd = os.environ.get('AD_PASSWORD')
     if ad_server_ip is None:
         ad_server_ip = os.environ.get('AD_SERVER_IP')
-    run('yum install -y gssproxy nfs-utils')
-    run('yum install -y sssd adcli realmd ipa-python samba-common-tools')
+    run('yum -y --disableplugin=foreman-protector install '
+        'gssproxy nfs-utils sssd adcli realmd ipa-python samba-common-tools')
     run('chattr -i /etc/resolv.conf')
     run('sed -i \'0,/nameserver/{{s/nameserver.*/nameserver {0}/}}\' '
         '/etc/resolv.conf'.format(ad_server_ip))
@@ -1678,7 +1659,7 @@ def configure_ad_external_auth(ad_passwd=None, realm=None):
         sys.exit(1)
     if ad_passwd is None:
         ad_passwd = os.environ.get('AD_PASSWORD')
-    run('yum install -y krb5-workstation')
+    run('yum -y --disableplugin=foreman-protector install krb5-workstation')
     run('echo {0} | kinit administrator@{1}'.format(ad_passwd, realm))
     run('mkdir -p /etc/ipa/')
     ipa_default = StringIO()
@@ -1745,7 +1726,7 @@ def configure_realm(admin_password=None, keytab_url=None, realm=None,
         admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme')
     if realm is None:
         realm = domain.upper()
-    run(package_install('wget'))
+    run('yum -y --disableplugin=foreman-protector install wget')
     run('wget -O /root/freeipa.keytab {0}'.format(keytab_url))
     run('mv /root/freeipa.keytab /etc/foreman-proxy')
     run('chown foreman-proxy:foreman-proxy /etc/foreman-proxy/freeipa.keytab')
@@ -1775,7 +1756,7 @@ def apply_hotfix():
         run('wget -O /etc/yum.repos.d/hotfix.repo '
             '{0}/pub/hotfix/hotfix_rhel{1}.repo'
             .format(http_server, os_version))
-        run('yum -y update')
+        run('yum -y --disableplugin=foreman-protector update')
         run('satellite-installer --upgrade')
     elif hotfix == 'CUSTOM':
         run('wget -0 /root/hotfix.sh '
@@ -3268,9 +3249,10 @@ def setup_alternate_capsule_ports(port_range='9400-14999'):
     # nmap is used by checks for open port during capsule faking
     # nmap's ncat (opposite to nc) supports -c option we use for capsule faking
     # and rhel7 has separate package for ncat named nmap-ncat
-    run('which nmap || {}'.format(package_install('nmap')), warn_only=True)
     # fuser is used to find out available ports to listen on
-    run('which fuser || {}'.format(package_install('psmisc')), warn_only=True)
+
+    if run('which nmap fuser', warn_only=True).failed:
+        run('yum -y --disableplugin=foreman-protector install nmap psmisc')
     # labelling custom port range so that passenger will be allowed to connect
     run('semanage port -a -t websm_port_t -p tcp {0}'.format(port_range), warn_only=True)
 
