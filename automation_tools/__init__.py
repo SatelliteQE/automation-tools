@@ -810,16 +810,8 @@ def setup_python_code_coverage():
             remote_path='/usr/lib/python2.7/site-packages/sitecustomize.py')
     sitecustomize_file.close()
 
-    # Install EPEL packages for the installation
-    epel_present = run('rpm -q epel-release', warn_only=True).return_code == 0
-    if not epel_present:
-        run('yum -y install https://dl.fedoraproject.org/pub/epel/'
-            'epel-release-latest-{0}.noarch.rpm'.format(os_version))
-    run(package_install('python-pip'))
+    run('easy_install pip')
     run('pip install -U coverage')
-    # Uninstall EPEL package only if we have installed it (leave for upstream)
-    if not epel_present:
-        run('rpm -e epel-release')
     run('chcon -R -u system_u -t httpd_sys_rw_content_t /etc/coverage')
     run('chmod -R 777 /etc/coverage ; chown -R apache.apache /etc/coverage')
 
