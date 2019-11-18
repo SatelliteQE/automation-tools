@@ -3312,7 +3312,8 @@ def configure_telemetry(http_server=None):
 def package_install(packages, sat_version=None):
     # Fetch the Satellite Version information.
     sat_version = sat_version or os.environ.get('SATELLITE_VERSION')
-    if sat_version is not None and sat_version not in ('6.3', '6.4', '6.5'):
+    if (sat_version not in ('6.3', '6.4', '6.5') and
+       run('which foreman-maintain', warn_only=True).succeeded):
         command = 'foreman-maintain packages install -y {}'.format(packages)
     else:
         command = 'yum -y install {}'.format(packages)
