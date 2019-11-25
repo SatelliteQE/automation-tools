@@ -2239,6 +2239,11 @@ def product_install(distribution, create_vm=False, certificate_url=None,
     # enable ostree feature
     installer_options.update({'katello-enable-ostree': 'true'})
 
+    # BZ #1772851 Puppet classes are missing after adding a puppet module and CV publishing
+    if bz_bug_is_open(1772851) and sat_version == '6.7':
+        installer_options.update({
+            'foreman-proxy-plugin-pulp-puppet-content-dir': '/etc/puppetlabs/code/environments'})
+
     if os.environ.get('PROXY_INFO'):
         # execute returns a dictionary mapping host strings to the given
         # task's return value
