@@ -2286,7 +2286,7 @@ def product_install(distribution, create_vm=False, certificate_url=None,
     execute(setup_alternate_capsule_ports, host=host)
 
     execute(setup_default_docker, host=host)
-    execute(katello_service, 'restart', host=host)
+    execute(katello_service, 'restart', sat_version=sat_version, host=host)
     # if we have ssh key to libvirt machine we can setup access to it
     if os.environ.get('LIBVIRT_KEY_URL') is not None:
         execute(setup_libvirt_key, host=host)
@@ -2942,18 +2942,19 @@ def katello_installer(debug=False, distribution=None, verbose=True,
     ))
 
 
-def katello_service(action, exclude=None):
+def katello_service(action, sat_version='', exclude=None):
     """Run katello-service
 
     :param str action: One of stop, start, restart, status.
     :param list exclude: A list of services to skip
 
     """
-    if exclude is None:
-        exclude = ''
+    exclude = '--exclude {0}'.format(','.join(exclude)) if exclude else ''
+    if tuple(sat_version.split('.')) > ('6', '7'):  # sat_version > '6.7'
+        command = 'foreman-maintain service'
     else:
-        exclude = '--exclude {0}'.format(','.join(exclude))
-    return run('katello-service {0} {1}'.format(exclude, action))
+        command = 'katello-service'
+    return run('{0} {1} {2}'.format(command, exclude, action))
 
 
 def manage_daemon(action, daemon, pty=True, warn_only=False):
