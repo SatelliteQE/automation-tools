@@ -1098,9 +1098,13 @@ def setup_local_rex_key():
     run('cat ~foreman-proxy/.ssh/id_rsa_foreman_proxy.pub >> /root/.ssh/authorized_keys')
 
 
-def vm_create():
-    """Task to create a VM using snap-guest based on a ``SOURCE_IMAGE`` base
-    image.
+def vm_create(target_image=None, source_image=None, bridge=None, network=None):
+    """Task to create a VM using snap-guest based on a `source_image` base image.
+
+    :param str target_image: target image name (VM name)
+    :param str source_image: source image name (base image name)
+    :param str bridge: isolated VLAN bridge (static IP), if ommited br0 is used (engops DHCP IP)
+    :param str network: the name of NATed network with static IP adressing. Typically "foreman"
 
     Expects the following environment variables:
 
@@ -1110,25 +1114,14 @@ def vm_create():
         number of CPU cores
     VM_DOMAIN
         VM's domain name
-    SOURCE_IMAGE
-        base image name
-    TARGET_IMAGE
-        target image name
     SERVER_HOSTNAME
         server hostname
     IMAGE_DIR
         path where the generated image will be stored
     CPU_FEATURE
         copies cpu features of base-metal to vm, thus enabling nested_virt
-    BRIDGE
-        Now Sat6 VM can use isolated VLAN Bridge with static Ip address if
-        available, otherwise uses the bridge br0 which provides a dhcp IP
-        address from corporate network.
     BRIDGE2
         Specify another bridge to second NIC for the provisioned VM.
-    NAT
-        the name of NATed network with static IP adressing on custom
-        hypervisors where Sat6 VM can be operated too. Typically "foreman"
     IPADDR
         The static IP address from the VLAN which needs to be provided when
         using VLAN Bridge or NAT network.
@@ -1152,17 +1145,17 @@ def vm_create():
 
     """
     options = {
+        'target_image': target_image,
+        'source_image': source_image,
         'vm_ram': os.environ.get('VM_RAM'),
         'vm_cpu': os.environ.get('VM_CPU'),
         'vm_domain': os.environ.get('VM_DOMAIN'),
-        'source_image': os.environ.get('SOURCE_IMAGE'),
-        'target_image': os.environ.get('TARGET_IMAGE'),
         'hostname': os.environ.get('SERVER_HOSTNAME'),
         'image_dir': os.environ.get('IMAGE_DIR'),
         'cpu_feature': os.environ.get('CPU_FEATURE'),
-        'bridge': os.environ.get('BRIDGE'),
+        'bridge': bridge,
         'bridge2': os.environ.get('BRIDGE2'),
-        'nat': os.environ.get('NAT'),
+        'network': network,
         'ip_addr': os.environ.get('IPADDR'),
         'netmask': os.environ.get('NETMASK'),
         'gateway': os.environ.get('GATEWAY'),
@@ -1186,8 +1179,8 @@ def vm_create():
     if options['cpu_feature']:
         command_args.append('--cpu-feature {cpu_feature}')
 
-    if options['nat']:
-        command_args.append('-n network={nat}')
+    if options['network']:
+        command_args.append('-n network={network}')
     elif options['bridge']:
         command_args.append('-n bridge={bridge}')
     else:
@@ -1226,16 +1219,6 @@ def vm_create():
     else:
         env['vm_domain'] = '{hostname}'.format(**options)
 
-    # fix_hostname only if using VLAN Bridge.
-    if options['bridge'] != 'br0':
-        # We need to fix the /etc/hosts file for snap-guest changes.
-        execute(
-            fix_hostname,
-            entry_domain=env['vm_domain'],
-            host_ip=env['vm_ip'],
-            host=env['vm_ip'],
-        )
-
     # Execute setup_ddns only if using bridge br0 and foreman (In case of internal
     # libvirt provisioning) with dynamic IP
     if (
@@ -1252,18 +1235,15 @@ def vm_create():
 
 def vm_destroy(target_image=None, image_dir=None, delete_image=False):
     """Task to destroy a VM"""
-    if target_image is None:
+    if not target_image:
         print('You should specify the virtual machine image')
         sys.exit(1)
-    if image_dir is None:
-        image_dir = LIBVIRT_IMAGES_DIR
+    image_dir = image_dir or LIBVIRT_IMAGES_DIR
     if isinstance(delete_image, str):
         delete_image = (delete_image.lower() == 'true')
 
-    run('virsh destroy {target_image}'.format(target_image=target_image),
-        warn_only=True)
-    run('virsh undefine {target_image}'.format(target_image=target_image),
-        warn_only=True)
+    run('virsh destroy {target_image}'.format(target_image=target_image), warn_only=True)
+    run('virsh undefine {target_image}'.format(target_image=target_image), warn_only=True)
 
     if delete_image is True:
         image_name = '{target_image}.img'.format(target_image=target_image)
@@ -1402,9 +1382,8 @@ def install_prerequisites():
     # Full forward and reverse DNS resolution using a fully qualified domain
     # name. Check that hostname and localhost resolve correctly, using the
     # following commands:
-    for command in (
-            'ping -c1 localhost', 'ping -c1 $(hostname -s)',
-            'ping -c1 $(hostname -f)'):
+    for target in ('localhost', '$(hostname -f)'):
+        command = 'ping -c1 {0}'.format(target)
         if run(command, warn_only=True).failed:
             time.sleep(5)
             run(command)
@@ -2055,8 +2034,7 @@ def iso_install(
         return installer_options
 
 
-def product_install(distribution, create_vm=False, certificate_url=None,
-                    selinux_mode=None, sat_version=None,
+def product_install(distribution, certificate_url=None, selinux_mode=None, sat_version=None,
                     test_in_stage=False, puppet4='no'):
     """Task which install every product distribution.
 
@@ -2075,12 +2053,6 @@ def product_install(distribution, create_vm=False, certificate_url=None,
     Product distributions are satellite6-cdn, satellite6-downstream,
     satellite6-iso or satellite6-upstream, satellite6-koji
 
-    If ``create_vm`` is True then ``vm_destroy`` and ``vm_create`` tasks will
-    be run. Make sure to set the required environment variables for those
-    tasks.
-    Also, if one of the ``setup_ddns`` required environment variables
-    is set then that task will only run if the VM does not use any VLAN Bridges
-
     If ``certificate_url`` parameter or ``FAKE_MANIFEST_CERT_URL`` env var is
     defined the setup_fake_manifest_certificate task will run.
 
@@ -2095,8 +2067,6 @@ def product_install(distribution, create_vm=False, certificate_url=None,
     env['host'])`` must be run by using ``execute`` and passing ``host=host``.
 
     :param str distribution: product distribution wanted to install
-    :param bool create_vm: creates a virtual machine and then install the
-        product on it. Default: False.
     :param str certificate_url: where to fetch a fake certificate.
     :param sat_version: Indicates which satellite version should be installed
     :param puppet4: Indicates what puppet to install with Satellite 6.3
@@ -2110,8 +2080,6 @@ def product_install(distribution, create_vm=False, certificate_url=None,
     puppet4 = puppet4 if sat_version == '6.3' else 'no'
 
     # Command-line arguments are passed in as strings.
-    if isinstance(create_vm, str):
-        create_vm = (create_vm.lower() == 'true')
     if isinstance(test_in_stage, str):
         test_in_stage = (test_in_stage.lower() == 'true')
 
@@ -2152,20 +2120,10 @@ def product_install(distribution, create_vm=False, certificate_url=None,
             print('The ISO_URL environment variable should be defined')
             sys.exit(1)
 
-    if create_vm:
-        target_image = os.environ.get('TARGET_IMAGE')
-        if not target_image:
-            print('The TARGET_IMAGE environment variable should be defined')
-            sys.exit(1)
-
-        execute(vm_destroy, target_image, delete_image=True)
-        execute(vm_create)
-    else:
-        # if host already exists (vm_create=False) still fix hostname
-        execute(fix_hostname)
-
-    # When creating a vm the vm_ip will be set, otherwise use the fabric host
-    host = env.get('vm_ip', env['host'])
+    # if host already exists still fix hostname
+    execute(fix_hostname)
+    # Use fabric host (host defined on fab commandline)
+    host = env['host']
 
     # If we are using activationkey, subscribe to dogfood server
     # otherwise subscribe to CDN
@@ -2320,7 +2278,7 @@ def product_install(distribution, create_vm=False, certificate_url=None,
         execute(setup_bfa_prevention, host=host)
     execute(fix_qdrouterd_listen_to_ipv6, host=host)
 
-    if create_vm and 'base' in target_image:
+    if os.environ.get('PYTHON_CODE_COVERAGE') == 'true':
         # Setup Python Code Coverage only for the provisoning jobs.
         execute(setup_python_code_coverage, host=host)
 
@@ -2396,10 +2354,14 @@ def fix_hostname(entry_domain=None, host_ip=None):
             .format(host_ip, entry_domain, host))
     else:
         # Required for fixing the hostname when using satellite-installer
-        ip_addr = run(r"ping -c1 $(hostname) | awk -F\( '/icmp_seq/{print$2}' "
-                      r"| awk -F\) '{print$1}'")
-        run('echo "{0} $(hostname) $(hostname -s)" >> /etc/hosts'
-            .format(ip_addr))
+        for ip_ver in (4, 6):
+            ip_addr = run(r"ping -{0}c1 $(hostname) 2>/dev/null | "
+                          r"sed -nE 's/.*\((.+)\):\s+icmp_seq.*/\1/p'".format(ip_ver))
+            if ip_addr:
+                # if ip_addr is defined and not reversibly resolvable to hostname then do the fix
+                testcmd = '[[ $(hostname). == $(dig +short -x {0}) ]]'.format(ip_addr)
+                if run(testcmd, warn_only=True).failed:
+                    run('echo "{0} $(hostname) $(hostname -s)" >> /etc/hosts'.format(ip_addr))
 
 
 def iso_download(iso_url=None):
