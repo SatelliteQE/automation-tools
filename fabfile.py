@@ -54,6 +54,7 @@ from automation_tools import (  # noqa: F401
     setup_python_code_coverage,
     setup_satellite_firewall,
     setup_libvirt_key,
+    setup_local_rex_key,
     setup_proxy,
     setup_ruby_code_coverage,
     setup_rubysys_code_coverage,

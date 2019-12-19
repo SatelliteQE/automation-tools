@@ -1091,6 +1091,13 @@ def setup_libvirt_key():
         )
 
 
+def setup_local_rex_key():
+    """Puts the foreman-proxy public RSA key to authorized_keys of root user
+    This allows performing REX jobs (and accessing cockpit console) on the sat host itself
+    """
+    run('cat ~foreman-proxy/.ssh/id_rsa_foreman_proxy.pub >> /root/.ssh/authorized_keys')
+
+
 def vm_create():
     """Task to create a VM using snap-guest based on a ``SOURCE_IMAGE`` base
     image.
@@ -2244,6 +2251,10 @@ def product_install(distribution, create_vm=False, certificate_url=None,
         installer_options.update({
             'foreman-proxy-plugin-pulp-puppet-content-dir': '/etc/puppetlabs/code/environments'})
 
+    # enable cockpit feature
+    if (sat_version not in ('6.3', '6.4', '6.5', '6.6')):
+        installer_options.update({'enable-foreman-plugin-remote-execution-cockpit': 'true'})
+
     if os.environ.get('PROXY_INFO'):
         # execute returns a dictionary mapping host strings to the given
         # task's return value
@@ -2294,6 +2305,7 @@ def product_install(distribution, create_vm=False, certificate_url=None,
         execute(install_puppet_scap_client, host=host)
         execute(install_ansible_scap_client, host=host)
     execute(oscap_content, host=host)
+    execute(setup_local_rex_key, host=host)
     # setup_foreman_discovery
     # setup_discovery_task needs to be run at last otherwise, any other
     # tasks like ostree which is re-running installer would re-set the
@@ -2911,6 +2923,7 @@ def katello_installer(debug=False, distribution=None, verbose=True,
         installer = 'foreman'
         scenario = 'katello'
         extra_options.append('--enable-foreman-plugin-remote-execution')
+        extra_options.append('--enable-foreman-plugin-remote-execution-cockpit')  # noqa
         extra_options.append('--enable-foreman-proxy-plugin-remote-execution-ssh')  # noqa
         extra_options.append('--enable-foreman-plugin-discovery')
         extra_options.append('--enable-foreman-proxy-plugin-discovery')
