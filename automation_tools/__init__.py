@@ -2239,6 +2239,10 @@ def product_install(distribution, create_vm=False, certificate_url=None,
     # enable ostree feature
     installer_options.update({'katello-enable-ostree': 'true'})
 
+    # enable async ssh for rex
+    if sat_version not in ('6.3', '6.4', '6.5', '6.6'):
+        installer_options.update({'foreman-proxy-plugin-remote-execution-ssh-async-ssh': 'true'})
+
     # BZ #1772851 Puppet classes are missing after adding a puppet module and CV publishing
     if bz_bug_is_open(1772851) and sat_version == '6.7':
         installer_options.update({
