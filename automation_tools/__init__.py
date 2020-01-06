@@ -2257,7 +2257,7 @@ def product_install(distribution, create_vm=False, certificate_url=None,
 
     # enable cockpit feature
     if (sat_version not in ('6.3', '6.4', '6.5', '6.6')):
-        installer_options.update({'enable-foreman-plugin-remote-execution-cockpit': 'true'})
+        installer_options.update({'enable-foreman-plugin-remote-execution-cockpit': None})
 
     if os.environ.get('PROXY_INFO'):
         # execute returns a dictionary mapping host strings to the given
@@ -2927,7 +2927,6 @@ def katello_installer(debug=False, distribution=None, verbose=True,
         installer = 'foreman'
         scenario = 'katello'
         extra_options.append('--enable-foreman-plugin-remote-execution')
-        extra_options.append('--enable-foreman-plugin-remote-execution-cockpit')  # noqa
         extra_options.append('--enable-foreman-proxy-plugin-remote-execution-ssh')  # noqa
         extra_options.append('--enable-foreman-plugin-discovery')
         extra_options.append('--enable-foreman-proxy-plugin-discovery')
