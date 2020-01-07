@@ -2358,8 +2358,7 @@ def product_install(distribution, create_vm=False, certificate_url=None,
         execute(upgrade_puppet, cdn=distribution.endswith('cdn'), host=host)
     if os.environ.get('HOTFIX') != 'NO_HOTFIX':
         execute(apply_hotfix, host=host)
-    if bz_bug_is_open(1607793):
-        execute(setup_rhv_ca, host=host)
+    execute(setup_rhv_ca, host=host)
 
 
 def fix_qdrouterd_listen_to_ipv6():
