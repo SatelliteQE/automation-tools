@@ -14,7 +14,6 @@ from datetime import date
 from io import StringIO
 from re import MULTILINE, search
 
-from automation_tools.bz import bz_bug_is_open
 from automation_tools.repository import (
     create_custom_repos, disable_repos, disable_beaker_repos, enable_repos, enable_satellite_repos,
 )
@@ -2204,11 +2203,6 @@ def product_install(distribution, certificate_url=None, selinux_mode=None, sat_v
     if sat_version not in ('6.3', '6.4', '6.5', '6.6'):
         installer_options.update({'foreman-proxy-plugin-remote-execution-ssh-async-ssh': 'true'})
 
-    # BZ #1772851 Puppet classes are missing after adding a puppet module and CV publishing
-    if bz_bug_is_open(1772851) and sat_version == '6.7':
-        installer_options.update({
-            'foreman-proxy-plugin-pulp-puppet-content-dir': '/etc/puppetlabs/code/environments'})
-
     # enable cockpit feature
     if (sat_version not in ('6.3', '6.4', '6.5', '6.6')):
         installer_options.update({'enable-foreman-plugin-remote-execution-cockpit': None})
@@ -2239,8 +2233,7 @@ def product_install(distribution, certificate_url=None, selinux_mode=None, sat_v
     execute(run_command, os.environ.get('FIX_POSTINSTALL'))
 
     # Temporary workaround to solve pulp message bus connection issue
-    # only for 6.1 and above
-    if (sat_version not in ('6.0', '6.1', '6.2', '6.3', '6.4')):
+    if (sat_version not in ('6.3', '6.4')):
         execute(set_service_check_status)
 
     certificate_url = certificate_url or os.environ.get('FAKE_MANIFEST_CERT_URL')
