@@ -1,7 +1,7 @@
 """Taks for managing repositories"""
 from __future__ import print_function
 
-from automation_tools.utils import distro_info
+from automation_tools.utils import distro_info, version
 from fabric.api import hide, put, run
 from functools import wraps
 from io import StringIO
@@ -162,7 +162,7 @@ def enable_satellite_repos(cdn=False, beta=False, disable_enabled=True,
         ]
         if sat_version in ['6.4', '6.5']:
             repos.append('rhel-{0}-server-ansible-2.6-rpms')
-        if sat_version >= '6.6':
+        if version(sat_version) > version(6.5):
             repos.append('rhel-{0}-server-ansible-2.8-rpms')
 
     if beta:

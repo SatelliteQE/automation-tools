@@ -18,9 +18,7 @@ from automation_tools.bz import bz_bug_is_open
 from automation_tools.repository import (
     create_custom_repos, disable_repos, disable_beaker_repos, enable_repos, enable_satellite_repos,
 )
-from automation_tools.utils import (
-    distro_info, run_command, update_packages
-)
+from automation_tools.utils import distro_info, run_command, update_packages, version
 from fabric.api import cd, env, execute, get, hide, local, put, run, settings, sudo
 
 from six.moves.urllib.parse import urljoin
@@ -446,7 +444,7 @@ def setup_default_libvirt(bridge=None, ip_address="192.168.100.1"):
     return interface
 
 
-def setup_default_subnet(sat_version):
+def setup_default_subnet():
     """Postinstall task to setup default subnet within Satellite
 
     Expects the following environment variables:
@@ -460,10 +458,8 @@ def setup_default_subnet(sat_version):
     DHCP_RANGE
         The range in the subnet operated by DHCP Capsule
 
-    :param str sat_version: contains Satellite version (e.g. 6.3, 6.4)
     """
-    dhcp_range = os.environ.get(
-        'DHCP_RANGE', '192.168.100.10 192.168.100.254').split()
+    dhcp_range = os.environ.get('DHCP_RANGE', '192.168.100.10 192.168.100.254').split()
     options = {
         'password': os.environ.get('ADMIN_PASSWORD', 'changeme'),
         'network':  os.environ.get('SUBNET', '192.168.100.0'),
@@ -1744,7 +1740,7 @@ def apply_hotfix():
         run('/root/hotfix.sh')
 
 
-def upstream_install(admin_password=None, run_katello_installer=True):
+def upstream_install(admin_password=None, run_katello_installer=True, **kwargs):
     """Task to install Foreman nightly using forklift scripts"""
     koji = 'koji' in os.environ.get('DISTRIBUTION', '').lower()
     if admin_password is None:
@@ -1808,7 +1804,7 @@ def upstream_install(admin_password=None, run_katello_installer=True):
         return installer_options
 
 
-def downstream_install(admin_password=None, run_katello_installer=True):
+def downstream_install(sat_version='7', admin_password=None, run_katello_installer=True):
     """Task to install Satellite 6
 
     The following environment variables affect this command:
@@ -1819,8 +1815,8 @@ def downstream_install(admin_password=None, run_katello_installer=True):
         URL for the Satellite compose repository.
     MAINTAIN_REPO
         URL for the satellite maintenance compose repository
-    SATELLITE_VERSION
-        Satellite version.
+
+    :param sat_version: Indicates which satellite version is being installed
 
     """
     if admin_password is None:
@@ -1850,14 +1846,12 @@ def downstream_install(admin_password=None, run_katello_installer=True):
 
     # Install required packages for the installation
     run('yum install -y satellite')
-    if float(os.environ.get('SATELLITE_VERSION')) > 6.5:
-        installer_options = {
-            'foreman-initial-admin-password': admin_password,
-        }
+
+    if version(sat_version) > version(6.5):
+        installer_options = {'foreman-initial-admin-password': admin_password}
     else:
-        installer_options = {
-            'foreman-admin-password': admin_password,
-        }
+        installer_options = {'foreman-admin-password': admin_password}
+
     if run_katello_installer:
         katello_installer(**installer_options)
         # Ensure that the installer worked
@@ -1866,9 +1860,9 @@ def downstream_install(admin_password=None, run_katello_installer=True):
         return installer_options
 
 
-def repofile_install(admin_password=None, run_katello_installer=True,
-                     repo_url=None):
-    """Task to install Satellite 6.3 and 6.4 via repo files
+def repofile_install(sat_version='7', admin_password=None,
+                     run_katello_installer=True, repo_url=None):
+    """Task to install Satellite via repo files
 
     The following environment variables affect this command:
 
@@ -1876,8 +1870,9 @@ def repofile_install(admin_password=None, run_katello_installer=True,
         Optional, defaults to 'changeme'. Foreman admin password.
     REPO_FILE_URL
         URL for the compose repository file to fetch.
-    SATELLITE_VERSION
-        Satellite version.
+
+    :param sat_version: Indicates which satellite version is being installed
+
     """
     os_version = distro_info()[1]
     if admin_password is None:
@@ -1896,14 +1891,11 @@ def repofile_install(admin_password=None, run_katello_installer=True,
     # Install required packages for the installation
     run('yum install -y satellite')
 
-    if float(os.environ.get('SATELLITE_VERSION')) > 6.5:
-        installer_options = {
-            'foreman-initial-admin-password': admin_password,
-        }
+    if version(sat_version) > version(6.5):
+        installer_options = {'foreman-initial-admin-password': admin_password}
     else:
-        installer_options = {
-            'foreman-admin-password': admin_password,
-        }
+        installer_options = {'foreman-admin-password': admin_password}
+
     if run_katello_installer:
         katello_installer(**installer_options)
         # Ensure that the installer worked
@@ -1912,15 +1904,16 @@ def repofile_install(admin_password=None, run_katello_installer=True,
         return installer_options
 
 
-def ak_install(admin_password=None, run_katello_installer=True):
-    """Task to install Satellite 6.3 and 6.4 via Activation Keys
+def ak_install(sat_version='7', admin_password=None, run_katello_installer=True):
+    """Task to install Satellite via Activation Keys
 
     The following environment variables affect this command:
 
     ADMIN_PASSWORD
         Optional, defaults to 'changeme'. Foreman admin password.
-    SATELLITE_VERSION
-        Satellite version.
+
+    :param sat_version: Indicates which satellite version is being installed
+
     """
     if admin_password is None:
         admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme')
@@ -1928,14 +1921,11 @@ def ak_install(admin_password=None, run_katello_installer=True):
     # Install required packages for the installation
     run('yum install -y satellite')
 
-    if float(os.environ.get('SATELLITE_VERSION')) > 6.5:
-        installer_options = {
-            'foreman-initial-admin-password': admin_password,
-        }
+    if version(sat_version) > version(6.5):
+        installer_options = {'foreman-initial-admin-password': admin_password}
     else:
-        installer_options = {
-            'foreman-admin-password': admin_password,
-        }
+        installer_options = {'foreman-admin-password': admin_password}
+
     if run_katello_installer:
         katello_installer(**installer_options)
         # Ensure that the installer worked
@@ -1944,29 +1934,27 @@ def ak_install(admin_password=None, run_katello_installer=True):
         return installer_options
 
 
-def cdn_install(run_katello_installer=True):
+def cdn_install(sat_version='7', run_katello_installer=True):
     """Installs Satellite 6 from CDN.
 
     The following environment variables affect this command:
 
     ADMIN_PASSWORD
         Optional, defaults to 'changeme'. Foreman admin password.
-    SATELLITE_VERSION
-        Satellite version.
+
+    :param sat_version: Indicates which satellite version is being installed
 
     """
     admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme')
 
     # Install required packages for the installation
     run('yum install -y satellite')
-    if float(os.environ.get('SATELLITE_VERSION')) > 6.5:
-        installer_options = {
-            'foreman-initial-admin-password': admin_password,
-        }
+
+    if version(sat_version) > version(6.5):
+        installer_options = {'foreman-initial-admin-password': admin_password}
     else:
-        installer_options = {
-            'foreman-admin-password': admin_password,
-        }
+        installer_options = {'foreman-admin-password': admin_password}
+
     if run_katello_installer:
         katello_installer(**installer_options)
         # Ensure that the installer worked
@@ -1975,9 +1963,8 @@ def cdn_install(run_katello_installer=True):
         return installer_options
 
 
-def iso_install(
-        admin_password=None, check_gpg_signatures=False,
-        run_katello_installer=True):
+def iso_install(sat_version='7',
+                admin_password=None, check_gpg_signatures=False, run_katello_installer=True):
     """Installs Satellite 6 from an ISO image.
 
     The following environment variables affect this command:
@@ -1988,8 +1975,9 @@ def iso_install(
         Optional, defaults to 'changeme'. Foreman admin password.
     CHECK_GPG_SIGNATURES
        Optional, all values other than 'true' will default to 'false'.
-    SATELLITE_VERSION
-        Satellite version.
+
+    :param sat_version: Indicates which satellite version is being installed
+
     """
     iso_url = os.environ.get('ISO_URL') or os.environ.get('BASE_URL')
     if iso_url is None:
@@ -2018,14 +2006,11 @@ def iso_install(
         else:
             run('./install_packages --nogpgsigs')
 
-    if float(os.environ.get('SATELLITE_VERSION')) > 6.5:
-        installer_options = {
-            'foreman-initial-admin-password': admin_password,
-        }
+    if version(sat_version) > version(6.5):
+        installer_options = {'foreman-initial-admin-password': admin_password}
     else:
-        installer_options = {
-            'foreman-admin-password': admin_password,
-        }
+        installer_options = {'foreman-admin-password': admin_password}
+
     if run_katello_installer:
         katello_installer(**installer_options)
         # Ensure that the installer worked
@@ -2172,7 +2157,9 @@ def product_install(distribution, certificate_url=None, selinux_mode=None, sat_v
 
     # execute returns a dictionary mapping host strings to the given task's return value
     installer_options.update(
-        next(iter(execute(install_tasks[distribution], run_katello_installer=False).values()))
+        next(iter(execute(
+            install_tasks[distribution], sat_version=sat_version, run_katello_installer=False
+        ).values()))
     )
 
     # When using VLAN Bridges os.environ.get('BRIDGE') is 'true' and
@@ -2201,11 +2188,11 @@ def product_install(distribution, certificate_url=None, selinux_mode=None, sat_v
     installer_options.update({'katello-enable-ostree': 'true'})
 
     # enable async ssh for rex
-    if sat_version not in ('6.3', '6.4', '6.5', '6.6'):
+    if version(sat_version) > version(6.6):
         installer_options.update({'foreman-proxy-plugin-remote-execution-ssh-async-ssh': 'true'})
 
     # enable cockpit feature
-    # if (sat_version not in ('6.3', '6.4', '6.5', '6.6')):
+    # if version(sat_version) > version(6.6):
     # WORKAROUND (no BZ): 6.8 presnaps are failing due to this feature, disable temporarily for 6.8
     if (sat_version not in ('6.3', '6.4', '6.5', '6.6', '6.8')):
         installer_options.update({'enable-foreman-plugin-remote-execution-cockpit': None})
@@ -2236,7 +2223,7 @@ def product_install(distribution, certificate_url=None, selinux_mode=None, sat_v
     execute(run_command, os.environ.get('FIX_POSTINSTALL'))
 
     # Temporary workaround to solve pulp message bus connection issue
-    if (sat_version not in ('6.3', '6.4')):
+    if version(sat_version) > version(6.4):
         execute(set_service_check_status)
 
     certificate_url = certificate_url or os.environ.get('FAKE_MANIFEST_CERT_URL')
@@ -2260,8 +2247,8 @@ def product_install(distribution, certificate_url=None, selinux_mode=None, sat_v
     # tasks like ostree which is re-running installer would re-set the
     # discovery templates as well. Please see #1387179 for more info.
     execute(setup_foreman_discovery, sat_version=sat_version)
-    execute(setup_default_subnet, sat_version=sat_version)
-    if sat_version not in ('6.3', '6.4'):
+    execute(setup_default_subnet)
+    if version(sat_version) > version(6.4):
         execute(setup_bfa_prevention)
     execute(fix_qdrouterd_listen_to_ipv6)
 
@@ -3252,7 +3239,7 @@ def configure_telemetry(http_server=None):
 def package_install(packages, sat_version=None):
     # Fetch the Satellite Version information.
     sat_version = sat_version or os.environ.get('SATELLITE_VERSION')
-    if (sat_version not in ('6.3', '6.4', '6.5') and
+    if (version(sat_version) > version(6.5) and
        run('which foreman-maintain', warn_only=True).succeeded):
         command = 'foreman-maintain packages install -y {}'.format(packages)
     else:

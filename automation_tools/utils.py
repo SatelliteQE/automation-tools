@@ -96,6 +96,11 @@ def run_command(cmd=None):
         run(cmd)
 
 
+def version(satver='0'):
+    satver = str(satver)
+    return tuple(map(int, ('9999' if 'nightly' in satver else satver).split('.')))
+
+
 def get_discovery_image():
     """ Task for getting unattended foreman-discovery ISO image
     :return: foreman-discovery-image iso under /var/lib/libvirt/images/
