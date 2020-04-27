@@ -14,6 +14,7 @@ from datetime import date
 from io import StringIO
 from re import MULTILINE, search
 
+from automation_tools.bz import bz_bug_is_open
 from automation_tools.repository import (
     create_custom_repos, disable_repos, disable_beaker_repos, enable_repos, enable_satellite_repos,
 )
@@ -2875,6 +2876,12 @@ def katello_installer(debug=False, distribution=None, verbose=True,
     else:  # downstream
         installer = 'satellite'
         scenario = scenario or 'satellite'
+        if sat_version == '6.7':
+            # menu item "RH Inventory"
+            extra_options.append('--enable-foreman-plugin-inventory-upload')
+        elif sat_version == '6.8' and not bz_bug_is_open(1834302):
+            # menu item "RH Inventory"
+            extra_options.append('--enable-foreman-plugin-rh-cloud')
 
     if ('foreman-proxy-dns-forwarders' in kwargs and
             isinstance(kwargs['foreman-proxy-dns-forwarders'], list)):
