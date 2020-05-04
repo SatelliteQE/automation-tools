@@ -59,8 +59,8 @@ chmod +x /etc/rc.local
 cat << EOF >> /etc/rc.local
 (
     [ -f /root/setup_configured ] && echo exiting && exit
-    firewall-cmd --add-service mdns --permanent
-    firewall-cmd --reload
+    firewall-cmd --add-service mdns
+    firewall-cmd --runtime-to-permanent
     ntpdate clock.redhat.com
     touch /root/setup_configured
 ) 2>&1 | tee -a /var/log/baseimage-firstboot.log
