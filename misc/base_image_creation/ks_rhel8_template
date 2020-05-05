@@ -14,10 +14,8 @@ lang en_US.UTF-8
 network  --bootproto=dhcp --device=ens3 --ipv6=auto --activate
 # Root password
 rootpw --iscrypted ENCRYPT_PASS 
-# System services
-services --enabled="chronyd"
 # System timezone
-timezone America/New_York
+timezone --utc America/New_York
 # System bootloader configuration
 bootloader --location=mbr --boot-drive=vda
 #autopart --type=lvm
@@ -65,7 +63,9 @@ cat << EOF >> /etc/rc.local
     [ -f /root/setup_configured ] && echo exiting && exit
     firewall-cmd --add-service mdns
     firewall-cmd --runtime-to-permanent
+    systemctl stop chronyd
     ntpdate clock.redhat.com
+    systemctl start chronyd
     touch /root/setup_configured
 ) 2>&1 | tee -a /var/log/baseimage-firstboot.log
 EOF
