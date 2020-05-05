@@ -2296,6 +2296,7 @@ def product_install(distribution, certificate_url=None, selinux_mode=None, sat_v
     if os.environ.get('HOTFIX') != 'NO_HOTFIX':
         execute(apply_hotfix)
     execute(setup_rhv_ca)
+    execute(install_expect)
 
 
 def fix_qdrouterd_listen_to_ipv6():
@@ -3262,3 +3263,8 @@ def package_install(packages, sat_version=None):
     else:
         command = 'yum -y install {}'.format(packages)
     return command
+
+
+def install_expect():
+    # install Expect package
+    run(package_install('expect'))
