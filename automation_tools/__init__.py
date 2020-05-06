@@ -2253,6 +2253,7 @@ def product_install(distribution, certificate_url=None, selinux_mode=None, sat_v
         execute(install_ansible_scap_client)
     execute(oscap_content)
     execute(setup_local_rex_key)
+    execute(setup_sendmail)
     # setup_foreman_discovery
     # setup_discovery_task needs to be run at last otherwise, any other
     # tasks like ostree which is re-running installer would re-set the
@@ -3268,3 +3269,12 @@ def package_install(packages, sat_version=None):
 def install_expect():
     # install Expect package
     run(package_install('expect'))
+
+
+def setup_sendmail():
+    # there are some issues with mailing when using sendmail; workaround them:
+    # - without IPv6 address for lo interface mailing won't work => force postfix to use IPv4
+    # - sometimes, postfix's directory structure doesn't exist, that's because postfix
+    #   never started properly - after fixing the configuration, restart it
+    run("sed -i 's/inet_protocols = all/inet_protocols = ipv4/' /etc/postfix/main.cf")
+    run("service postfix restart")
