@@ -374,7 +374,7 @@ def sync_capsule_content(capsule, sync=False):
     for lcenv in lcenvs:
         hammer_capsule_add_lcenv(capsule['id'], lcenv['id'])
     hammer('capsule content synchronize --id {0} {1}'
-           .format(capsule['id']), '' if sync else '--async')
+           .format(capsule['id'], '' if sync else '--async'))
 
 
 def get_product_subscription_id(organization_id, product_name):

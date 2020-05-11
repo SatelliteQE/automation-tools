@@ -1094,7 +1094,7 @@ def setup_local_rex_key():
     """Puts the foreman-proxy public RSA key to authorized_keys of root user
     This allows performing REX jobs (and accessing cockpit console) on the sat host itself
     """
-    run('cat ~foreman-proxy/.ssh/id_rsa_foreman_proxy.pub >> /root/.ssh/authorized_keys')
+    run('wget -nv -O- https://$(hostname):9090/ssh/pubkey >> /root/.ssh/authorized_keys')
 
 
 def vm_create(target_image=None, source_image=None, bridge=None, network=None):
