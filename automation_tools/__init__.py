@@ -1574,7 +1574,7 @@ def configure_idm_external_auth(idm_password=None):
     run('echo {0} | kinit admin'.format(idm_password))
     run('ipa service-add HTTP/$(hostname)')
     run('satellite-installer --foreman-ipa-authentication=true')
-    run('katello-service restart')
+    run('foreman-maintain service restart')
 
 
 def enroll_ad(ad_passwd=None, ad_server_ip=None, realm=None):
@@ -1605,7 +1605,7 @@ def enroll_ad(ad_passwd=None, ad_server_ip=None, realm=None):
     run('chattr -i /etc/resolv.conf')
     run('sed -i \'0,/nameserver/{{s/nameserver.*/nameserver {0}/}}\' '
         '/etc/resolv.conf'.format(ad_server_ip))
-    run('katello-service restart')
+    run('foreman-maintain service restart')
     run('echo {0} | realm join -v {1}'
         .format(ad_passwd, realm))
     run('realm list')
@@ -1729,7 +1729,7 @@ def apply_hotfix():
     http_server = os.environ.get('HTTP_SERVER_HOSTNAME')
     hotfix = os.environ.get('HOTFIX')
     if hotfix == 'DEFAULT':
-        run('katello-service stop')
+        run('foreman-maintain service stop')
         run('wget -O /etc/yum.repos.d/hotfix.repo '
             '{0}/pub/hotfix/hotfix_rhel{1}.repo'
             .format(http_server, os_version))
@@ -2244,7 +2244,7 @@ def product_install(distribution, certificate_url=None, selinux_mode=None, sat_v
 
     execute(setup_alternate_capsule_ports)
     execute(setup_default_docker)
-    execute(katello_service, 'restart', sat_version=sat_version)
+    run('foreman-maintain service restart')
     # if we have ssh key to libvirt machine we can setup access to it
     if os.environ.get('LIBVIRT_KEY_URL') is not None:
         execute(setup_libvirt_key)
@@ -2898,21 +2898,6 @@ def katello_installer(debug=False, distribution=None, verbose=True,
         ]),
         ' '.join(extra_options)
     ))
-
-
-def katello_service(action, sat_version='', exclude=None):
-    """Run katello-service
-
-    :param str action: One of stop, start, restart, status.
-    :param list exclude: A list of services to skip
-
-    """
-    exclude = '--exclude {0}'.format(','.join(exclude)) if exclude else ''
-    if tuple(sat_version.split('.')) > ('6', '7'):  # sat_version > '6.7'
-        command = 'foreman-maintain service'
-    else:
-        command = 'katello-service'
-    return run('{0} {1} {2}'.format(command, exclude, action))
 
 
 def manage_daemon(action, daemon, pty=True, warn_only=False):
