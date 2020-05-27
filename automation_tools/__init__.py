@@ -2287,7 +2287,9 @@ def product_install(distribution, certificate_url=None, selinux_mode=None, sat_v
     if os.environ.get('EXTERNAL_AUTH') == 'IDM':
         execute(configure_idm_external_auth)
     if os.environ.get('IDM_REALM') == 'true':
-        execute(configure_realm)
+        # WORKAROUND for BZ 1840635 which manifests only on 6.8
+        if not bz_bug_is_open(1840635) or sat_version != '6.8':
+            execute(configure_realm)
 
     if os.environ.get('EXTERNAL_AUTH') == 'AD':
         execute(enroll_ad)
