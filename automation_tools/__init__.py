@@ -340,7 +340,7 @@ def setup_default_capsule(interface=None, run_katello_installer=True):
         print('Please make sure the hostname is configured with a FQDN')
         sys.exit(1)
 
-    domain = hostname.split('.', 1)[1]
+    domain = os.environ.get('DNS_ZONE', hostname.split('.', 1)[1])
     if len(domain) == 0:
         print('Was not possible to fetch domain information')
         sys.exit(1)
@@ -446,6 +446,37 @@ def setup_default_libvirt(bridge=None, ip_address="192.168.100.1"):
     return interface
 
 
+def setup_dns_resolver(nameserver='127.0.0.1'):
+    """Postinstall task to setup DNS resolver to use Internal DNS Capsule
+
+    :param str dns_server: DNS server IP adress
+    """
+    # change dns resolver only if new server is responding
+    if run('host $(hostname) {0}'.format(nameserver), warn_only=True).succeeded:
+        run('chattr -i /etc/resolv.conf')
+        run('sed -Ei \'s/^(search.*)/\\1\\nnameserver {0}/\' /etc/resolv.conf'.format(nameserver))
+
+
+def setup_default_domain(dns_zone='example.com'):
+    """Postinstall task to setup default domain matching dns zone operated by DNS Capsule
+
+    Expects the following environment variables:
+
+    :param str dns_zone: the domain operated by DNS Capsule
+    """
+    options = {
+        'password': os.environ.get('ADMIN_PASSWORD', 'changeme'),
+        'dns_zone': dns_zone,
+    }
+    command = (
+        'hammer -u admin -p {password} domain create --name {dns_zone} --dns-id 1'
+        .format(**options)
+    )
+    # create or update if failed
+    if run(command, warn_only=True).failed:
+        run(command.replace(' create ', ' update ', 1))
+
+
 def setup_default_subnet(sat_version):
     """Postinstall task to setup default subnet within Satellite
 
@@ -459,6 +490,8 @@ def setup_default_subnet(sat_version):
         The gateway in the subnet
     DHCP_RANGE
         The range in the subnet operated by DHCP Capsule
+    DNS_ZONE
+        The domain operated by DNS Capsule
 
     :param str sat_version: contains Satellite version (e.g. 6.3, 6.4)
     """
@@ -470,13 +503,13 @@ def setup_default_subnet(sat_version):
         'mask':     os.environ.get('NETMASK', '255.255.255.0'),
         'gateway':  os.environ.get('GATEWAY', '192.168.100.1'),
         'from':     dhcp_range[0], 'to': dhcp_range[1],
+        'dns_zone': os.environ.get('DNS_ZONE', 'example.com')
     }
     command = (
         'hammer -u admin -p {password} subnet create --name "Default Subnet" '
-        '--network {network} --mask {mask} '
-        '--gateway {gateway} --dns-primary {gateway} '
-        '--ipam DHCP --from {from} --to {to} '
-        '--dhcp-id 1 --dns-id 1 --tftp-id 1 --discovery-id 1'
+        '--network {network} --mask {mask} --gateway {gateway} '
+        '--dns-primary {gateway} --ipam DHCP --from {from} --to {to} '
+        '--dhcp-id 1 --dns-id 1 --tftp-id 1 --discovery-id 1 --domains {dns_zone}'
     ).format(**options)
     # create or update if failed
     if run(command, warn_only=True).failed:
@@ -1535,26 +1568,27 @@ def cleanup_idm(hostname, idm_password=None):
     run('ipa host-del {0}'.format(hostname), warn_only=True)
 
 
-def enroll_idm(idm_password=None):
+def enroll_idm(idm_server=None, idm_password=None):
     """Enroll the Satellite6 Server to an IDM Server.
 
     Expects the following environment variables:
 
     IDM_PASSWORD
         IDM Server Password to fetch a token.
-
+    IDM_SERVER_FQDN
+        IDM Server hostname
     """
     # NOTE: Works only when Satellite6 and IDM domains are same and the
     # first nameserver in /etc/resolv.conf file points to the IDM server.
-    if idm_password is None:
-        idm_password = os.environ.get('IDM_PASSWORD')
+    idm_password = idm_password or os.environ.get('IDM_PASSWORD')
+    idm_server = idm_server or os.environ.get('IDM_SERVER_FQDN')
     run('yum -y --disableplugin=foreman-protector install ipa-client ipa-admintools')
-    run('ipa-client-install --password={0} --principal admin '
-        '--unattended --no-ntp'.format(idm_password))
-    result = run('id admin')
-    if result.succeeded:
-        print('Enrollment of Satellite6 Server to IDM is successfully '
-              'completed.')
+    # ipa-client-install has no force install so try to uninstall first
+    run('ipa-client-install --uninstall --unattended', warn_only=True)
+    run('ipa-client-install --password={0} --principal=admin --unattended --no-ntp '
+        '--domain=$(hostname -d) --server={1}'.format(idm_password, idm_server))
+    if run('id admin').succeeded:
+        print('Enrollment of Satellite6 Server to IDM is successfully completed.')
 
 
 def configure_idm_external_auth(idm_password=None):
@@ -1566,15 +1600,13 @@ def configure_idm_external_auth(idm_password=None):
         IDM Server Password to fetch a token.
 
     """
-    result = run('id admin')
-    if result.failed:
+    if run('id admin').failed:
         print('Please execute enroll_idm before configuring External Auth')
         sys.exit(1)
-    if idm_password is None:
-        idm_password = os.environ.get('IDM_PASSWORD')
+    idm_password = idm_password or os.environ.get('IDM_PASSWORD')
     run('echo {0} | kinit admin'.format(idm_password))
     run('ipa service-add HTTP/$(hostname)')
-    run('satellite-installer --foreman-ipa-authentication=true')
+    run('satellite-installer --disable-system-checks --foreman-ipa-authentication=true')
     run('katello-service restart')
 
 
@@ -1585,35 +1617,28 @@ def enroll_ad(ad_passwd=None, ad_server_ip=None, realm=None):
 
     AD_PASSWORD
         AD Server Password to fetch a token.
-    VM_DOMAIN
-        The domain name of the AD Server.
+    AD_REALM
+        The realm to join.
     AD_SERVER_IP
         The AD Server's IP address.
 
     """
-    # NOTE: Works only when Satellite6 and Windows AD Server domains are
-    # same and the first nameserver in /etc/resolv.conf file points to the
-    # AD server.
-    if realm is None:
-        domain = os.environ.get('VM_DOMAIN')
-        realm = domain.upper()
-    if ad_passwd is None:
-        ad_passwd = os.environ.get('AD_PASSWORD')
-    if ad_server_ip is None:
-        ad_server_ip = os.environ.get('AD_SERVER_IP')
+    # NOTE: Works only when Satellite6 and Windows AD Server domains are the same
+    # and the first nameserver in /etc/resolv.conf file points to the AD server.
+    realm = realm or os.environ.get('AD_REALM')
+    ad_passwd = ad_passwd or os.environ.get('AD_PASSWORD')
+    ad_server_ip = ad_server_ip or os.environ.get('AD_SERVER_IP')
     run('yum -y --disableplugin=foreman-protector install '
         'gssproxy nfs-utils sssd adcli realmd ipa-python samba-common-tools')
     run('chattr -i /etc/resolv.conf')
-    run('sed -i \'0,/nameserver/{{s/nameserver.*/nameserver {0}/}}\' '
-        '/etc/resolv.conf'.format(ad_server_ip))
+    run('sed -i \'0,/nameserver/{{s/nameserver.*/nameserver {0}/}}\' /etc/resolv.conf'
+        .format(ad_server_ip))
     run('katello-service restart')
-    run('echo {0} | realm join -v {1}'
-        .format(ad_passwd, realm))
+    if not realm.lower() in run('realm list -n'):
+        run('echo {0} | realm join -v {1}'.format(ad_passwd, realm))
     run('realm list')
-    result = run('id administrator@{0}'.format(realm))
-    if result.succeeded:
-        print('Enrollment of Satellite6 Server to AD is successfully '
-              'completed.')
+    if run('id administrator@{0}'.format(realm)).succeeded:
+        print('Enrollment of Satellite6 Server to AD is successfully completed.')
 
 
 def configure_ad_external_auth(ad_passwd=None, realm=None):
@@ -1623,20 +1648,16 @@ def configure_ad_external_auth(ad_passwd=None, realm=None):
 
     AD_PASSWORD
         AD Server Password to fetch a token.
-    VM_DOMAIN
-        The domain name of the AD Server.
+    AD_REALM
+        The realm to use.
 
     """
-    if realm is None:
-        domain = os.environ.get('VM_DOMAIN')
-        realm = domain.upper()
-        workgroup = realm.split('.')[0]
-    result = run('id administrator@{0}'.format(realm))
-    if result.failed:
+    realm = realm or os.environ.get('AD_REALM')
+    workgroup = realm.split('.')[0]
+    ad_passwd = ad_passwd or os.environ.get('AD_PASSWORD')
+    if run('id administrator@{0}'.format(realm)).failed:
         print('Please execute enroll_ad before configuring External Auth')
         sys.exit(1)
-    if ad_passwd is None:
-        ad_passwd = os.environ.get('AD_PASSWORD')
     run('yum -y --disableplugin=foreman-protector install krb5-workstation')
     run('echo {0} | kinit administrator@{1}'.format(ad_passwd, realm))
     run('mkdir -p /etc/ipa/')
@@ -1661,7 +1682,7 @@ def configure_ad_external_auth(ad_passwd=None, realm=None):
         .format(ad_passwd))
     run('chown root:root /etc/gssproxy/http.keytab')
     run('touch /etc/httpd/conf/http.keytab')
-    run('satellite-installer --foreman-ipa-authentication=true')
+    run('satellite-installer --disable-system-checks --foreman-ipa-authentication=true')
     run('systemctl restart gssproxy.service')
     run('systemctl enable gssproxy.service')
     httpd_service = StringIO()
@@ -1691,22 +1712,17 @@ def configure_realm(admin_password=None, keytab_url=None, realm=None,
         The admin password for Satellite 6.
 
     """
-    if idm_server_ip is None:
-        idm_server_ip = os.environ.get('IDM_SERVER_IP')
-    domain = os.environ.get('VM_DOMAIN')
-    result = run('id admin')
-    if result.failed:
+    if run('id admin').failed:
         print('Please execute enroll_idm before configuring External Auth')
         sys.exit(1)
-    if keytab_url is None:
-        keytab_url = os.environ.get('KEYTAB_URL')
-    if admin_password is None:
-        admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme')
-    if realm is None:
-        realm = domain.upper()
+
+    idm_server_ip = idm_server_ip or os.environ.get('IDM_SERVER_IP')
+    keytab_url = keytab_url or os.environ.get('KEYTAB_URL')
+    admin_password = admin_password or os.environ.get('ADMIN_PASSWORD', 'changeme')
+    realm = realm or os.environ.get('VM_DOMAIN').upper()
+
     run('yum -y --disableplugin=foreman-protector install wget')
-    run('wget -O /root/freeipa.keytab {0}'.format(keytab_url))
-    run('mv /root/freeipa.keytab /etc/foreman-proxy')
+    run('wget -nv -O /etc/foreman-proxy/freeipa.keytab {0}'.format(keytab_url))
     run('chown foreman-proxy:foreman-proxy /etc/foreman-proxy/freeipa.keytab')
     run('satellite-installer --foreman-proxy-realm true '
         '--foreman-proxy-realm-principal realm-proxy@{0} '
@@ -2260,6 +2276,8 @@ def product_install(distribution, certificate_url=None, selinux_mode=None, sat_v
     # tasks like ostree which is re-running installer would re-set the
     # discovery templates as well. Please see #1387179 for more info.
     execute(setup_foreman_discovery, sat_version=sat_version)
+    execute(setup_dns_resolver)
+    execute(setup_default_domain, dns_zone=os.environ.get('DNS_ZONE'))
     execute(setup_default_subnet, sat_version=sat_version)
     if sat_version not in ('6.3', '6.4'):
         execute(setup_bfa_prevention)
