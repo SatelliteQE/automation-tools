@@ -26,7 +26,6 @@ from automation_tools import (  # noqa: F401
     install_prerequisites,
     iso_download,
     iso_install,
-    katello_service,
     partition_disk,
     performance_tuning,
     product_install,
