@@ -2847,13 +2847,17 @@ def foreman_debug(tarball_name=None, local_path=None):
 # =============================================================================
 # Helper functions
 # =============================================================================
-def katello_installer(debug=False, distribution=None, verbose=True,
+def katello_installer(distribution=None, verbose=True,
                       sat_version='6.3', scenario=None, **kwargs):
     """Runs the installer with ``kwargs`` as command options."""
     # capsule-dns-forwarders should be repeated if setting more than one
     # value check if a list is being received and repeat the option with
     # different values
-    extra_options = []
+    extra_options = [
+        '--log-level=DEBUG',
+        '--foreman-proxy-log-level=DEBUG',
+        '--foreman-logging-level=debug'
+    ]
 
     if sat_version == 'upstream-nightly':
         installer = 'foreman'
@@ -2883,10 +2887,9 @@ def katello_installer(debug=False, distribution=None, verbose=True,
             extra_options.append(
                 '--foreman-proxy-dns-forwarders="{0}"'.format(forwarder))
 
-    run('{0}-installer --scenario {1} {2} {3} {4} {5}'.format(
+    run('{0}-installer --scenario {1} {2} {3} {4}'.format(
         installer,
         scenario,
-        '-d' if debug else '',
         '-v' if verbose else '',
         ' '.join([
             '--{0}="{1}"'.format(key, val) if val else '--{0}'.format(key)
