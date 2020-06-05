@@ -444,6 +444,40 @@ def setup_default_libvirt(bridge=None, ip_address="192.168.100.1"):
     return interface
 
 
+def setup_http_proxy(proxy_info):
+    """Postinstall task to set http_proxy and content_default_http_proxy settings for
+    Satellite >= 6.7
+
+    Proxy information is passed using the PROXY_INFO environmental variable.
+    The expected format is::
+
+        PROXY_INFO=proxy://<username>:<password>@<hostname>:<port>
+
+    ``username`` and ``password`` fields can be omitted if the proxy does not
+    require authentication, for example::
+
+        PROXY_INFO=proxy://<hostname>:<port>
+    """
+    command = (
+        'hammer -u admin -p {0} settings set --name "http_proxy" --value {1}'
+    ).format(os.environ.get('ADMIN_PASSWORD', 'changeme'), proxy_info.replace('proxy:', 'http:'))
+    run(command, warn_only=True)
+    proxy_info = urlsplit(proxy_info)
+    url = 'http://{0}:{1}'.format(proxy_info.hostname, proxy_info.port)
+    command = (
+        'hammer -u admin -p {0} http-proxy create --name {1} --url {2}'
+    ).format(os.environ.get('ADMIN_PASSWORD', 'changeme'), proxy_info.hostname, url)
+    if proxy_info.username and proxy_info.password:
+        creds = ' --username {0} --password {1}'.format(proxy_info.username, proxy_info.password)
+        command = command + creds
+    run(command, warn_only=True)
+    command = (
+        'hammer -u admin -p {0} settings set --name "content_default_http_proxy" --value {1}'
+    ).format(
+        os.environ.get('ADMIN_PASSWORD', 'changeme'), proxy_info.hostname)
+    run(command, warn_only=True)
+
+
 def setup_default_subnet():
     """Postinstall task to setup default subnet within Satellite
 
@@ -2162,7 +2196,8 @@ def product_install(distribution, certificate_url=None, selinux_mode=None, sat_v
     if (sat_version not in ('6.4', '6.5', '6.6', '6.8')):
         installer_options.update({'enable-foreman-plugin-remote-execution-cockpit': None})
 
-    if os.environ.get('PROXY_INFO'):
+    proxy_info = os.environ.get('PROXY_INFO')
+    if proxy_info and version(sat_version) < version(6.7):
         # execute returns a dictionary mapping host strings to the given
         # task's return value
         installer_options.update(
@@ -2250,6 +2285,8 @@ def product_install(distribution, certificate_url=None, selinux_mode=None, sat_v
         execute(apply_hotfix)
     execute(setup_rhv_ca)
     execute(install_expect)
+    if proxy_info and version(sat_version) >= version(6.7):
+        execute(setup_http_proxy, proxy_info)
 
 
 def fix_qdrouterd_listen_to_ipv6():

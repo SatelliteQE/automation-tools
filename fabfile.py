@@ -59,6 +59,7 @@ from automation_tools import (  # noqa: F401
     setup_rubysys_code_coverage,
     setup_rubytfm_code_coverage,
     setup_vm_provisioning,
+    setup_http_proxy,
     subscribe,
     subscribe_dogfood,
     unsubscribe,
