@@ -980,7 +980,7 @@ def setup_foreman_discovery(sat_version):
     * `PXE_DEFAULT_TEMPLATE_URL`
     * `PXELINUX_DISCOVERY_SNIPPET_URL`
 
-    :param str sat_version: contains Satellite version e.g. 6.3
+    :param str sat_version: contains Satellite version
     """
     admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme')
 
@@ -1000,38 +1000,15 @@ def setup_foreman_discovery(sat_version):
     # Dump the template
     run('hammer -u admin -p {0} template dump --name "PXELinux global default" > {1}'
         .format(admin_password, template_file))
-    if sat_version == '6.3':
-        run(r'sed -i -e "s/^ONTIMEOUT\s\+local/ONTIMEOUT discovery/" {0}'.format(template_file))
-    else:
-        # since 6.4, ONTIMEOUT option uses "default_pxe_item_global" setting
-        run('hammer -u admin -p {0} settings set --name '
-            '"default_pxe_item_global" --value="discovery"'.format(admin_password))
+    # since 6.4, ONTIMEOUT option uses "default_pxe_item_global" setting
+    run('hammer -u admin -p {0} settings set --name '
+        '"default_pxe_item_global" --value="discovery"'.format(admin_password))
     run(r'sed -i -e "s/^TIMEOUT\s\+[0-9]\+/TIMEOUT 5/" {0}'.format(template_file))
     # Update the template
     run('hammer -u admin -p {0} template update --name '
         '"PXELinux global default" --type "PXELinux" --file {1}'
         .format(admin_password, template_file))
     run('rm -rf {0}'.format(template_file))
-
-
-def upgrade_puppet(cdn=False):
-    """Upgrades puppet3 to puppet4 and is applicable to Satellite6.3 only
-
-    :param cdn: Indicates whether CDN or Internal Puppet4 repo be used
-
-    Expects the following environment variables:
-
-    PUPPET4_REPO
-        The internal puppet4 repository URL.
-
-    """
-    if cdn:
-        enable_repos('rhel-7-server-satellite-6.3-puppet4-rpms')
-    else:
-        puppet4_repo = os.environ.get('PUPPET4_REPO')
-        if puppet4_repo:
-            create_custom_repos(puppet4_repo=puppet4_repo)
-    run('satellite-installer --upgrade-puppet')
 
 
 def disable_baseos_repo():
@@ -2020,7 +1997,7 @@ def iso_install(sat_version='7',
 
 
 def product_install(distribution, certificate_url=None, selinux_mode=None, sat_version=None,
-                    test_in_stage=False, puppet4='no'):
+                    test_in_stage=False):
     """Task which install every product distribution.
 
     The following environment variables affect this command:
@@ -2041,9 +2018,6 @@ def product_install(distribution, certificate_url=None, selinux_mode=None, sat_v
     If ``certificate_url`` parameter or ``FAKE_MANIFEST_CERT_URL`` env var is
     defined the setup_fake_manifest_certificate task will run.
 
-    ``PUPPET4_REPO`` env var can be defined to setup a Puppet4 repository
-    prior Satellite installation
-
     ``OS_UPGRADE_REPOS`` env var can be defined to setup a custom repository or
     repositories (space-separated list) before OS upgrade, typically OS-
     candidate repo when tesing OS compatibility.
@@ -2054,15 +2028,10 @@ def product_install(distribution, certificate_url=None, selinux_mode=None, sat_v
     :param str distribution: product distribution wanted to install
     :param str certificate_url: where to fetch a fake certificate.
     :param sat_version: Indicates which satellite version should be installed
-    :param puppet4: Indicates what puppet to install with Satellite 6.3
-        Default: 'no', 'yes', 'upgrade'
 
     """
     # Fetch the Satellite Version information.
     sat_version = sat_version or os.environ.get('SATELLITE_VERSION')
-
-    # Honour puppet4 flag only for 6.3, set 'no' for all other sat versions
-    puppet4 = puppet4 if sat_version == '6.3' else 'no'
 
     # Command-line arguments are passed in as strings.
     if isinstance(test_in_stage, str):
@@ -2090,10 +2059,10 @@ def product_install(distribution, certificate_url=None, selinux_mode=None, sat_v
 
     if (
         distribution == 'satellite6-cdn' and
-        sat_version not in ('6.3', '6.4', '6.5', '6.6', '6.7')
+        sat_version not in ('6.4', '6.5', '6.6', '6.7')
     ):
         raise ValueError(
-            "Satellite version should be in [6.3, 6.4, 6.5, 6.6, 6.7]"
+            "Satellite version should be in [6.4, 6.5, 6.6, 6.7]"
         )
 
     if selinux_mode is None:
@@ -2115,11 +2084,12 @@ def product_install(distribution, certificate_url=None, selinux_mode=None, sat_v
     else:
         execute(subscribe, stage=test_in_stage)
         # Enable repos for Satellite and disable other ones
-        execute(enable_satellite_repos,
-                cdn=distribution.endswith('cdn'),
-                beta=distribution.endswith('beta'),
-                sat_version=sat_version,
-                puppet4=puppet4)
+        execute(
+            enable_satellite_repos,
+            sat_version=sat_version,
+            cdn=distribution.endswith('cdn'),
+            beta=distribution.endswith('beta'),
+        )
 
     # Disable BaseOS if using custom image for vault_requests.
     execute(disable_baseos_repo)
@@ -2149,11 +2119,6 @@ def product_install(distribution, certificate_url=None, selinux_mode=None, sat_v
     execute(setup_avahi_discovery)
 
     execute(run_command, os.environ.get('FIX_PREINSTALL'))
-    # Sat6.3: enable *internal* puppet4 repo to perform fresh p4 install
-    if puppet4 == 'yes' and not distribution.endswith('cdn'):
-        puppet4_repo = os.environ.get('PUPPET4_REPO')
-        if puppet4_repo:
-            execute(create_custom_repos, puppet4_repo=puppet4_repo)
 
     # execute returns a dictionary mapping host strings to the given task's return value
     installer_options.update(
@@ -2194,7 +2159,7 @@ def product_install(distribution, certificate_url=None, selinux_mode=None, sat_v
     # enable cockpit feature
     # if version(sat_version) > version(6.6):
     # WORKAROUND (no BZ): 6.8 presnaps are failing due to this feature, disable temporarily for 6.8
-    if (sat_version not in ('6.3', '6.4', '6.5', '6.6', '6.8')):
+    if (sat_version not in ('6.4', '6.5', '6.6', '6.8')):
         installer_options.update({'enable-foreman-plugin-remote-execution-cockpit': None})
 
     if os.environ.get('PROXY_INFO'):
@@ -2281,9 +2246,6 @@ def product_install(distribution, certificate_url=None, selinux_mode=None, sat_v
     if os.environ.get('EXTERNAL_AUTH') == 'AD':
         execute(enroll_ad)
         execute(configure_ad_external_auth)
-    # Sat6.3: enable puppet4 repo and perform upgraded p4 install
-    if puppet4 == 'upgrade':
-        execute(upgrade_puppet, cdn=distribution.endswith('cdn'))
     if os.environ.get('HOTFIX') != 'NO_HOTFIX':
         execute(apply_hotfix)
     execute(setup_rhv_ca)
@@ -2847,8 +2809,7 @@ def foreman_debug(tarball_name=None, local_path=None):
 # =============================================================================
 # Helper functions
 # =============================================================================
-def katello_installer(distribution=None, verbose=True,
-                      sat_version='6.3', scenario=None, **kwargs):
+def katello_installer(sat_version='7', distribution=None, scenario=None, verbose=True, **kwargs):
     """Runs the installer with ``kwargs`` as command options."""
     # capsule-dns-forwarders should be repeated if setting more than one
     # value check if a list is being received and repeat the option with
@@ -2863,7 +2824,7 @@ def katello_installer(distribution=None, verbose=True,
         installer = 'foreman'
         scenario = 'katello'
         extra_options.append('--enable-foreman-plugin-remote-execution')
-        extra_options.append('--enable-foreman-proxy-plugin-remote-execution-ssh')  # noqa
+        extra_options.append('--enable-foreman-proxy-plugin-remote-execution-ssh')
         extra_options.append('--enable-foreman-plugin-discovery')
         extra_options.append('--enable-foreman-proxy-plugin-discovery')
         extra_options.append('--enable-foreman-plugin-openscap')

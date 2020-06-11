@@ -64,7 +64,6 @@ from automation_tools import (  # noqa: F401
     unsubscribe,
     update_basic_packages,
     update_rhsm_stage,
-    upgrade_puppet,
     upstream_install,
     vm_create,
     vm_destroy,
