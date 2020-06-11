@@ -120,10 +120,10 @@ def create_custom_repos(**kwargs):
         repo_file.close()
 
 
-def enable_satellite_repos(cdn=False, beta=False, disable_enabled=True,
-                           sat_version='6.5', puppet4='no'):
+def enable_satellite_repos(sat_version='6.8', cdn=False, beta=False, disable_enabled=True):
     """Enable repositories required to install Satellite 6
 
+    :param sat_version: Indicates which satellite version should be installed, default: latest
     :param cdn: Indicates if the CDN Satellite 6 repo should be enabled or not
     :param beta: Indicates if the Beta Satellite 6 repo should be enabled or
         not. The Beta repo is available through the CDN and, if both ``cdn``
@@ -131,10 +131,6 @@ def enable_satellite_repos(cdn=False, beta=False, disable_enabled=True,
         stable one.
     :param disable_enabled: If True, disable all repositories (including beaker
         repositories) before enabling repositories.
-    :param sat_version: Indicates which satellite version should be installed,
-        default set to latest.
-    :param puppet4: Indicates what puppet to install with Satellite 6.3
-        Default: 'no', 'yes', 'upgrade'
 
     """
     if isinstance(cdn, str):
@@ -171,9 +167,6 @@ def enable_satellite_repos(cdn=False, beta=False, disable_enabled=True,
     elif cdn:
         repos.append('rhel-{0}-server-satellite-{1}-rpms')
         repos.append('rhel-{0}-server-satellite-maintenance-6-rpms')
-        # Sat6.3: enable *cdn* puppet4 repo to perform fresh p4 install
-        if sat_version == '6.3' and puppet4 == 'yes':
-            repos.append('rhel-{0}-server-satellite-{1}-puppet4-rpms')
 
     enable_repos(*[repo.format(os_version, sat_version) for repo in repos])
     run('yum repolist')
