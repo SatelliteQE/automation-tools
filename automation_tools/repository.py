@@ -149,17 +149,21 @@ def enable_satellite_repos(sat_version='6.8', cdn=False, beta=False, disable_ena
         repos = [
             'rhel-{0}-for-x86_64-baseos-rpms',
             'rhel-{0}-for-x86_64-appstream-rpms',
-            'ansible-2.8-for-rhel-{0}-x86_64-rpms'
+            'ansible-{2}-for-rhel-{0}-x86_64-rpms',
         ]
     else:
         repos = [
             'rhel-{0}-server-rpms',
             'rhel-server-rhscl-{0}-rpms',
+            'rhel-{0}-server-ansible-{2}-rpms',
         ]
-        if sat_version in ['6.4', '6.5']:
-            repos.append('rhel-{0}-server-ansible-2.6-rpms')
-        if version(sat_version) > version(6.5):
-            repos.append('rhel-{0}-server-ansible-2.8-rpms')
+
+    if version(sat_version) > version(6.7):
+        ansible_version = '2.9'
+    elif version(sat_version) > version(6.5):
+        ansible_version = '2.8'
+    else:
+        ansible_version = '2.6'
 
     if beta:
         repos.append('rhel-server-{0}-satellite-6-beta-rpms')
@@ -168,7 +172,7 @@ def enable_satellite_repos(sat_version='6.8', cdn=False, beta=False, disable_ena
         repos.append('rhel-{0}-server-satellite-{1}-rpms')
         repos.append('rhel-{0}-server-satellite-maintenance-6-rpms')
 
-    enable_repos(*[repo.format(os_version, sat_version) for repo in repos])
+    enable_repos(*[repo.format(os_version, sat_version, ansible_version) for repo in repos])
     run('yum repolist')
 
 

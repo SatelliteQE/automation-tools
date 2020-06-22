@@ -255,24 +255,16 @@ def setup_avahi_discovery():
     """
     os_version = distro_info()[1]
     if run('rpm -q nss-mdns', warn_only=True).failed:
-        if os_version == 8:  # temporary fix until EPEL8 goes out
-            run('yum -y install https://dl.fedoraproject.org/pub/epel/7/x86_64/Packages'
-                '/n/nss-mdns-0.14.1-1.el7.x86_64.rpm')
-        else:
-            epel_present = run('rpm -q epel-release', warn_only=True).return_code == 0
-            if not epel_present:
-                run('yum -y install https://dl.fedoraproject.org/pub/epel/'
-                    'epel-release-latest-{0}.noarch.rpm'.format(os_version))
-            run('yum -y install nss-mdns')  # also pulls in avahi
-            if not epel_present:  # we installed epel, so removing aftwerwards
-                run('rpm -e epel-release')
+        epel_present = run('rpm -q epel-release', warn_only=True).return_code == 0
+        if not epel_present:
+            run('yum -y install https://dl.fedoraproject.org/pub/epel/'
+                'epel-release-latest-{0}.noarch.rpm'.format(os_version))
+        run('yum -y install nss-mdns')  # also pulls in avahi
+        if not epel_present:  # we installed epel, so removing afterwards
+            run('rpm -e epel-release')
 
-    if os_version >= 7:
-        run('firewall-cmd --add-service mdns --permanent')
-        run('firewall-cmd --reload')
-    else:
-        run('iptables -I INPUT -d 224.0.0.251/32 -p udp -m udp --dport 5353'
-            ' -m conntrack --ctstate NEW -j ACCEPT')
+    run('firewall-cmd --add-service mdns --permanent')
+    run('firewall-cmd --add-service mdns')
     run('service avahi-daemon restart')
 
 
@@ -287,30 +279,27 @@ def setup_default_docker():
     if os_version == 7:
         enable_repos('rhel-{0}-server-extras-rpms'.format(os_version))
 
-    # Install ``Docker`` package.
+    # Install "docker" package. On RHEL8 alias for "podman-docker"
     run('yum -y --disableplugin=foreman-protector install docker')
     # Disable 'extras' repo after installing Docker
     if os_version == 7:
         disable_repos('rhel-{0}-server-extras-rpms'.format(os_version))
 
-    run('groupadd docker', warn_only=True)
-    run('usermod -aG docker foreman')
+        run('groupadd docker', warn_only=True)
+        run('usermod -aG docker foreman')
 
-    # SElinux workaround let us use ``http://localhost:2375`` for a
-    # ``Docker`` Compute Resurce.
-    run('sed -i -e "s|^{0}=.*|{0}=\'{1}\'|" /etc/sysconfig/docker'.format(
-        'OPTIONS' if os_version >= 7 else 'other_args',
-        ' '.join([
-            '--selinux-enabled=true',
-            '--host tcp://0.0.0.0:2375',
-            '--host unix:///var/run/docker.sock',
-            '-G docker',
-        ])
-    ))
-
-    # Restart and enable ``docker`` service
-    manage_daemon('enable', 'docker')
-    manage_daemon('restart', 'docker')
+        # SElinux workaround let us use ``http://localhost:2375`` for Docker Compute Resurce.
+        run('sed -i -e "s|^OPTIONS=.*|OPTIONS=\'{0}\'|" /etc/sysconfig/docker'.format(
+            ' '.join([
+                '--selinux-enabled=true',
+                '--host tcp://0.0.0.0:2375',
+                '--host unix:///var/run/docker.sock',
+                '-G docker',
+            ])
+        ))
+        # Restart and enable ``docker`` service
+        manage_daemon('enable', 'docker')
+        manage_daemon('restart', 'docker')
 
 
 def setup_default_capsule(interface=None, run_katello_installer=True):
@@ -1723,11 +1712,10 @@ def upstream_install(admin_password=None, run_katello_installer=True, **kwargs):
     if admin_password is None:
         admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme')
 
-    enable_repos('rhel-*-server-extras-rpms', 'rhel-*-server-optional-rpms')
+    os_version = distro_info()[1]
+    if os_version == 7:
+        enable_repos('rhel-*-server-extras-rpms', 'rhel-*-server-optional-rpms')
     # Install required packages for the installation
-    epel_present = run('rpm -q epel-release', warn_only=True).return_code == 0
-    if not epel_present:
-        run('rpm -iv http://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm')
     run('yum -y install ansible git')
     run('rm -rf forklift')
     run('git clone -q https://github.com/theforeman/forklift.git')
@@ -2863,23 +2851,14 @@ def katello_installer(sat_version='7', distribution=None, scenario=None, verbose
 def manage_daemon(action, daemon, pty=True, warn_only=False):
     """Manage a system daemon
 
-    :param str action: Daemon action like start, stop, restart, info
+    :param str action: Daemon action like start, stop, restart, status, enable, disable
     :param str daemon: Daemon name to perform the action
     :param bool pty: Controls the creation of a pseudo-terminal when managing
         the daemon. Some daemons actions fail with pty=True.
     :param bool warn_only: Will be passed directly to Fabric's run
 
     """
-    if distro_info()[1] >= 7:
-        command = 'systemctl {0} {1}'.format(action, daemon)
-    else:
-        if action in ('enable', 'disable'):
-            command = 'chkconfig {0} {1}'.format(
-                daemon,
-                'on' if action == 'enable' else 'off'
-            )
-        else:
-            command = 'service {0} {1}'.format(daemon, action)
+    command = 'systemctl {0} {1}'.format(action, daemon)
     return run(command, pty=pty, warn_only=warn_only)
 
 
