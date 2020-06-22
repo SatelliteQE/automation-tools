@@ -12,7 +12,6 @@ from automation_tools import (  # noqa: F401
     configure_sonarqube,
     configure_telemetry,
     create_personal_git_repo,
-    download_manifest,
     downstream_install,
     enroll_ad,
     enroll_idm,
@@ -30,7 +29,6 @@ from automation_tools import (  # noqa: F401
     performance_tuning,
     product_install,
     remove_katello_agent,
-    relink_manifest,
     run_errata,
     set_service_check_status,
     set_yum_debug_level,
@@ -76,6 +74,12 @@ from automation_tools.baseimage import (  # noqa: F401
     deploy_baseimage,
     deploy_baseimage_by_url,
     detect_imagename,
+)
+from automation_tools.manifest import (  # noqa: F401
+    download_manifest,
+    refresh_manifest,
+    relink_manifest,
+    validate_manifest,
 )
 from automation_tools.repository import (  # noqa: F401
     create_custom_repos,
