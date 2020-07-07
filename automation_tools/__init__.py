@@ -458,23 +458,27 @@ def setup_http_proxy(proxy_info):
 
         PROXY_INFO=proxy://<hostname>:<port>
     """
+    admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme')
+
     command = (
         'hammer -u admin -p {0} settings set --name "http_proxy" --value {1}'
-    ).format(os.environ.get('ADMIN_PASSWORD', 'changeme'), proxy_info.replace('proxy:', 'http:'))
+    ).format(admin_password, proxy_info.replace('proxy:', 'http:'))
     run(command, warn_only=True)
+
     proxy_info = urlsplit(proxy_info)
     url = 'http://{0}:{1}'.format(proxy_info.hostname, proxy_info.port)
     command = (
         'hammer -u admin -p {0} http-proxy create --name {1} --url {2}'
-    ).format(os.environ.get('ADMIN_PASSWORD', 'changeme'), proxy_info.hostname, url)
+    ).format(admin_password, proxy_info.hostname, url)
     if proxy_info.username and proxy_info.password:
         creds = ' --username {0} --password {1}'.format(proxy_info.username, proxy_info.password)
         command = command + creds
     run(command, warn_only=True)
+
     command = (
         'hammer -u admin -p {0} settings set --name "content_default_http_proxy" --value {1}'
     ).format(
-        os.environ.get('ADMIN_PASSWORD', 'changeme'), proxy_info.hostname)
+        admin_password, proxy_info.hostname)
     run(command, warn_only=True)
 
 
@@ -2286,6 +2290,10 @@ def product_install(distribution, certificate_url=None, selinux_mode=None, sat_v
     execute(setup_rhv_ca)
     execute(install_expect)
     if proxy_info and version(sat_version) >= version(6.7):
+        # WORKAROUND for BZ 1852371 - Allow http proxy ports by default
+        # proxy connection is allowed only to http_cache_port_t but not squid_port_t
+        if bz_bug_is_open(1852371) and sat_version == '6.8':
+            execute(lambda: run('semanage port -m -t http_cache_port_t -p tcp 3128'))
         execute(setup_http_proxy, proxy_info)
 
 
