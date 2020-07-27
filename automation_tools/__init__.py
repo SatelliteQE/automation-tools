@@ -2193,9 +2193,7 @@ def product_install(distribution, certificate_url=None, selinux_mode=None, sat_v
         installer_options.update({'foreman-proxy-plugin-remote-execution-ssh-async-ssh': 'true'})
 
     # enable cockpit feature
-    # if version(sat_version) > version(6.6):
-    # WORKAROUND (no BZ): 6.8 presnaps are failing due to this feature, disable temporarily for 6.8
-    if (sat_version not in ('6.4', '6.5', '6.6', '6.8')):
+    if version(sat_version) > version(6.6):
         installer_options.update({'enable-foreman-plugin-remote-execution-cockpit': None})
 
     proxy_info = os.environ.get('PROXY_INFO')
