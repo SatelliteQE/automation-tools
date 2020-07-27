@@ -109,7 +109,7 @@ def get_discovery_image():
         url = os.environ.get('BASE_URL') + '/Packages/'
         soup = BeautifulSoup(urlopen(url).read())
         for link in soup.findAll('a'):
-            if 'foreman-discovery-image' in link.string:
+            if re.search(r'foreman-discovery-image-\d+', link.string):
                 discovery_image = link.string
         try:
             run("wget -O /tmp/" + discovery_image + " " + url + discovery_image)
