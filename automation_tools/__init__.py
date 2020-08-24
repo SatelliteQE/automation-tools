@@ -2176,10 +2176,6 @@ def product_install(distribution, certificate_url=None, selinux_mode=None, sat_v
     # enable ostree feature
     installer_options.update({'katello-enable-ostree': 'true'})
 
-    # enable async ssh for rex
-    if version(sat_version) > version(6.6):
-        installer_options.update({'foreman-proxy-plugin-remote-execution-ssh-async-ssh': 'true'})
-
     # enable cockpit feature
     if version(sat_version) > version(6.6):
         installer_options.update({'enable-foreman-plugin-remote-execution-cockpit': None})
