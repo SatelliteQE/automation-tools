@@ -1753,6 +1753,12 @@ def upstream_install(admin_password=None, run_katello_installer=True, **kwargs):
         enable_repos('rhel-*-server-extras-rpms', 'rhel-*-server-optional-rpms')
     # Install required packages for the installation
     run('yum -y install ansible git')
+
+    # Workaround as forklift currently doesn't support RHEL7 with SCL
+    # so we stick to old RHEL + CentOS scl-rh till new way is implemented in forklift
+    run('yum -y install http://yum.theforeman.org/releases/2.2/el7/x86_64/'
+        'centos-release-scl-rh-2-3.el7.centos.noarch.rpm')
+
     run('rm -rf forklift')
     run('git clone -q https://github.com/theforeman/forklift.git')
 
