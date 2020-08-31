@@ -16,12 +16,15 @@ def detect_imagename(os_url):
     :param str os_url: URL of OS media to detect
 
     """
-    comp_id = run('wget -q -O- {}'.format(urljoin(os_url, '../../../../COMPOSE_ID')), quiet=True)
-    if comp_id.succeeded:
-        match_comp = search(r'(\w+)-([\d\.]+)-(?:\w+-)?([\d\.]+)', comp_id)
-        image = match_comp.group(1).lower() + match_comp.group(2).replace('.', '') + '-' + \
-            match_comp.group(3) + '-base'
-    else:
+    for updirs in (4, 3):  # 4 dir ascends for RHEL, 3 ascends for CentOS
+        comp_id_path = updirs * '../' + 'COMPOSE_ID'
+        comp_id = run('wget -q -O- {}'.format(urljoin(os_url, comp_id_path)), quiet=True)
+        if comp_id.succeeded:
+            match_comp = search(r'(\w+)-([\d\.]+)-(?:\w+-)?([\d\.]+)', comp_id)
+            image = match_comp.group(1).lower() + match_comp.group(2).replace('.', '') + '-' + \
+                match_comp.group(3) + '-base'
+            break
+    if not image:
         image = 'unknown-{}-base'.format(str(time.time()).split('.')[0])
 
     print(image)
@@ -44,13 +47,18 @@ def create_baseimage(os_url, image=None, auth_keys_url=None, dns_server=None, di
         disable_ipv6 = (disable_ipv6.lower() == 'true')
 
     # Detect OS version
-    media = run('wget -q -O- {}'.format(urljoin(os_url, 'media.repo')))
+    media = run('wget -q -O- {}'.format(urljoin(os_url, 'media.repo')), warn_only=True)
     if media.succeeded:
         match_name = search(r'^name\s*=\s*(\D*)\s+([\d\.]*)', media, MULTILINE)
         if match_name:
             os_ver = match_name.group(2).split('.')[0]
         else:
             os_ver = 8
+    else:  # CentOS 7 has no media.repo
+        os_ver = 7
+
+    if os_ver > 9:  # map Fedora to RHEL8 kickstart
+        os_ver = 8
 
     if not image:
         image = detect_imagename(os_url)
