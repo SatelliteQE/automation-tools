@@ -1015,7 +1015,7 @@ def setup_foreman_discovery(sat_version):
         run('wget -nv -O- {0} | tar x --overwrite -C /var/lib/tftpboot/boot'.format(image_url))
     else:
         # Since 6.3, installer should install all required packages except FDI
-        run(package_install('foreman-discovery-image'))
+        run('yum -y --disableplugin=foreman-protector install foreman-discovery-image')
 
     # Unlock the default Locked template for discovery
     run('hammer -u admin -p {0} template update '
@@ -3018,7 +3018,7 @@ def package_install(packages, sat_version=None):
 
 def install_expect():
     # install Expect package
-    run(package_install('expect'))
+    run('yum -y --disableplugin=foreman-protector install expect')
 
 
 def setup_sendmail():
