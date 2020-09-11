@@ -704,6 +704,7 @@ def setup_capsule_firewall():
             # Subscription Management Services connection to the reverse proxy
             # for the certificate-based API
             8443,
+            5000,
         ),
         'udp': (
             # Queries to the DNS service
