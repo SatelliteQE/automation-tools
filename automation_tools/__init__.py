@@ -2235,9 +2235,7 @@ def product_install(distribution, certificate_url=None, selinux_mode=None, sat_v
     if os.environ.get('EXTERNAL_AUTH') == 'IDM':
         execute(configure_idm_external_auth)
     if os.environ.get('IDM_REALM') == 'true':
-        # WORKAROUND for BZ 1840635 which manifests only on 6.8
-        if not bz_bug_is_open(1840635) or sat_version != '6.8':
-            execute(configure_realm)
+        execute(configure_realm)
 
     if os.environ.get('EXTERNAL_AUTH') == 'AD':
         execute(enroll_ad)
@@ -2247,10 +2245,6 @@ def product_install(distribution, certificate_url=None, selinux_mode=None, sat_v
     execute(setup_rhv_ca)
     execute(install_expect)
     if proxy_info and version(sat_version) >= version(6.7):
-        # WORKAROUND for BZ 1852371 - Allow http proxy ports by default
-        # proxy connection is allowed only to http_cache_port_t but not squid_port_t
-        if bz_bug_is_open(1852371) and sat_version == '6.8':
-            execute(lambda: run('semanage port -m -t http_cache_port_t -p tcp 3128'))
         execute(setup_http_proxy, proxy_info)
 
 
