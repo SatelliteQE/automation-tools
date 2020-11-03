@@ -2156,9 +2156,15 @@ def product_install(distribution, certificate_url=None, selinux_mode=None, sat_v
 
     # enable cockpit feature
     if version(sat_version) > version(6.6):
-        # WORKAROUND https://bugzilla.redhat.com/show_bug.cgi?id=1889320 manifests only on 6.8
-        if not bz_bug_is_open(1889320) or sat_version != '6.8':
+        # WORKAROUND https://bugzilla.redhat.com/show_bug.cgi?id=1889320 manifests only on 6.8+
+        if not bz_bug_is_open(1889320) or sat_version not in ['6.8', '6.9']:
             installer_options.update({'enable-foreman-plugin-remote-execution-cockpit': None})
+
+    # WORKAROUND for 6.9 presnaps
+    if sat_version == '6.9':
+        execute(lambda: run(
+            "sed -i '/ conf_dir_mode/d' /usr/share/foreman-installer/"
+            "modules/foreman_proxy/manifests/proxydhcp.pp", warn_only=True))
 
     proxy_info = os.environ.get('PROXY_INFO')
     if proxy_info and version(sat_version) < version(6.7):
