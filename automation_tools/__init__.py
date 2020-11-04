@@ -1815,11 +1815,10 @@ def upstream_install(admin_password='changeme', run_katello_installer=True, dist
         return installer_options
 
 
-def downstream_install(sat_version='7', admin_password='changeme', run_katello_installer=True,
+def downstream_install(admin_password='changeme', run_katello_installer=True,
                        url=None, maintain_url=None):
     """Task to install Satellite from internal repo
 
-    :param str sat_version: Indicates which Satellite version is being installed
     :param str admin_password: Foreman admin password. Default: 'changeme'.
     :param bool run_katello_installer: Should the task run installer or just pass installer options
     :param str url: the repo URL where to install from
@@ -1846,10 +1845,7 @@ def downstream_install(sat_version='7', admin_password='changeme', run_katello_i
     # Install required packages for the installation
     run('yum install -y satellite')
 
-    if version(sat_version) > version(6.5):
-        installer_options = {'foreman-initial-admin-password': admin_password}
-    else:
-        installer_options = {'foreman-admin-password': admin_password}
+    installer_options = {'foreman-initial-admin-password': admin_password}
 
     if run_katello_installer:
         katello_installer(**installer_options)
@@ -1859,11 +1855,9 @@ def downstream_install(sat_version='7', admin_password='changeme', run_katello_i
         return installer_options
 
 
-def repofile_install(sat_version='7', admin_password='changeme', run_katello_installer=True,
-                     url=None):
+def repofile_install(admin_password='changeme', run_katello_installer=True, url=None):
     """Task to install Satellite via repofile from the Dogfood
 
-    :param str sat_version: Indicates which Satellite version is being installed
     :param str admin_password: Foreman admin password. Default: 'changeme'.
     :param bool run_katello_installer: Should the task run installer or just pass installer options
     :param str url: the repofile URL where to install from
@@ -1871,22 +1865,13 @@ def repofile_install(sat_version='7', admin_password='changeme', run_katello_ins
     if not url:
         raise ValueError('The url parameter is not defined')
 
-    os_version = distro_info()[1]
-
     run('yum install -y wget')
-    run('wget -O /etc/yum.repos.d/satellite6.repo {0}'.format(url))
-
-    # Enable required repository
-    run('subscription-manager repos --enable rhel-{0}-server-optional-rpms'
-        .format(os_version))
+    run('wget -O /etc/yum.repos.d/satellite.repo {0}'.format(url))
 
     # Install required packages for the installation
     run('yum install -y satellite')
 
-    if version(sat_version) > version(6.5):
-        installer_options = {'foreman-initial-admin-password': admin_password}
-    else:
-        installer_options = {'foreman-admin-password': admin_password}
+    installer_options = {'foreman-initial-admin-password': admin_password}
 
     if run_katello_installer:
         katello_installer(**installer_options)
@@ -1896,20 +1881,16 @@ def repofile_install(sat_version='7', admin_password='changeme', run_katello_ins
         return installer_options
 
 
-def ak_install(sat_version='7', admin_password='changeme', run_katello_installer=True):
+def ak_install(admin_password='changeme', run_katello_installer=True):
     """Task to install Satellite via Activation Key from the Dogfood
 
-    :param str sat_version: Indicates which Satellite version is being installed
     :param str admin_password: Foreman admin password. Default: 'changeme'.
     :param bool run_katello_installer: Should the task run installer or just pass installer options
     """
     # Install required packages for the installation
     run('yum install -y satellite')
 
-    if version(sat_version) > version(6.5):
-        installer_options = {'foreman-initial-admin-password': admin_password}
-    else:
-        installer_options = {'foreman-admin-password': admin_password}
+    installer_options = {'foreman-initial-admin-password': admin_password}
 
     if run_katello_installer:
         katello_installer(**installer_options)
@@ -1919,20 +1900,16 @@ def ak_install(sat_version='7', admin_password='changeme', run_katello_installer
         return installer_options
 
 
-def cdn_install(sat_version='7', admin_password='changeme', run_katello_installer=True):
+def cdn_install(admin_password='changeme', run_katello_installer=True):
     """Task to install Satellite from CDN.
 
-    :param sat_version: Indicates which satellite version is being installed
     :param str admin_password: Foreman admin password. Default: 'changeme'.
     :param bool run_katello_installer: Should the task run installer or just pass installer options
     """
     # Install required packages for the installation
     run('yum install -y satellite')
 
-    if version(sat_version) > version(6.5):
-        installer_options = {'foreman-initial-admin-password': admin_password}
-    else:
-        installer_options = {'foreman-admin-password': admin_password}
+    installer_options = {'foreman-initial-admin-password': admin_password}
 
     if run_katello_installer:
         katello_installer(**installer_options)
@@ -1942,11 +1919,10 @@ def cdn_install(sat_version='7', admin_password='changeme', run_katello_installe
         return installer_options
 
 
-def iso_install(sat_version='7', admin_password='changeme', run_katello_installer=True,
+def iso_install(admin_password='changeme', run_katello_installer=True,
                 check_gpg_signatures=False, url=None):
     """Installs Satellite from an ISO image.
 
-    :param str sat_version: Indicates which Satellite version is being installed
     :param str admin_password: Foreman admin password. Default: 'changeme'.
     :param bool run_katello_installer: Should the task run installer or just pass installer options
     :param bool check_gpg_signatures : Whether to check rpm gpg signatures or not
@@ -1966,10 +1942,7 @@ def iso_install(sat_version='7', admin_password='changeme', run_katello_installe
         else:
             run('./install_packages --nogpgsigs')
 
-    if version(sat_version) > version(6.5):
-        installer_options = {'foreman-initial-admin-password': admin_password}
-    else:
-        installer_options = {'foreman-admin-password': admin_password}
+    installer_options = {'foreman-initial-admin-password': admin_password}
 
     if run_katello_installer:
         katello_installer(**installer_options)
@@ -2042,8 +2015,6 @@ def product_install(distribution, certificate_url=None, selinux_mode=None, sat_v
     }
     if distribution in ('upstream', 'koji'):
         task_params.update({'distribution': distribution})
-    else:
-        task_params.update({'sat_version': sat_version})
 
     if distribution == 'repofile':
         url = os.environ.get('REPO_FILE_URL')
@@ -2078,8 +2049,8 @@ def product_install(distribution, certificate_url=None, selinux_mode=None, sat_v
         raise ValueError('distribution "{0}" is not one of {1}'.format(
             distribution, ', '.join(distributions)))
 
-    if distribution == 'cdn' and sat_version not in ('6.5', '6.6', '6.7', '6.8'):
-        raise ValueError("CDN Satellite version is not one of [6.5, 6.6, 6.7, 6.8]")
+    if distribution == 'cdn' and sat_version not in ('6.6', '6.7', '6.8'):
+        raise ValueError("CDN Satellite version is not one of [6.6, 6.7, 6.8]")
 
     # if host already exists still fix hostname
     execute(fix_hostname)
@@ -2972,10 +2943,7 @@ def configure_telemetry(http_server=None):
 
 
 def package_install(packages, sat_version=None):
-    # Fetch the Satellite Version information.
-    sat_version = sat_version or os.environ.get('SATELLITE_VERSION')
-    if (version(sat_version) > version(6.5) and
-       run('which foreman-maintain', warn_only=True).succeeded):
+    if run('which foreman-maintain', warn_only=True).succeeded:
         command = 'foreman-maintain packages install -y {}'.format(packages)
     else:
         command = 'yum -y install {}'.format(packages)
