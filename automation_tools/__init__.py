@@ -2075,8 +2075,8 @@ def product_install(distribution, certificate_url=None, selinux_mode=None, sat_v
         raise ValueError('distribution "{0}" is not one of {1}'.format(
             distribution, ', '.join(distributions)))
 
-    if distribution == 'cdn' and sat_version not in ('6.4', '6.5', '6.6', '6.7'):
-        raise ValueError("CDN Satellite version is not one of [6.4, 6.5, 6.6, 6.7]")
+    if distribution == 'cdn' and sat_version not in ('6.5', '6.6', '6.7', '6.8'):
+        raise ValueError("CDN Satellite version is not one of [6.5, 6.6, 6.7, 6.8]")
 
     # if host already exists still fix hostname
     execute(fix_hostname)
@@ -2193,8 +2193,7 @@ def product_install(distribution, certificate_url=None, selinux_mode=None, sat_v
     execute(run_command, os.environ.get('FIX_POSTINSTALL'))
 
     # Temporary workaround to solve pulp message bus connection issue
-    if version(sat_version) > version(6.4):
-        execute(set_service_check_status)
+    execute(set_service_check_status)
 
     certificate_url = certificate_url or os.environ.get('FAKE_MANIFEST_CERT_URL')
     if certificate_url:
@@ -2217,8 +2216,7 @@ def product_install(distribution, certificate_url=None, selinux_mode=None, sat_v
     # Please see #1387179 for more info.
     execute(setup_foreman_discovery, sat_version=sat_version, admin_password=admin_password)
     execute(setup_default_subnet)
-    if version(sat_version) > version(6.4):
-        execute(setup_bfa_prevention)
+    execute(setup_bfa_prevention)
     execute(fix_qdrouterd_listen_to_ipv6)
 
     if os.environ.get('PYTHON_CODE_COVERAGE') == 'true':
