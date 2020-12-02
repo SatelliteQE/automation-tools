@@ -2165,12 +2165,6 @@ def product_install(distribution, certificate_url=None, selinux_mode=None, sat_v
         ):
             installer_options.update({'enable-foreman-plugin-remote-execution-cockpit': None})
 
-    # WORKAROUND for 6.9 presnaps
-    if sat_version == '6.9':
-        execute(lambda: run(
-            "sed -i '/ conf_dir_mode/d' /usr/share/foreman-installer/"
-            "modules/foreman_proxy/manifests/proxydhcp.pp", warn_only=True))
-
     proxy_info = os.environ.get('PROXY_INFO')
     if proxy_info and version(sat_version) < version(6.7):
         # execute returns a dictionary mapping host strings to the given
