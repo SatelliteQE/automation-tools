@@ -2150,14 +2150,7 @@ def product_install(distribution, certificate_url=None, selinux_mode=None, sat_v
 
     # enable cockpit feature
     if version(sat_version) > version(6.6):
-        # WORKAROUND https://bugzilla.redhat.com/show_bug.cgi?id=1889320 tracks 6.9
-        # WORKAROUND https://bugzilla.redhat.com/show_bug.cgi?id=1890923 tracks 6.8
-        # Installer fails when rex cockpit is enabled
-        if (
-            (not bz_bug_is_open(1889320) or sat_version != '6.9') and
-            (not bz_bug_is_open(1890923) or sat_version != '6.8')
-        ):
-            installer_options.update({'enable-foreman-plugin-remote-execution-cockpit': None})
+        installer_options.update({'enable-foreman-plugin-remote-execution-cockpit': None})
 
     proxy_info = os.environ.get('PROXY_INFO')
     if proxy_info and version(sat_version) < version(6.7):
