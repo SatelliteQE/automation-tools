@@ -772,9 +772,6 @@ def setup_abrt():
 def setup_python_code_coverage():
     """Task to setup python code coverage on Satellite 6."""
     os_version = distro_info()[1]
-    # This has to be inside the function so that it runs actually on Sat6.
-    if os_version == 6:
-        return
 
     run('mkdir -p /etc/coverage')
     coveragerc_file = StringIO()
@@ -815,7 +812,7 @@ def setup_python_code_coverage():
             remote_path='/usr/lib/python2.7/site-packages/sitecustomize.py')
     sitecustomize_file.close()
 
-    run('easy_install pip')
+    run('easy_install "pip<21"')  # preserve pip python2 compatibility
     run('pip install -U coverage')
     run('chcon -R -u system_u -t httpd_sys_rw_content_t /etc/coverage')
     run('chmod -R 777 /etc/coverage ; chown -R apache.apache /etc/coverage')
@@ -825,9 +822,6 @@ def setup_ruby_code_coverage():
     """Task to setup ruby code coverage on Satellite 6."""
 
     os_version = distro_info()[1]
-    # This has to be inside the function so that it runs actually on Sat6.
-    if os_version == 6:
-        return
 
     # Install ruby-devel package from the rhel optional installation
     # Enable required repository
