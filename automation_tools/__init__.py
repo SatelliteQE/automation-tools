@@ -179,9 +179,11 @@ def setup_ddns(entry_domain, host_ip):
         sys.exit(1)
 
     os_version = distro_info()[1]
-
+     
     target, domain = entry_domain.split('.', 1)
-
+    
+    import time 
+    time.sleep(1800)
     if os_version >= 7:
         internal_cert_url = os.environ.get('internal_cert_url')
         if internal_cert_url is None:
@@ -189,7 +191,7 @@ def setup_ddns(entry_domain, host_ip):
             sys.exit(1)
 
         run('yum localinstall -y {0}'.format(internal_cert_url))
-
+    
     run('yum localinstall -y {0}'.format(ddns_package_url))
 
     if os_version >= 7:
