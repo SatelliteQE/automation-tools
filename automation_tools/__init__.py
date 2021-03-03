@@ -172,7 +172,7 @@ def setup_ddns(entry_domain, host_ip):
     if ddns_hash is None:
         print('The DDNS_HASH environment variable should be defined')
         sys.exit(1)
-
+    execute(subscribe, host=host_ip)
     ddns_package_url = os.environ.get('DDNS_PACKAGE_URL')
     if ddns_package_url is None:
         print('The DDNS_PACKAGE_URL environment variable should be defined')
