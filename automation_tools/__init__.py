@@ -172,38 +172,47 @@ def setup_ddns(entry_domain, host_ip):
     if ddns_hash is None:
         print('The DDNS_HASH environment variable should be defined')
         sys.exit(1)
-    execute(subscribe, host=host_ip)
-    ddns_package_url = os.environ.get('DDNS_PACKAGE_URL')
-    if ddns_package_url is None:
-        print('The DDNS_PACKAGE_URL environment variable should be defined')
-        sys.exit(1)
-
-    os_version = distro_info()[1]
-
-    target, domain = entry_domain.split('.', 1)
-
-    if os_version >= 7:
-        internal_cert_url = os.environ.get('internal_cert_url')
-        if internal_cert_url is None:
-            print('The internal_cert_url environment variable should be defined')
+    # subscribed, because ddns pacakge requires java
+    try:
+        execute(subscribe, host=host_ip)
+        ddns_package_url = os.environ.get('DDNS_PACKAGE_URL')
+        if ddns_package_url is None:
+            print('The DDNS_PACKAGE_URL environment variable should be defined')
             sys.exit(1)
 
-        run('yum localinstall -y {0}'.format(internal_cert_url))
+        os_version = distro_info()[1]
 
-    run('yum localinstall -y {0}'.format(ddns_package_url))
+        target, domain = entry_domain.split('.', 1)
 
-    if os_version >= 7:
-        run('echo "{0} {1} {2}" >> /etc/redhat-internal-ddns/hosts'.format(
-            target, domain, ddns_hash))
-        fix_hostname(entry_domain, host_ip)
-        run('redhat-internal-ddns-client.sh enable')
-        run('redhat-internal-ddns-client.sh update')
-    else:
-        run('echo "{0} {1} {2}" >> /etc/redhat-ddns/hosts'.format(
-            target, domain, ddns_hash))
-        fix_hostname(entry_domain, host_ip)
-        run('redhat-ddns-client enable')
-        run('redhat-ddns-client')
+        if os_version >= 7:
+            internal_cert_url = os.environ.get('internal_cert_url')
+            if internal_cert_url is None:
+                print('The internal_cert_url environment variable should be defined')
+                sys.exit(1)
+
+            run('yum localinstall -y {0}'.format(internal_cert_url))
+
+        run('yum localinstall -y {0}'.format(ddns_package_url))
+
+        if os_version >= 7:
+            run('echo "{0} {1} {2}" >> /etc/redhat-internal-ddns/hosts'.format(
+                target, domain, ddns_hash))
+            fix_hostname(entry_domain, host_ip)
+            run('redhat-internal-ddns-client.sh enable')
+            run('redhat-internal-ddns-client.sh update')
+        else:
+            run('echo "{0} {1} {2}" >> /etc/redhat-ddns/hosts'.format(
+                target, domain, ddns_hash))
+            fix_hostname(entry_domain, host_ip)
+            run('redhat-ddns-client enable')
+            run('redhat-ddns-client')
+        # unsubscribe and removed java as it will conflict satellite installation
+    except Exception as error:
+        print("An exception occurred: ", error)
+        raise Exception("Failed to setup ddns client")
+    finally:
+        unsubscribe()
+        run('yum remove -y java*')
 
 
 def setup_proxy(run_katello_installer=True):
