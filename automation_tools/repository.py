@@ -188,11 +188,7 @@ def disable_beaker_repos(**kwargs):
 
     """
     # Clean up system if Beaker-based
-    result = run('which yum-config-manager', quiet=True)
-    if result.succeeded:
-        run('yum-config-manager --disable "beaker*"', warn_only=True)
-    else:
-        run('sed -i "s/^enabled=.*/enabled=0/" /etc/yum.repos.d/beaker-*.repo', warn_only=True)
+    run('sed -i "s/^enabled=.*/enabled=0/" /etc/yum.repos.d/beaker-[^t]*.repo', warn_only=True)
     run('rm -rf /var/cache/yum*')
 
 
