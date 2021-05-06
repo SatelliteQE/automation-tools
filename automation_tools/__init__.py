@@ -821,7 +821,11 @@ def setup_python_code_coverage():
             remote_path='/usr/lib/python2.7/site-packages/sitecustomize.py')
     sitecustomize_file.close()
 
-    run('easy_install "pip<21"')  # preserve pip python2 compatibility
+    # install python2 compatible pip (pip<21)
+    # easy_install is obsoleted and stopped working - use wget to work around failing download
+    run('wget -nv https://files.pythonhosted.org/packages/'
+        '53/7f/55721ad0501a9076dbc354cc8c63ffc2d6f1ef360f49ad0fbcce19d68538/pip-20.3.4.tar.gz')
+    run('easy_install pip-20.3.4.tar.gz')
     run('pip install -U coverage')
     run('chcon -R -u system_u -t httpd_sys_rw_content_t /etc/coverage')
     run('chmod -R 777 /etc/coverage ; chown -R apache.apache /etc/coverage')
