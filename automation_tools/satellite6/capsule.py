@@ -14,7 +14,6 @@ from automation_tools.satellite6.hammer import (
     hammer_repository_synchronize,
     set_hammer_config
 )
-from robozilla.decorators import bz_bug_is_open
 
 
 class ImproperlyConfigured(Exception):
