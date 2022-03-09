@@ -202,11 +202,7 @@ def generate_capsule_certs(capsule_hostname, force=False):
     :param bool force: Force creation of the capsule cert even if it is
         already created.
     """
-    if bz_bug_is_open(1466688):
-        # Absolute path bug
-        cert_path = '~/{0}-certs.tar'.format(capsule_hostname)
-    else:
-        cert_path = '{0}-certs.tar'.format(capsule_hostname)
+    cert_path = '{0}-certs.tar'.format(capsule_hostname)
     result = run('[ -f {0} ]'.format(cert_path), quiet=True)
     if result.failed or force:
         run('capsule-certs-generate -v --foreman-proxy-fqdn {0} '
