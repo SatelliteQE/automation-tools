@@ -14,7 +14,8 @@ BZ_OPEN_STATUSES = [
     'NEW',
     'ASSIGNED',
     'POST',
-    'MODIFIED'
+    'MODIFIED',
+    'ON_DEV'
 ]
 BUGZILLA_URL = "https://bugzilla.redhat.com/xmlrpc.cgi"
 LOGGER = logging.getLogger(__name__)
@@ -158,7 +159,7 @@ def bz_bug_is_open(bug_id, upstream=False):
     elif (upstream and
           bug.whiteboard and 'verified in upstream' in bug.whiteboard.lower()):
         return False
-    # NEW, ASSIGNED, MODIFIED, POST
+    # NEW, ASSIGNED, MODIFIED, POST, ON_DEV
     return True
 
 
