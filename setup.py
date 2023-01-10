@@ -30,7 +30,7 @@ setup(
     include_package_data=True,
     install_requires=[
         'beautifulsoup4',
-        'Fabric3',
+        'Fabric<2',
         'lxml',
         'pycurl',
         'pytest',
